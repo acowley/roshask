@@ -1,0 +1,38 @@
+Name:                roshask
+Version:             0.1
+Synopsis:            Haskell support for ROS.
+-- A longer description of the package.
+-- Description:         
+
+
+License:             BSD3
+License-file:        LICENSE
+Cabal-version:       >=1.2
+Author:              Anthony Cowley
+Maintainer:          acowley@seas.upenn.edu
+
+-- A copyright notice.
+-- Copyright:           
+
+Category:            Robotics
+Build-type:          Simple
+
+-- Extra files to be distributed with the package, such as examples or
+-- a README.
+-- Extra-source-files:  
+
+Library
+  -- Modules exported by the library.
+  Exposed-modules:     ROSTypes
+  
+  -- Packages needed in order to build this package.
+  Build-depends:       base >= 4,
+                       containers,
+                       haxr == 3000.*
+  
+  -- Modules not exported by this package.
+  -- Other-modules:       
+  
+  -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
+  -- Build-tools:         
+  
