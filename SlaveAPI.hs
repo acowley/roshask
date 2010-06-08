@@ -121,10 +121,8 @@ requestTopic :: RosSlave a => a -> CallerID -> TopicName -> [[Value]] ->
 requestTopic n _ topic protocols = return (1, "", toValue protocolInfo)
     where protocolInfo = ("TCPROS", getTopicPortTCP n topic)
 
---slaveRPC :: (RosSlave a) => a -> QSem -> String -> String
---slaveRPC n = (unsafePerformIO .) . handleCall . dispatch
-slaveRPC :: (RosSlave a) => a -> QSem -> String -> Snap String
-slaveRPC n = (liftIO .) . handleCall . dispatch
+slaveRPC :: (RosSlave a) => a -> QSem -> String -> IO String
+slaveRPC n = handleCall . dispatch
     where dispatch q = methods [ ("getBusStats", fun (getBusStats n))
                                , ("getBusInfo", fun (getBusInfo n))
                                , ("getMasterUri", fun (getMaster' n))
@@ -148,7 +146,7 @@ runSlave n = do quitNow <- newQSem 0
                 killThread t
     where rpc f = do body <- BL.foldr ((:) . toEnum . fromEnum) [] <$> 
                              getRequestBody
-                     response <- f body
+                     response <- liftIO $ f body
                      writeBS $ B.pack (map (toEnum . fromEnum) response)
 
 
