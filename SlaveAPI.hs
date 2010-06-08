@@ -1,18 +1,23 @@
+{-# LANGUAGE PackageImports #-}
 module SlaveAPI (RosSlave(..), runSlave) where
 import Control.Applicative
 import Control.Arrow (second)
 import Control.Concurrent (killThread, forkIO)
 import Control.Concurrent.QSem
 import Control.Monad
-import Control.Monad.Error (throwError)
---import Network.Fancy
-import Network.HTTP.Server
+import "mtl" Control.Monad.Error (throwError)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import Snap.Http.Server
+import Snap.Types
 import Network.Socket (recv)
 import Network.XmlRpc.Internals
 import Network.XmlRpc.Server
 import System.IO (hGetContents, hPutStr, hClose)
 import System.Posix.Process (getProcessID)
 import ROSTypes
+
+import System.IO.Unsafe
 
 class RosSlave a where
     getMaster :: a -> URI
@@ -117,17 +122,8 @@ requestTopic :: RosSlave a => a -> CallerID -> TopicName -> [[Value]] ->
 requestTopic n _ topic protocols = return (1, "", toValue protocolInfo)
     where protocolInfo = ("TCPROS", getTopicPortTCP n topic)
 
-runSlave :: RosSlave a => a -> IO ()
-runSlave n = do quitNow <- newQSem 0
-                let handleRequest = handleCall (dispatch quitNow)
---                     http h _ = hGetContents h >>= handleRequest >>= hPutStr h
---                     spec = serverSpec { address = IPv4 "" 9932 }
---                 threads <- streamServer spec http
-                --sock <- listenOn (PortNumber (fromIntegral 9932)) 
-                --thread <- forkIO (acceptClients sock handleRequest)
-                waitQSem quitNow
-                --killThread thread
-                sClose sock
+slaveRPC :: (RosSlave a) => a -> QSem -> String -> String
+slaveRPC n = (unsafePerformIO .) . handleCall . dispatch
     where dispatch q = methods [ ("getBusStats", fun (getBusStats n))
                                , ("getBusInfo", fun (getBusInfo n))
                                , ("getMasterUri", fun (getMaster' n))
@@ -138,12 +134,19 @@ runSlave n = do quitNow <- newQSem 0
                                , ("paramUpdate", fun (paramUpdate' n))
                                , ("publisherUpdate", fun (pubUpdate n))
                                , ("requestTopic", fun (requestTopic n)) ]
---           acceptClients s rpc = do (h, _, _) <- accept s
---                                    request <- hGetContents h
---                                    putStrLn $ "Got request "++request
---                                    response <- rpc request
---                                    putStrLn $ "Sending reponse "++response
---                                    hPutStr h response
---                                    hClose h
---                                    acceptClients s rpc
+
+simpleServe :: Int -> Snap () -> IO ()
+simpleServe port handler = httpServe (pack "*") port (pack "myserver")
+                                     Nothing Nothing handler
+    where pack = B.pack . map (toEnum . fromEnum)
+
+runSlave :: RosSlave a => a -> IO ()
+runSlave n = do quitNow <- newQSem 0
+                t <- forkIO $ simpleServe 9131 (rpc (slaveRPC n quitNow))
+                waitQSem quitNow
+                killThread t
+    where rpc f = do body <- BL.foldr ((:) . toEnum . fromEnum) [] <$> 
+                             getRequestBody
+                     writeBS $ B.pack (map (toEnum . fromEnum) (f body))
+
 
