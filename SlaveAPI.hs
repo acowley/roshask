@@ -16,6 +16,7 @@ import Network.XmlRpc.Internals
 import Network.XmlRpc.Server
 import System.IO (hGetContents, hPutStr, hClose)
 import System.Posix.Process (getProcessID)
+import XmlRpcTuples
 import ROSTypes
 
 class RosSlave a where
@@ -29,39 +30,6 @@ class RosSlave a where
 type MessageData = String
 type PublishStatsX = (TopicName, MessageData, [(Int, Int, Int, Bool)])
 type RpcResult a = IO (Int, String, a)
-
-instance (XmlRpcType a, XmlRpcType b, XmlRpcType c, XmlRpcType d, 
-          XmlRpcType e) => 
-         XmlRpcType (a,b,c,d,e) where
-    toValue (v,w,x,y,z) = 
-        ValueArray [toValue v, toValue w, toValue x, toValue y, toValue z]
-    fromValue (ValueArray [v,w,x,y,z]) = 
-        liftM5 (,,,,) (fromValue v) (fromValue w) (fromValue x) 
-                      (fromValue y) (fromValue z) 
-    fromValue _ = throwError "Expected 5-element tuple!"
-    getType _ = TArray
-
-
-instance (XmlRpcType a, XmlRpcType b, XmlRpcType c, XmlRpcType d) => 
-         XmlRpcType (a,b,c,d) where
-    toValue (w,x,y,z) = ValueArray [toValue w, toValue x, toValue y, toValue z]
-    fromValue (ValueArray [w,x,y,z]) = 
-        liftM4 (,,,) (fromValue w) (fromValue x) (fromValue y) (fromValue z)
-    fromValue _ = throwError "Expected 4-element tuple!"
-    getType _ = TArray
-
-instance (XmlRpcType a, XmlRpcType b, XmlRpcType c) => XmlRpcType (a,b,c) where
-    toValue (x,y,z) = ValueArray [toValue x, toValue y, toValue z]
-    fromValue (ValueArray [x,y,z]) = 
-        liftM3 (,,) (fromValue x) (fromValue y) (fromValue z)
-    fromValue _ = throwError "Expected 3-element tuple!"
-    getType _ = TArray
-
-instance (XmlRpcType a, XmlRpcType b) => XmlRpcType (a,b) where
-    toValue (x,y) = ValueArray [toValue x, toValue y]
-    fromValue (ValueArray [x,y]) = liftM2 (,) (fromValue x) (fromValue y)
-    fromValue _ = throwError "Expected 2-element tuple."
-    getType _ = TArray
 
 mkPublishStats :: (TopicName, a, [PubStats]) -> PublishStatsX
 mkPublishStats (n, _, pstats) = (n, "", map formatStats pstats)
@@ -148,5 +116,3 @@ runSlave n = do quitNow <- newQSem 0
                              getRequestBody
                      response <- liftIO $ f body
                      writeBS $ B.pack (map (toEnum . fromEnum) response)
-
-
