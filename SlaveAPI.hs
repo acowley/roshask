@@ -2,18 +2,17 @@
 module SlaveAPI (RosSlave(..), runSlave) where
 import Control.Applicative
 import Control.Arrow (second)
-import Control.Concurrent (killThread, forkIO)
+import Control.Concurrent (killThread, forkIO, threadDelay)
 import Control.Concurrent.QSem
-import Control.Monad
 import "mtl" Control.Monad.Error (throwError)
-import "monads-fd" Control.Monad.Trans
+import "monads-fd" Control.Monad.Trans (liftIO)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
-import Snap.Http.Server
-import Snap.Types
+import Snap.Http.Server (httpServe)
+import Snap.Types (Snap, getRequestBody, writeBS)
 import Network.Socket (recv)
-import Network.XmlRpc.Internals
-import Network.XmlRpc.Server
+import Network.XmlRpc.Internals (Value, toValue)
+import Network.XmlRpc.Server (handleCall, methods, fun)
 import System.IO (hGetContents, hPutStr, hClose)
 import System.Posix.Process (getProcessID)
 import XmlRpcTuples
@@ -28,10 +27,10 @@ class RosSlave a where
     stopNode :: a -> IO ()
 
 type MessageData = String
-type PublishStatsX = (TopicName, MessageData, [(Int, Int, Int, Bool)])
 type RpcResult a = IO (Int, String, a)
 
-mkPublishStats :: (TopicName, a, [PubStats]) -> PublishStatsX
+mkPublishStats :: (TopicName, a, [PubStats]) -> 
+                  (TopicName, MessageData, [(Int, Int, Int, Bool)])
 mkPublishStats (n, _, pstats) = (n, "", map formatStats pstats)
     where formatStats (PubStats bytesSent numSent _ conn) = 
               (0, bytesSent, numSent, conn)
@@ -89,6 +88,10 @@ requestTopic :: RosSlave a => a -> CallerID -> TopicName -> [[Value]] ->
 requestTopic n _ topic protocols = return (1, "", toValue protocolInfo)
     where protocolInfo = ("TCPROS", getTopicPortTCP n topic)
 
+-- Dispatch an XML-RPC request body and return the response. The first
+-- parameter is a value that provides the necessary reflective API as
+-- to ROS Node state. The second parameter is a semaphore indicating
+-- that the node should terminate.
 slaveRPC :: (RosSlave a) => a -> QSem -> String -> IO String
 slaveRPC n = handleCall . dispatch
     where dispatch q = methods [ ("getBusStats", fun (getBusStats n))
@@ -102,15 +105,19 @@ slaveRPC n = handleCall . dispatch
                                , ("publisherUpdate", fun (pubUpdate n))
                                , ("requestTopic", fun (requestTopic n)) ]
 
+-- Start a Snap webserver on the specified port with the specified
+-- handler.
 simpleServe :: Int -> Snap () -> IO ()
 simpleServe port handler = httpServe (pack "*") port (pack "myserver")
                                      Nothing Nothing handler
     where pack = B.pack . map (toEnum . fromEnum)
 
+-- |Run a ROS slave node until it receives a shutdown command.
 runSlave :: RosSlave a => a -> IO ()
 runSlave n = do quitNow <- newQSem 0
                 t <- forkIO $ simpleServe 9131 (rpc (slaveRPC n quitNow))
                 waitQSem quitNow
+                threadDelay 1000000 -- Wait a second for the response to flush
                 killThread t
     where rpc f = do body <- BL.foldr ((:) . toEnum . fromEnum) [] <$> 
                              getRequestBody
