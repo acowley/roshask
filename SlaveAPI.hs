@@ -6,6 +6,7 @@ import Control.Concurrent (killThread, forkIO)
 import Control.Concurrent.QSem
 import Control.Monad
 import "mtl" Control.Monad.Error (throwError)
+import "monads-fd" Control.Monad.Trans
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Snap.Http.Server
@@ -16,8 +17,6 @@ import Network.XmlRpc.Server
 import System.IO (hGetContents, hPutStr, hClose)
 import System.Posix.Process (getProcessID)
 import ROSTypes
-
-import System.IO.Unsafe
 
 class RosSlave a where
     getMaster :: a -> URI
@@ -122,8 +121,10 @@ requestTopic :: RosSlave a => a -> CallerID -> TopicName -> [[Value]] ->
 requestTopic n _ topic protocols = return (1, "", toValue protocolInfo)
     where protocolInfo = ("TCPROS", getTopicPortTCP n topic)
 
-slaveRPC :: (RosSlave a) => a -> QSem -> String -> String
-slaveRPC n = (unsafePerformIO .) . handleCall . dispatch
+--slaveRPC :: (RosSlave a) => a -> QSem -> String -> String
+--slaveRPC n = (unsafePerformIO .) . handleCall . dispatch
+slaveRPC :: (RosSlave a) => a -> QSem -> String -> Snap String
+slaveRPC n = (liftIO .) . handleCall . dispatch
     where dispatch q = methods [ ("getBusStats", fun (getBusStats n))
                                , ("getBusInfo", fun (getBusInfo n))
                                , ("getMasterUri", fun (getMaster' n))
@@ -147,6 +148,7 @@ runSlave n = do quitNow <- newQSem 0
                 killThread t
     where rpc f = do body <- BL.foldr ((:) . toEnum . fromEnum) [] <$> 
                              getRequestBody
-                     writeBS $ B.pack (map (toEnum . fromEnum) (f body))
+                     response <- f body
+                     writeBS $ B.pack (map (toEnum . fromEnum) response)
 
 
