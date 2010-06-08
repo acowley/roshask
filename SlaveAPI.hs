@@ -1,16 +1,13 @@
 {-# LANGUAGE PackageImports #-}
 module SlaveAPI (RosSlave(..), runSlave) where
 import Control.Applicative
-import Control.Arrow (second)
 import Control.Concurrent (killThread, forkIO, threadDelay)
 import Control.Concurrent.QSem
-import "mtl" Control.Monad.Error (throwError)
 import "monads-fd" Control.Monad.Trans (liftIO)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Snap.Http.Server (httpServe)
 import Snap.Types (Snap, getRequestBody, writeBS)
-import Network.Socket (recv)
 import Network.XmlRpc.Internals (Value, toValue)
 import Network.XmlRpc.Server (handleCall, methods, fun)
 import System.IO (hGetContents, hPutStr, hClose)
