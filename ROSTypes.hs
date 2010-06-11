@@ -23,6 +23,7 @@ instance Applicative Stream where
     (Stream f fs) <*> (Stream x xs) = Stream (f x) (fs <*> xs)
 
 data SubStats = SubStats { bytesReceived  :: Int
+                         , subDestination :: URI
                          , subConnected   :: Bool }
 
 data PubStats = PubStats { bytesSent      :: Int

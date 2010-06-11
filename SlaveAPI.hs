@@ -5,6 +5,8 @@ import Control.Concurrent (killThread, forkIO, threadDelay)
 import Control.Concurrent.QSem
 import "monads-fd" Control.Monad.Trans (liftIO)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.UTF8 as BU
+import qualified Data.ByteString.Lazy.UTF8 as BLU
 import qualified Data.ByteString.Lazy as BL
 import Snap.Http.Server (httpServe)
 import Snap.Types (Snap, getRequestBody, writeBS)
@@ -107,7 +109,8 @@ slaveRPC n = handleCall . dispatch
 simpleServe :: Int -> Snap () -> IO ()
 simpleServe port handler = httpServe (pack "*") port (pack "myserver")
                                      Nothing Nothing handler
-    where pack = B.pack . map (toEnum . fromEnum)
+    where pack = BU.fromString
+
 
 -- |Run a ROS slave node until it receives a shutdown command.
 runSlave :: RosSlave a => a -> IO ()
@@ -116,7 +119,6 @@ runSlave n = do quitNow <- newQSem 0
                 waitQSem quitNow
                 threadDelay 1000000 -- Wait a second for the response to flush
                 killThread t
-    where rpc f = do body <- BL.foldr ((:) . toEnum . fromEnum) [] <$> 
-                             getRequestBody
+    where rpc f = do body <- BLU.toString <$> getRequestBody
                      response <- liftIO $ f body
-                     writeBS $ B.pack (map (toEnum . fromEnum) response)
+                     writeBS $ BU.fromString response
