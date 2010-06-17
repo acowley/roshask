@@ -21,7 +21,8 @@ data Subscription = Subscription { knownPubs :: Set URI
 
 data Publication = Publication { subscribers :: Set URI
                                , pubType     :: TypeRep
-                               , pubStats    :: TVar PubStats
+                               , pubPort     :: Int
+                               , pubStats    :: TVar (Map URI PubStats)
                                , pubThread   :: ThreadId }
 
 data NodeState = NodeState { nodeName      :: String
@@ -40,12 +41,19 @@ mkSub :: forall a. (Typeable a, Binary a) => IO (Stream a, Subscription)
 mkSub = do c <- newChan
            stats <- newTVarIO M.empty
            stream <- list2stream <$> getChanContents c
-           let sub = Subscription (S.empty)
+           let sub = Subscription S.empty
                                   (addSource c)
                                   (typeOf (undefined::a))
                                   stats
            return (stream, sub)
     where list2stream (x:xs) = Stream x (list2stream xs)
+
+-- This isn't done yet. I think the publisher needs to run a server
+-- client's can connect to.
+mkPub :: forall a. (Typeable a, Binary a) => Stream a -> IO Publication
+mkPub s = do t <- forkIO undefined
+             stats <- newTVarIO M.empty
+             return $ Publication S.empty (typeOf (undefined::a)) stats t
 
 newtype Node a = Node { unNode :: StateT NodeState IO a }
 
@@ -70,15 +78,21 @@ subscribe name = do n <- get
                                return stream
 
 advertise :: (Typeable a, Binary a) => TopicName -> Stream a -> Node ()
-advertise name stream = return ()
+advertise name stream = do pubs <- publications <$> get
+                           if M.member name pubs 
+                             then error $ "Already advertised "++name
+                             else put n { publications = M.insert name 
 
 -- | A filtered stream.
 fooBar :: (Num a, Ord a) => Stream a -> Stream a
 fooBar (Stream x xs) = if x < 2 then fooBar xs else Stream x (fooBar xs)
-          
 
-mkPub :: Typeable a => Stream a -> Publication
-mkPub gen = undefined
+mkPub :: Typeable a => TopicName -> Stream a -> Publication
+mkPub gen = do n <- get
+               let pubs = publications n
+
+runNode :: Node a -> IO ()
+runNode = 
 
 runNode :: NodeName -> 
            [(TopicName, Subscription)] -> 

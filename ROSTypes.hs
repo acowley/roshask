@@ -28,7 +28,6 @@ data SubStats = SubStats { bytesReceived  :: Int
 
 data PubStats = PubStats { bytesSent      :: Int
                          , numSent        :: Int
-                         , pubDestination :: URI
                          , pubConnected   :: Bool }
 
 
