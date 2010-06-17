@@ -6,6 +6,7 @@ import Data.Binary (Binary)
 import Data.Binary.Get
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as B
+import qualified Data.ByteString.Lazy.Char8 as BC8
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VM
@@ -77,6 +78,8 @@ buildVector n bs g =
                                    in VM.unsafeWrite m i x >> go (i+1) t
        go 0 bs
 
+getInt = unsafeCoerce <$> getWord32host
+
 -- Build Vectors by reading in the number of elements and then the
 -- elements themselves. The vector is only returned when all data is
 -- available.
@@ -87,7 +90,6 @@ instance forall a. (V.Unbox a, Storable a) => BinaryIter (V.Vector a) where
                       in getCount (runGet getInt h) t
         where sz = sizeOf (undefined::a)
               get' = unsafeGet sz
-              getInt = unsafeCoerce <$> getWord32host
               getCount n bs = 
                   let len = fromIntegral $ B.length bs
                   in if len < n * sz
@@ -95,4 +97,15 @@ instance forall a. (V.Unbox a, Storable a) => BinaryIter (V.Vector a) where
                      else let (h,t) = B.splitAt (fromIntegral (n*sz)) bs
                               v = buildVector n h get'
                           in Emit v (consume t)
+
+instance BinaryIter BC8.ByteString where
+    consume bs = if B.length bs < 4
+                 then More (consume . B.append bs)
+                 else let (h,t) = B.splitAt 4 bs
+                      in getCount (fromIntegral (runGet getInt h)) t
+        where getCount n bs = 
+                  if B.length bs < n then More (getCount n . B.append bs)
+                  else let (h,t) = B.splitAt n bs
+                       in Emit h (consume t)
+
 
