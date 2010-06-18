@@ -1,7 +1,7 @@
 {-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables, 
              TupleSections #-}
 module Node (Node, runNode, advertise, subscribe) where
-import Control.Applicative
+import Control.Applicative ((<$>))
 import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar (TVar, readTVar, writeTVar, newTVarIO)
@@ -51,18 +51,16 @@ instance RosSlave NodeState where
     getMaster = master
     getSubscriptions = mapM formatSub . M.toList . subscriptions
         where formatSub (name, sub) = let topicType = show $ subType sub
-                                      in do stats <- mapM formatStats . 
+                                      in do stats <- mapM statSnapshot . 
                                                      M.toList $
                                                      subStats sub
                                             return (name, topicType, stats)
-              formatStats (uri, stat) = (uri,) <$> atomically (readTVar stat)
     getPublications = mapM formatPub . M.toList . publications
         where formatPub (name, pub) = let topicType = show $ pubType pub
-                                      in do stats <- mapM formatStats .
+                                      in do stats <- mapM statSnapshot .
                                                      M.toList $
                                                      pubStats pub
                                             return (name, topicType, stats)
-              formatStats (uri, stat) = (uri,) <$> atomically (readTVar stat)
     publisherUpdate ns name uris = 
         case M.lookup name (subscriptions ns) of
           Nothing -> return ()
@@ -74,8 +72,11 @@ instance RosSlave NodeState where
                                                uris
                          writeTVar (knownPubs sub) known'
                          return act
-    getTopicPortTCP = (liftM pubPort . ) . flip M.lookup . publications
+    getTopicPortTCP = (liftM pubPort .) . flip M.lookup . publications
     stopNode = mapM_ (pubCleanup . snd) . M.toList . publications
+
+statSnapshot :: (URI, TVar a) -> IO (URI, a)
+statSnapshot (uri, stat) = (uri,) <$> atomically (readTVar stat)
 
 -- If a given URI is not a part of a Set of known URIs, add an action
 -- to effect a subscription to an accumulated action and add the URI
@@ -91,6 +92,8 @@ connectToPub doSub (act, known) uri = if S.member uri known
 recvBufferSize :: Int
 recvBufferSize = 10
 
+-- |Spark a thread that funnels a Stream from a URI into the given
+-- Chan.
 addSource :: BinaryIter a => BoundedChan a -> URI -> IO ThreadId
 addSource c uri = forkIO $ subStream uri >>= go
     where go (Stream x xs) = writeChan c x >> go xs
@@ -101,10 +104,8 @@ mkSub :: forall a. (Typeable a, BinaryIter a) => IO (Stream a, Subscription)
 mkSub = do c <- newBoundedChan recvBufferSize
            stream <- list2stream <$> getChanContents c
            known <- newTVarIO S.empty
-           let sub = Subscription known
-                                  (addSource c)
-                                  (typeOf (undefined::a))
-                                  M.empty
+           let topicType = typeOf (undefined::a)
+               sub = Subscription known (addSource c) topicType M.empty
            return (stream, sub)
     where list2stream (x:xs) = Stream x (list2stream xs)
 
