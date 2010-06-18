@@ -19,42 +19,43 @@ import ROSTypes
 
 class RosSlave a where
     getMaster :: a -> URI
-    getSubscriptions :: a -> [(TopicName, TopicType, [SubStats])]
-    getPublications :: a -> [(TopicName, TopicType, [PubStats])]
+    getSubscriptions :: a -> IO [(TopicName, TopicType, [(URI, SubStats)])]
+    getPublications :: a -> IO [(TopicName, TopicType, [(URI, PubStats)])]
     publisherUpdate :: a -> TopicName -> [URI] -> IO ()
-    getTopicPortTCP :: a -> TopicName -> Int
+    getTopicPortTCP :: a -> TopicName -> Maybe Int
     stopNode :: a -> IO ()
 
 type MessageData = String
 type RpcResult a = IO (Int, String, a)
 
-mkPublishStats :: (TopicName, a, [PubStats]) -> 
+mkPublishStats :: (TopicName, a, [(URI, PubStats)]) -> 
                   (TopicName, MessageData, [(Int, Int, Int, Bool)])
 mkPublishStats (n, _, pstats) = (n, "", map formatStats pstats)
-    where formatStats (PubStats bytesSent numSent _ conn) = 
+    where formatStats (_, (PubStats bytesSent numSent conn)) = 
               (0, bytesSent, numSent, conn)
 
-mkSubStats :: (TopicName, a, [SubStats]) -> (String, [(Int, Int, Int, Bool)])
+mkSubStats :: (TopicName, a, [(URI, SubStats)]) -> 
+              (String, [(Int, Int, Int, Bool)])
 mkSubStats (n, _, sstats) = (n, map formatStats sstats)
-    where formatStats (SubStats bytesReceived _ conn) = 
+    where formatStats (_, (SubStats bytesReceived _ conn)) = 
               (0, bytesReceived, -1, conn)
 
 getBusStats :: (RosSlave a) => a -> CallerID -> RpcResult [[Value]]
-getBusStats n callerId = 
+getBusStats n callerId = do
+    publishStats <- map (toValue . mkPublishStats) <$> getPublications n
+    subscribeStats <- map (toValue . mkSubStats) <$> getSubscriptions n
+    let serviceStats = []
     return (1, "", [publishStats, subscribeStats, serviceStats])
-    where serviceStats = []
-          publishStats = map (toValue . mkPublishStats) (getPublications n)
-          subscribeStats = map (toValue . mkSubStats) (getSubscriptions n)
 
 getBusInfo :: (RosSlave a) => a -> CallerID -> RpcResult [[Value]]
-getBusInfo n _ = 
+getBusInfo n _ = do
+    pubs <- map formatPubs <$> getPublications n
+    subs <- map formatSubs <$> getSubscriptions n
     return (1, "", map (map toValue) (pubs ++ subs))
-    where pubs = map formatPubs (getPublications n)
-          subs = map formatSubs (getSubscriptions n)
-          formatPubs (n, _, stats) = 
-              map (\c -> (0::Int, pubDestination c, "o", "TCPROS", n)) stats
+    where formatPubs (n, _, stats) = 
+              map (\(u,_) -> (0::Int, u, "o", "TCPROS", n)) stats
           formatSubs (n, _, stats) = 
-              map (\c -> (0::Int, subDestination c, "i", "TCPROS", n)) stats
+              map (\(u,_) -> (0::Int, u, "i", "TCPROS", n)) stats
 
 getMaster' :: RosSlave a => a -> CallerID -> IO (Int, String, URI)
 getMaster' n _ = return (1, "", getMaster n)
@@ -67,12 +68,14 @@ getPid' = do pid <- getProcessID
              return (1, "", fromEnum pid)
 
 getSubscriptions' :: RosSlave a => a -> CallerID -> RpcResult [(String, String)]
-getSubscriptions' n _ = return (1, "", subs)
-    where subs = map (\(n,t,_) -> (n,t)) (getSubscriptions n)
+getSubscriptions' n _ = do 
+  subs <- map (\(n,t,_) -> (n,t)) <$> getSubscriptions n
+  return (1, "", subs)
 
 getPublications' :: RosSlave a => a -> CallerID -> RpcResult [(String, String)]
-getPublications' n _ = return (1, "", pubs)
-    where pubs = map (\(n,t,_) -> (n,t)) (getPublications n)
+getPublications' n _ = do 
+  pubs <- map (\(n,t,_) -> (n,t)) <$> getPublications n
+  return (1, "", pubs)
 
 paramUpdate' :: RosSlave a => a -> CallerID -> String -> Value -> RpcResult Bool
 paramUpdate' n _ paramKey paramVal = do putStrLn "paramUpdate not implemented!"
@@ -84,8 +87,10 @@ pubUpdate n _ topic publishers = do publisherUpdate n topic publishers
 
 requestTopic :: RosSlave a => a -> CallerID -> TopicName -> [[Value]] -> 
                 RpcResult Value
-requestTopic n _ topic protocols = return (1, "", toValue protocolInfo)
-    where protocolInfo = ("TCPROS", getTopicPortTCP n topic)
+requestTopic n _ topic protocols = 
+    case getTopicPortTCP n topic of
+      Just p -> return (1, "", toValue ("TCPROS", p))
+      Nothing -> return (0, "Unknown topic", toValue ("TCPROS", 0::Int))
 
 -- Dispatch an XML-RPC request body and return the response. The first
 -- parameter is a value that provides the necessary reflective API as
@@ -118,6 +123,7 @@ runSlave n = do quitNow <- newQSem 0
                 t <- forkIO $ simpleServe 9131 (rpc (slaveRPC n quitNow))
                 waitQSem quitNow
                 threadDelay 1000000 -- Wait a second for the response to flush
+                stopNode n
                 killThread t
     where rpc f = do body <- BLU.toString <$> getRequestBody
                      response <- liftIO $ f body

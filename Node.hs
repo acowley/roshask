@@ -1,9 +1,11 @@
-{-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables #-}
+{-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables, 
+             TupleSections #-}
 module Node (Node, runNode, advertise, subscribe) where
 import Control.Applicative
-import Control.Concurrent.Chan
-import Control.Concurrent.STM.TVar (TVar, newTVarIO)
-import "mtl" Control.Monad.State
+import Control.Concurrent.BoundedChan
+import Control.Concurrent.STM (atomically)
+import Control.Concurrent.STM.TVar (TVar, readTVar, writeTVar, newTVarIO)
+import "monads-fd" Control.Monad.State
 import Data.Binary (Binary)
 import Data.Map (Map)
 import qualified Data.Map as M
@@ -11,49 +13,26 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Typeable (Typeable, TypeRep, typeOf)
 import Control.Concurrent (forkIO, ThreadId)
+import BinaryIter
 import ROSTypes
 import RosTcp
+import SlaveAPI
 
-data Subscription = Subscription { knownPubs :: Set URI
+data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , addPub    :: URI -> IO ThreadId
                                  , subType   :: TypeRep
-                                 , subStats  :: TVar (Map URI SubStats) }
+                                 , subStats  :: Map URI (TVar SubStats) }
 
-data Publication = Publication { subscribers :: Set URI
+data Publication = Publication { subscribers :: TVar (Set URI)
                                , pubType     :: TypeRep
                                , pubPort     :: Int
-                               , pubStats    :: TVar (Map URI PubStats)
-                               , pubThread   :: ThreadId }
+                               , pubCleanup  :: IO ()
+                               , pubStats    :: Map URI (TVar PubStats) }
 
 data NodeState = NodeState { nodeName      :: String
                            , master        :: URI
                            , subscriptions :: Map String Subscription
                            , publications  :: Map String Publication }
-
-addSource :: Binary a => Chan a -> URI -> IO ThreadId
-addSource c uri = do s <- connect uri
-                     forkIO $ go s
-    where go (Stream x xs) = writeChan c x >> go xs
-
--- Create a new Subscription value that will act as a named input
--- channel with zero or more connected publishers.
-mkSub :: forall a. (Typeable a, Binary a) => IO (Stream a, Subscription)
-mkSub = do c <- newChan
-           stats <- newTVarIO M.empty
-           stream <- list2stream <$> getChanContents c
-           let sub = Subscription S.empty
-                                  (addSource c)
-                                  (typeOf (undefined::a))
-                                  stats
-           return (stream, sub)
-    where list2stream (x:xs) = Stream x (list2stream xs)
-
--- This isn't done yet. I think the publisher needs to run a server
--- client's can connect to.
-mkPub :: forall a. (Typeable a, Binary a) => Stream a -> IO Publication
-mkPub s = do t <- forkIO undefined
-             stats <- newTVarIO M.empty
-             return $ Publication S.empty (typeOf (undefined::a)) stats t
 
 newtype Node a = Node { unNode :: StateT NodeState IO a }
 
@@ -68,7 +47,74 @@ instance MonadState NodeState Node where
     get = Node get
     put = Node . put
 
-subscribe :: (Typeable a, Binary a) => TopicName -> Node (Stream a)
+instance RosSlave NodeState where
+    getMaster = master
+    getSubscriptions = mapM formatSub . M.toList . subscriptions
+        where formatSub (name, sub) = let topicType = show $ subType sub
+                                      in do stats <- mapM formatStats . 
+                                                     M.toList $
+                                                     subStats sub
+                                            return (name, topicType, stats)
+              formatStats (uri, stat) = (uri,) <$> atomically (readTVar stat)
+    getPublications = mapM formatPub . M.toList . publications
+        where formatPub (name, pub) = let topicType = show $ pubType pub
+                                      in do stats <- mapM formatStats .
+                                                     M.toList $
+                                                     pubStats pub
+                                            return (name, topicType, stats)
+              formatStats (uri, stat) = (uri,) <$> atomically (readTVar stat)
+    publisherUpdate ns name uris = 
+        case M.lookup name (subscriptions ns) of
+          Nothing -> return ()
+          Just sub -> join . atomically $
+                      do let add = addPub sub >=> \_ -> return ()
+                         known <- readTVar (knownPubs sub) 
+                         (act,known') <- foldM (connectToPub add)
+                                               (return (), known)
+                                               uris
+                         writeTVar (knownPubs sub) known'
+                         return act
+    getTopicPortTCP = (liftM pubPort . ) . flip M.lookup . publications
+    stopNode = mapM_ (pubCleanup . snd) . M.toList . publications
+
+-- If a given URI is not a part of a Set of known URIs, add an action
+-- to effect a subscription to an accumulated action and add the URI
+-- to the Set.
+connectToPub :: Monad m => 
+                (URI -> IO ()) -> (IO (), Set URI) -> URI -> m (IO (), Set URI)
+connectToPub doSub (act, known) uri = if S.member uri known
+                                      then return (act, known)
+                                      else let known' = S.insert uri known
+                                           in return (act >> doSub uri, known')
+
+-- |Maximum number of items to buffer for a subscriber.
+recvBufferSize :: Int
+recvBufferSize = 10
+
+addSource :: BinaryIter a => BoundedChan a -> URI -> IO ThreadId
+addSource c uri = forkIO $ subStream uri >>= go
+    where go (Stream x xs) = writeChan c x >> go xs
+
+-- Create a new Subscription value that will act as a named input
+-- channel with zero or more connected publishers.
+mkSub :: forall a. (Typeable a, BinaryIter a) => IO (Stream a, Subscription)
+mkSub = do c <- newBoundedChan recvBufferSize
+           stream <- list2stream <$> getChanContents c
+           known <- newTVarIO S.empty
+           let sub = Subscription known
+                                  (addSource c)
+                                  (typeOf (undefined::a))
+                                  M.empty
+           return (stream, sub)
+    where list2stream (x:xs) = Stream x (list2stream xs)
+
+mkPub :: forall a. (Typeable a, Binary a) => Stream a -> IO Publication
+mkPub s = do (cleanup, port) <- runServer s
+             known <- newTVarIO S.empty
+             let trep = typeOf (undefined::a)
+             return $ Publication known trep port cleanup M.empty
+
+subscribe :: (Typeable a, BinaryIter a) => TopicName -> Node (Stream a)
 subscribe name = do n <- get
                     let subs = subscriptions n
                     if M.member name subs
@@ -78,23 +124,18 @@ subscribe name = do n <- get
                                return stream
 
 advertise :: (Typeable a, Binary a) => TopicName -> Stream a -> Node ()
-advertise name stream = do pubs <- publications <$> get
-                           if M.member name pubs 
-                             then error $ "Already advertised "++name
-                             else put n { publications = M.insert name 
+advertise name stream = 
+    do n <- get
+       let pubs = publications n
+       if M.member name pubs 
+         then error $ "Already advertised "++name
+         else do pub <- liftIO $ mkPub stream 
+                 put n { publications = M.insert name pub pubs }
 
 -- | A filtered stream.
 fooBar :: (Num a, Ord a) => Stream a -> Stream a
 fooBar (Stream x xs) = if x < 2 then fooBar xs else Stream x (fooBar xs)
 
-mkPub :: Typeable a => TopicName -> Stream a -> Publication
-mkPub gen = do n <- get
-               let pubs = publications n
-
-runNode :: Node a -> IO ()
-runNode = 
-
-runNode :: NodeName -> 
-           [(TopicName, Subscription)] -> 
-           [(TopicName, Publication)] -> IO ()
-runNode name subs pubs = return ()
+runNode :: NodeName -> Node a -> IO ()
+runNode name (Node n) = go $ execStateT n (NodeState name "" M.empty M.empty)
+    where go ns = undefined
