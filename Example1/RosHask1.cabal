@@ -1,0 +1,29 @@
+Name:                RosHask1
+Version:             0.1
+Synopsis:            A ROS node for testing
+-- A longer description of the package.
+-- Description:         
+
+
+License:             BSD3
+License-file:        LICENSE
+Cabal-version:       >=1.2
+Author:              Anthony Cowley
+Maintainer:          acowley@seas.upenn.edu
+
+-- A copyright notice.
+-- Copyright:           
+
+Category:            Robotics
+Build-type:          Simple
+
+-- Extra files to be distributed with the package, such as examples or
+-- a README.
+-- Extra-source-files:  
+Executable RosHask1
+  Build-Depends: base >= 4.2,
+                 bytestring,
+                 binary
+
+  GHC-Options:   -Odph
+  Main-Is:       Main.hs
