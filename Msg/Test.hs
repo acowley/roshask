@@ -1,6 +1,6 @@
 import qualified Data.ByteString.Char8 as B
-import MsgParse
-import MsgGen
+import Msg.Parse
+import Msg.Gen
 
 main = do parseResult <- parseMsg "LaserScan.msg"
           let txt = case parseResult of

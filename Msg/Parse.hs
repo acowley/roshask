@@ -1,31 +1,25 @@
 {-# LANGUAGE OverloadedStrings, TupleSections #-}
-module MsgParse (parseMsg) where
+module Msg.Parse (parseMsg) where
 import Prelude hiding (takeWhile)
 import Control.Applicative hiding (many)
 import Data.Attoparsec.Char8
 import Data.ByteString (ByteString)
---import qualified Data.ByteString as B
 import Data.ByteString.Char8 (pack, unpack)
 import qualified Data.ByteString.Char8 as B
 import Data.Char (toLower, digitToInt)
 import Data.List (foldl')
 import System.FilePath (dropExtension, takeFileName)
-import MsgTypes
+import Msg.Types
 
 eatLine = manyTill anyChar (eitherP endOfLine endOfInput) *> skipSpace
-parseName = skipSpace *> identifier <* eatLine <* try eatNothings
+parseName = skipSpace *> identifier <* eatLine <* try comment
 
 identifier = B.cons <$> letter_ascii <*> takeWhile validChar
     where validChar c = or (map ($ c) [isDigit, isAlpha_ascii, (== '_')])
 
 parseInt = foldl' (\s x -> s*10 + digitToInt x) 0 <$> many1 digit
 
-comment = skipSpace *> try (char '#' *> eatLine)
-
-eatNothings = many comment
-
---testFoo = feed (parse eatNothings "  #hi\n\n#guys\n\nfoo") ""
-testFoo = feed (parse eatNothings " #hi  #hardy    #boo") ""
+comment = many $ skipSpace *> try (char '#' *> eatLine)
 
 typeString :: MsgType -> Parser ByteString
 typeString = string . pack . map toLower . tail . show
@@ -47,27 +41,16 @@ varArrayParser x = (, RVarArray x) <$>
 userTypeParser = (\t name -> (name, RUserType t )) <$> 
                  takeTill (== ' ') <*> (space *> parseName)
 
--- fieldParsers = concatMap (flip map simpleFieldTypes) $
---                [simpleParser, fixedArrayParser, varArrayParser]
-fieldParsers = builtIns ++ [eatNothings *> userTypeParser]
-    where builtIns = concatMap (\f -> map ((eatNothings *>) . f) simpleFieldTypes)
+fieldParsers = builtIns ++ [comment *> userTypeParser]
+    where builtIns = concatMap (\f -> map ((comment *>) . f) simpleFieldTypes)
                                [simpleParser, fixedArrayParser, varArrayParser]
 
---test = feed (parse parseMsg "bool bar\nint32 x\nfloat32[] y\nfloat64[3] z") ""
--- parseMsg :: Parser Msg
--- parseMsg = Msg "Anon" <$> choice fieldParsers `sepBy` char '\n'
-
-testMsg = pack $ 
-          "# LaserScan message blah\n" ++
-          "#\n"++
-          "Header header # timestamp in the header\n"++
-          "              # froufrah\n"++
-          "\n"++
-          "float32 angle_min"
-test = feed (parse (mkParser "Laser") testMsg) ""
-
 mkParser :: String -> Parser Msg
-mkParser name = Msg name <$> many (choice fieldParsers) -- `sepBy` char '\n'
+mkParser name = Msg name "" <$> many (choice fieldParsers)
+
+testMsg = "# Foo bar\n\n#   \nHeader header  # a header\nuint32 aNum # a number \n  # It's not important"
+
+test = feed (parse (mkParser "") testMsg) ""
 
 parseMsg :: FilePath -> IO (Either String Msg)
 parseMsg fname = do msgFile <- B.readFile fname

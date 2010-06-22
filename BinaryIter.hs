@@ -132,4 +132,15 @@ instance BinaryIter BC8.ByteString where
                   else let (h,t) = B.splitAt n bs
                        in Emit h t --(consume t)
 
+instance (BinaryIter a, BinaryIter b) => BinaryIter (a,b) where
+    consume = case (,) <$> consume' <*> consume' of
+                Emit v r1 -> \r2 -> Emit v (r1 `mappend` r2)
+                More k -> k
 
+instance BinaryIter String where
+    consume bs = go "" bs
+        where go s b = case B.findIndex (== 0) bs of
+                         Nothing -> More (consume . B.append bs)
+                         Just i -> let (h,t) = B.splitAt i bs
+                                   in Emit (BC8.unpack h) t
+                         

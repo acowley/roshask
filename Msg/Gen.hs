@@ -1,7 +1,7 @@
 -- |Generate Haskell source files for ROS .msg types. Currently only
 -- supports arrays of built-in types.
 {-# LANGUAGE OverloadedStrings #-}
-module MsgGen where
+module Msg.Gen (generateMsgType) where
 import Data.ByteString.Char8 (pack, unpack, ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Char (toUpper)
@@ -10,10 +10,10 @@ import qualified Data.Set as S
 import Data.List (intercalate, foldl')
 import System.FilePath (takeFileName)
 import Text.Printf (printf)
-import MsgTypes
+import Msg.Types
 
 generateMsgType :: Msg -> ByteString
-generateMsgType msg@(Msg name fields) = 
+generateMsgType msg@(Msg name _ fields) = 
     B.concat [modLine, "\n", imports, dataLine, fieldSpecs, " }\n\n",
               genBinaryInstance msg, "\n\n", 
               genBinaryIterInstance msg, "\n\n",
@@ -31,9 +31,11 @@ generateMsgType msg@(Msg name fields) =
           fieldSpecs = B.intercalate lineSep $ map generateField fields
 
 genHasHeader :: Msg -> ByteString
-genHasHeader (Msg name ((_, RUserType t):_)) 
+genHasHeader (Msg name _ ((hn, RUserType t):_)) 
     | t == "Header" = B.concat["instance HasHeader ", pack name, 
-                               " where\n  getHeader = header\n"]
+                               " where\n  getHeader = header\n",
+                               "  setSequence x seq = x { ", hn, 
+                               " = seq }\n"]
     | otherwise = ""
 genHasHeader _ = ""
 
@@ -46,7 +48,7 @@ genImports fieldTypes = B.concat (concatMap (\i -> ["import ", i, "\n"])
      where allImports = foldl' ((. typeDependency) . flip S.union) S.empty
 
 genBinaryInstance :: Msg -> ByteString
-genBinaryInstance (Msg name fields) = 
+genBinaryInstance (Msg name _ fields) = 
    B.concat ["instance BinaryCompact ", pack name, " where\n",
              "  put x = do ", 
              B.intercalate (B.append "\n" (pack (replicate 13 ' ')))
@@ -108,7 +110,7 @@ ros2Hask (RVarArray t)     = B.append "V.Vector " (ros2Hask t)
 ros2Hask (RUserType t)     = pack $ takeFileName $ unpack t
 
 genBinaryIterInstance :: Msg -> ByteString
-genBinaryIterInstance (Msg name fields) = 
+genBinaryIterInstance (Msg name _ fields) = 
     B.concat ["instance BinaryIter ", pack name, " where\n",
               "  consume = case ", pack name, " <$> ", 
               B.intercalate " <*> " (replicate (length fields) "consume'"),
