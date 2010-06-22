@@ -1,4 +1,5 @@
--- |Generate Haskell source files for ROS .msg types.
+-- |Generate Haskell source files for ROS .msg types. Currently only
+-- supports arrays of built-in types.
 {-# LANGUAGE OverloadedStrings #-}
 module MsgGen where
 import Data.ByteString.Char8 (pack, unpack, ByteString)
@@ -41,10 +42,8 @@ genBinaryInstance (Msg name fields) =
     printf "instance BinaryCompact %s where\n" name ++
     printf "  put x = do " ++
     intercalate ("\n"++replicate 13 ' ') (map putField fields) ++
-    printf "\n  get = do " ++
-    concatMap (++"\n"++replicate 11 ' ') (map getField fields) ++
-    "return $ "++name++" "++
-    concatMap ((++" ").unpack.fst) fields 
+    printf "\n  get = %s <$> %s" name (intercalate " <*> " 
+                                                   (map getField fields))
 
 putField :: (ByteString, MsgType) -> String
 putField (name, t) = printf "%s (%s x)" (serialize t) (unpack name)
@@ -54,7 +53,7 @@ serialize (RFixedArray _ t) = "putFixed"
 serialize _ = "put"
 
 getField :: (ByteString, MsgType) -> String
-getField (name, t) = printf "%s <- %s" (unpack name) (deserialize t)
+getField = deserialize . snd
 
 deserialize :: MsgType -> String
 deserialize (RFixedArray n t) = "getFixed " ++ show n

@@ -112,5 +112,3 @@ getFixed n = bytesToVec undefined <$> getBytes (n*(sizeOf (undefined::a)))
 
 putFixed :: (BinaryCompact a, V.Unbox a) => V.Vector a -> Put
 putFixed = V.mapM_ put
-
-             
