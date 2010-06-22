@@ -19,7 +19,6 @@ generateMsgType msg@(Msg name fields) =
     where tName = toUpper (head name) : tail name
           modLine = printf "module %s where" tName
           imports = "import Control.Applicative\n"++
-                    "import Data.Binary\n"++
                     "import Data.Monoid\n"++
                     "import BinaryIter\n" ++
                     "import RosBinary\n" ++ 
@@ -39,7 +38,7 @@ genImports fieldTypes = concatMap (printf "import %s\n")
 
 genBinaryInstance :: Msg -> String
 genBinaryInstance (Msg name fields) = 
-    printf "instance Binary %s where\n" name ++
+    printf "instance BinaryCompact %s where\n" name ++
     printf "  put x = do " ++
     intercalate ("\n"++replicate 13 ' ') (map putField fields) ++
     printf "\n  get = do " ++
@@ -51,20 +50,15 @@ putField :: (ByteString, MsgType) -> String
 putField (name, t) = printf "%s (%s x)" (serialize t) (unpack name)
 
 serialize :: MsgType -> String
-serialize (RFixedArray _ t) = printf "V.mapM_ %s" (serialize t)
-serialize (RVarArray t)     = 
-    printf "(\\a -> putInt32 (V.length a) >> V.mapM_ %s a)" (serialize t)
-serialize (RUserType _)     = "put"
-serialize t = "put" ++ tail (show t)
+serialize (RFixedArray _ t) = "putFixed"
+serialize _ = "put"
 
 getField :: (ByteString, MsgType) -> String
 getField (name, t) = printf "%s <- %s" (unpack name) (deserialize t)
 
 deserialize :: MsgType -> String
 deserialize (RFixedArray n t) = "getFixed " ++ show n
-deserialize (RVarArray t) = "getVarArray"
-deserialize (RUserType _) = "get"
-deserialize t = "get" ++ tail (show t)
+deserialize _ = "get"
 
 vectorDeps = S.fromList [ "qualified Data.Vector.Unboxed as V" ]
 
