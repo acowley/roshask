@@ -1,4 +1,5 @@
-{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, BangPatterns #-}
+{-# LANGUAGE ScopedTypeVariables, FlexibleInstances, BangPatterns, 
+             TypeSynonymInstances #-}
 module BinaryIter (Iter(..), BinaryIter(..), streamIn) where
 import Control.Applicative
 import Control.Monad.ST (runST)
@@ -7,6 +8,7 @@ import Data.Binary.Get
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as BC8
+import Data.Int
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VM
@@ -62,9 +64,15 @@ getStorable bs = let sz = fromIntegral $ sizeOf (undefined::a)
                     else let (h,t) = B.splitAt sz bs
                          in Emit (runGet get' h) (getStorable t)
 
+instance BinaryIter Bool   where consume = getStorable
+instance BinaryIter Int8   where consume = getStorable
+instance BinaryIter Int16  where consume = getStorable
 instance BinaryIter Word8  where consume = getStorable
 instance BinaryIter Word16 where consume = getStorable
 instance BinaryIter Int    where consume = getStorable
+instance BinaryIter Word32 where consume = getStorable
+instance BinaryIter Int64  where consume = getStorable
+instance BinaryIter Word64 where consume = getStorable
 instance BinaryIter Float  where consume = getStorable
 instance BinaryIter Double where consume = getStorable
 

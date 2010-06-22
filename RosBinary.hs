@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 -- Note that tne endianess of message serialization is unclear. I am
 -- using the native byte ordering of the host to support the common
 -- scenario of same-machine transport.
@@ -7,8 +8,17 @@ import Control.Monad ((>=>))
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Int
+import qualified Data.Vector.Unboxed as V
 import Data.Word
 import Unsafe.Coerce (unsafeCoerce)
+
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Unsafe as BU
+import Foreign.C.String (CStringLen)
+import Foreign.Ptr (Ptr, castPtr)
+import Foreign.Storable (sizeOf, Storable, peekElemOff)
+import System.IO.Unsafe
+
 import ROSTypes
 
 getBool :: Get Bool
@@ -102,3 +112,16 @@ getDuration = (,) <$> getWord32host <*> getWord32host
 putDuration :: ROSDuration -> Put
 putDuration (s,n) = putWord32host s >> putWord32host n
 
+bytesToVec :: (Storable a, V.Unbox a) => a -> B.ByteString -> V.Vector a
+bytesToVec x bs = unsafePerformIO $ BU.unsafeUseAsCStringLen bs go
+    where go (ptr,len) = let ptr' = castPtr ptr
+                             num = len `div` (sizeOf x)
+                         in return $ 
+                            V.generate num (unsafePerformIO . peekElemOff ptr')
+
+getFixed :: forall a. (Storable a, V.Unbox a) => Int -> Get (V.Vector a)
+getFixed n = bytesToVec undefined <$> getBytes (n*(sizeOf (undefined::a)))
+
+getVarArray :: (Storable a, V.Unbox a) => Get (V.Vector a)
+getVarArray = getInt32 >>= getFixed
+             
