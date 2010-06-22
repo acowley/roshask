@@ -12,56 +12,57 @@ import System.FilePath (takeFileName)
 import Text.Printf (printf)
 import MsgTypes
 
-generateMsgType :: Msg -> String
+generateMsgType :: Msg -> ByteString
 generateMsgType msg@(Msg name fields) = 
-    modLine++"\n"++imports++"\n"++dataLine++fieldSpecs++" }\n\n"++
-    genBinaryInstance msg++"\n\n"++
-    genBinaryIterInstance msg ++"\n"
-    where tName = toUpper (head name) : tail name
-          modLine = printf "module %s where" tName
-          imports = "import Control.Applicative\n"++
-                    "import Data.Monoid\n"++
-                    "import BinaryIter\n" ++
-                    "import RosBinary\n" ++ 
-                    genImports (map snd fields)
-          dataLine = printf "data %s = %s { " tName tName
-          fieldIndent = replicate (length dataLine - 2) ' '
-          lineSep = "\n" ++ fieldIndent ++ ", "
-          fieldSpecs = intercalate lineSep $ map generateField fields
+    B.concat [modLine, "\n", imports, dataLine, fieldSpecs, " }\n\n",
+              genBinaryInstance msg, "\n\n", 
+              genBinaryIterInstance msg, "\n"]
+    where tName = pack $ toUpper (head name) : tail name
+          modLine = B.concat ["module ", tName, " where"]
+          imports = B.concat ["import Control.Applicative\n",
+                              "import Data.Monoid\n",
+                              "import BinaryIter\n",
+                              "import RosBinary\n",
+                              genImports (map snd fields)]
+          dataLine = B.concat ["\ndata ", tName, " = ", tName, " { "]
+          fieldIndent = B.replicate (B.length dataLine - 3) ' '
+          lineSep = B.concat ["\n", fieldIndent, ", "]
+          fieldSpecs = B.intercalate lineSep $ map generateField fields
 
-generateField :: (ByteString, MsgType) -> String
-generateField (name, t) = unpack name ++ " :: " ++ ros2Hask t
+generateField :: (ByteString, MsgType) -> ByteString
+generateField (name, t) = B.concat [name, " :: ", ros2Hask t]
 
-genImports :: [MsgType] -> String
-genImports fieldTypes = concatMap (printf "import %s\n") 
-                                  (S.toList (allImports fieldTypes))
-    where allImports = foldl' ((. typeDependency) . flip S.union) S.empty
+genImports :: [MsgType] -> ByteString
+genImports fieldTypes = B.concat (concatMap (\i -> ["import ", i, "\n"])
+                                            (S.toList (allImports fieldTypes)))
+     where allImports = foldl' ((. typeDependency) . flip S.union) S.empty
 
-genBinaryInstance :: Msg -> String
+genBinaryInstance :: Msg -> ByteString
 genBinaryInstance (Msg name fields) = 
-    printf "instance BinaryCompact %s where\n" name ++
-    printf "  put x = do " ++
-    intercalate ("\n"++replicate 13 ' ') (map putField fields) ++
-    printf "\n  get = %s <$> %s" name (intercalate " <*> " 
-                                                   (map getField fields))
+   B.concat ["instance BinaryCompact ", pack name, " where\n",
+             "  put x = do ", 
+             B.intercalate (B.append "\n" (pack (replicate 13 ' ')))
+                           (map putField fields),
+             "\n  get = ", pack name, " <$> ",
+             B.intercalate " <*> " (map getField fields)]
 
-putField :: (ByteString, MsgType) -> String
-putField (name, t) = printf "%s (%s x)" (serialize t) (unpack name)
+putField :: (ByteString, MsgType) -> ByteString
+putField (name, t) = B.concat [serialize t, " (", name, " x)"]
 
-serialize :: MsgType -> String
+serialize :: MsgType -> ByteString
 serialize (RFixedArray _ t) = "putFixed"
 serialize _ = "put"
 
-getField :: (ByteString, MsgType) -> String
+getField :: (ByteString, MsgType) -> ByteString
 getField = deserialize . snd
 
-deserialize :: MsgType -> String
-deserialize (RFixedArray n t) = "getFixed " ++ show n
+deserialize :: MsgType -> ByteString
+deserialize (RFixedArray n t) = B.append "getFixed " (pack (show n))
 deserialize _ = "get"
 
 vectorDeps = S.fromList [ "qualified Data.Vector.Unboxed as V" ]
 
-typeDependency :: MsgType -> Set String
+typeDependency :: MsgType -> Set ByteString
 typeDependency RInt8             = singleton "Data.Int"
 typeDependency RUInt8            = singleton "Data.Word"
 typeDependency RInt16            = singleton "Data.Int"
@@ -73,13 +74,13 @@ typeDependency (RFixedArray _ t) = S.union vectorDeps $
                                    typeDependency t
 typeDependency (RVarArray t)     = S.union vectorDeps $
                                    typeDependency t
-typeDependency (RUserType ut)    = singleton (unpack (path2Module ut))
+typeDependency (RUserType ut)    = singleton (path2Module ut)
 typeDependency _                 = S.empty
 
 path2Module :: ByteString -> ByteString
 path2Module = B.map (\c -> if c == '/' then '.' else c)
 
-ros2Hask :: MsgType -> String
+ros2Hask :: MsgType -> ByteString
 ros2Hask RBool             = "Bool"
 ros2Hask RInt8             = "Int8"
 ros2Hask RUInt8            = "Word8"
@@ -94,15 +95,16 @@ ros2Hask RFloat64          = "Double"
 ros2Hask RString           = "String"
 ros2Hask RTime             = "ROSTime"
 ros2Hask RDuration         = "ROSDuration"
-ros2Hask (RFixedArray _ t) = "V.Vector "++ros2Hask t
-ros2Hask (RVarArray t)     = "V.Vector "++ros2Hask t
-ros2Hask (RUserType t)     = takeFileName $ unpack t
+ros2Hask (RFixedArray _ t) = B.append "V.Vector " (ros2Hask t)
+ros2Hask (RVarArray t)     = B.append "V.Vector " (ros2Hask t)
+ros2Hask (RUserType t)     = pack $ takeFileName $ unpack t
 
-genBinaryIterInstance :: Msg -> String
+genBinaryIterInstance :: Msg -> ByteString
 genBinaryIterInstance (Msg name fields) = 
-    printf "instance BinaryIter %s where\n" name ++
-    printf "  consume = case %s <$> " name ++
-    intercalate " <*> " (replicate (length fields) "consume'") ++ " of\n"++
-    printf "              Emit v r1 -> \\r2 -> Emit v (r1 `mappend` r2)\n"++
-    printf "              More k -> k"
+    B.concat ["instance BinaryIter ", pack name, " where\n",
+              "  consume = case ", pack name, " <$> ", 
+              B.intercalate " <*> " (replicate (length fields) "consume'"),
+              " of\n",
+              "              Emit v r1 -> \\r2 -> Emit v (r1 `mappend` r2)\n",
+              "              More k -> k"]
                 
