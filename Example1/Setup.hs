@@ -6,9 +6,11 @@ import System.Environment
 import System.FilePath
 
 splitOn :: Eq a => a -> [a] -> [[a]]
-splitOn c lst = go lst 
+splitOn c lst = go lst
     where go [] = [] 
-          go lst' = let (h,t) = break (== c) lst' in h : go t
+          go lst' = let (h,t) = break (== c) lst' in h : go (tail' t)
+          tail' [] = []
+          tail' x = tail x
 
 getMsgPaths :: FilePath -> IO [FilePath]
 getMsgPaths = undefined
