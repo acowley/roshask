@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleInstances, BangPatterns, 
              TypeSynonymInstances #-}
-module BinaryIter (Iter(..), BinaryIter(..), streamIn) where
+module BinaryIter (Iter(..), BinaryIter(..), streamIn, consume') where
 import Control.Applicative
 import Control.Monad.ST (runST)
 import Data.Binary (Binary)
@@ -9,6 +9,7 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as BC8
 import Data.Int
+import Data.Monoid
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VM
@@ -22,12 +23,27 @@ import ROSTypes
 
 -- |An Iter provides either a continuation asking for more data or a
 -- produced value along with another Iter of the same type.
-data Iter a b = More (a -> Iter a b) | Emit b (Iter a b)
+data Iter a b = More (a -> Iter a b) | Emit b a --(Iter a b)
+
+-- Note: This Functor instance is rather funny in that the function is
+-- lost in the continuation of the Emit variant.
+instance Functor (Iter a) where
+    fmap f (More k) = More (fmap f . k)
+    fmap f (Emit v b) = Emit (f v) b
+
+instance Monoid a => Applicative (Iter a) where
+    pure f = Emit f mempty
+    More k <*> b2 = More (\bs -> k bs <*> b2)
+    Emit f r <*> More k = More (\bs -> Emit f mempty <*> k (r `mappend` bs))
+    Emit f r1 <*> Emit v r2 = Emit (f v) (r1 `mappend` r2)
 
 -- |This is like Get, but augmented to support partial reads via the
 -- Iter datatype.
 class BinaryIter a where
     consume :: ByteString -> Iter ByteString a
+
+consume' :: BinaryIter a => Iter ByteString a
+consume' = More consume
 
 -- The maximum number of bytes read from the Handle at a time.
 cHUNK_SIZE :: Int
@@ -39,7 +55,7 @@ streamIn :: BinaryIter a => Handle -> IO (Stream a)
 streamIn h = go consume
     where go k = B.hGet h cHUNK_SIZE >>= emit . k
           emit (More k')   = go k'
-          emit (Emit x k') = Stream x <$> unsafeInterleaveIO (emit k')
+          emit (Emit x k') = Stream x <$> unsafeInterleaveIO (emit (consume k'))
 
 -- Unsafe getters for the most common value sizes.
 unsafeGet :: Int -> Get a
@@ -62,7 +78,7 @@ getStorable bs = let sz = fromIntegral $ sizeOf (undefined::a)
                  in if B.length bs < sz
                     then More (getStorable . B.append bs)
                     else let (h,t) = B.splitAt sz bs
-                         in Emit (runGet get' h) (getStorable t)
+                         in Emit (runGet get' h) t --(getStorable t)
 
 instance BinaryIter Bool   where consume = getStorable
 instance BinaryIter Int8   where consume = getStorable
@@ -104,7 +120,7 @@ instance forall a. (V.Unbox a, Storable a) => BinaryIter (V.Vector a) where
                      then More (getCount n . B.append bs)
                      else let (h,t) = B.splitAt (fromIntegral (n*sz)) bs
                               v = buildVector n h get'
-                          in Emit v (consume t)
+                          in Emit v t --(consume t)
 
 instance BinaryIter BC8.ByteString where
     consume bs = if B.length bs < 4
@@ -114,6 +130,6 @@ instance BinaryIter BC8.ByteString where
         where getCount n bs = 
                   if B.length bs < n then More (getCount n . B.append bs)
                   else let (h,t) = B.splitAt n bs
-                       in Emit h (consume t)
+                       in Emit h t --(consume t)
 
 

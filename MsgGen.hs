@@ -19,6 +19,9 @@ generateMsgType msg@(Msg name fields) =
     where tName = toUpper (head name) : tail name
           modLine = printf "module %s where" tName
           imports = "import Control.Applicative\n"++
+                    "import Data.Binary\n"++
+                    "import Data.Monoid\n"++
+                    "import BinaryIter\n" ++
                     "import RosBinary\n" ++ 
                     genImports (map snd fields)
           dataLine = printf "data %s = %s { " tName tName
@@ -39,8 +42,8 @@ genBinaryInstance (Msg name fields) =
     printf "instance Binary %s where\n" name ++
     printf "  put x = do " ++
     intercalate ("\n"++replicate 13 ' ') (map putField fields) ++
-    printf "\n  get x = do " ++
-    concatMap (++"\n"++replicate 13 ' ') (map getField fields) ++
+    printf "\n  get = do " ++
+    concatMap (++"\n"++replicate 11 ' ') (map getField fields) ++
     "return $ "++name++" "++
     concatMap ((++" ").unpack.fst) fields 
 
@@ -104,6 +107,9 @@ ros2Hask (RUserType t)     = takeFileName $ unpack t
 
 genBinaryIterInstance :: Msg -> String
 genBinaryIterInstance (Msg name fields) = 
-    printf "instance BinIter %s where\n" name ++
-    printf "  consume = %s <$> " name ++
-    intercalate " <*> " (replicate (length fields) "consume")
+    printf "instance BinaryIter %s where\n" name ++
+    printf "  consume = case %s <$> " name ++
+    intercalate " <*> " (replicate (length fields) "consume'") ++ " of\n"++
+    printf "              Emit v r1 -> \\r2 -> Emit v (r1 `mappend` r2)\n"++
+    printf "              More k -> k"
+                

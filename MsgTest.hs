@@ -2,6 +2,8 @@ import MsgParse
 import MsgGen
 
 main = do parseResult <- parseMsg "LaserScan.msg"
-          case parseResult of
-            Right msg -> putStr (generateMsgType msg)
-            Left err -> putStrLn err
+          let txt = case parseResult of
+                      Right msg -> generateMsgType msg
+                      Left err -> error err
+          putStr txt
+          writeFile "LaserScan.hs" txt
