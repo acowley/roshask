@@ -16,7 +16,8 @@ generateMsgType :: Msg -> ByteString
 generateMsgType msg@(Msg name fields) = 
     B.concat [modLine, "\n", imports, dataLine, fieldSpecs, " }\n\n",
               genBinaryInstance msg, "\n\n", 
-              genBinaryIterInstance msg, "\n"]
+              genBinaryIterInstance msg, "\n\n",
+              genHasHeader msg]
     where tName = pack $ toUpper (head name) : tail name
           modLine = B.concat ["module ", tName, " where"]
           imports = B.concat ["import Control.Applicative\n",
@@ -28,6 +29,13 @@ generateMsgType msg@(Msg name fields) =
           fieldIndent = B.replicate (B.length dataLine - 3) ' '
           lineSep = B.concat ["\n", fieldIndent, ", "]
           fieldSpecs = B.intercalate lineSep $ map generateField fields
+
+genHasHeader :: Msg -> ByteString
+genHasHeader (Msg name ((_, RUserType t):_)) 
+    | t == "Header" = B.concat["instance HasHeader ", pack name, 
+                               " where\n  getHeader = header\n"]
+    | otherwise = ""
+genHasHeader _ = ""
 
 generateField :: (ByteString, MsgType) -> ByteString
 generateField (name, t) = B.concat [name, " :: ", ros2Hask t]
