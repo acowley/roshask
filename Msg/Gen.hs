@@ -36,7 +36,7 @@ genHasHeader (Msg name _ ((hn, RUserType t):_))
     | t == "Header" = B.concat["instance HasHeader ", pack name, 
                                " where\n  getHeader = header\n",
                                "  setSequence x seq = x { ", hn, 
-                               " = seq }\n"]
+                               " = (", hn, " x) { Header.seq = seq } }\n"]
     | otherwise = ""
 genHasHeader _ = ""
 
@@ -88,11 +88,22 @@ typeDependency (RFixedArray _ t) = S.union vectorDeps $
                                    typeDependency t
 typeDependency (RVarArray t)     = S.union vectorDeps $
                                    typeDependency t
-typeDependency (RUserType ut)    = singleton (path2Module ut)
+typeDependency (RUserType ut)    = path2Module ut
 typeDependency _                 = S.empty
 
-path2Module :: ByteString -> ByteString
-path2Module = B.map (\c -> if c == '/' then '.' else c)
+-- Non built-in types are, by default, in the Ros.Std_msgs
+-- namespace. If a package path is given, then it is converted to a
+-- Haskell hierarchical module name and prefixed by "Ros.".
+path2Module :: ByteString -> Set ByteString
+path2Module "Header" = S.fromList ["qualified Ros.Std_msgs.Header as Header", 
+                                   "Msg.HeaderSupport"]
+path2Module p = singleton $
+                if B.elem '/' p
+                then B.concat ["qualified Ros.",
+                               B.intercalate "." . map cap . B.split '/' $ p,
+                               " as ", p]
+                else B.concat ["qualified Ros.Std_msgs.", p, " as ", p]
+    where cap s = B.cons (toUpper (B.head s)) (B.tail s)
 
 ros2Hask :: MsgType -> ByteString
 ros2Hask RBool             = "P.Bool"
@@ -111,7 +122,8 @@ ros2Hask RTime             = "ROSTime"
 ros2Hask RDuration         = "ROSDuration"
 ros2Hask (RFixedArray _ t) = B.append "V.Vector " (ros2Hask t)
 ros2Hask (RVarArray t)     = B.append "V.Vector " (ros2Hask t)
-ros2Hask (RUserType t)     = pack $ takeFileName $ unpack t
+ros2Hask (RUserType t)     = qualify . pack . takeFileName . unpack $ t
+    where qualify b = B.concat [b, ".", b]
 
 genBinaryIterInstance :: Msg -> ByteString
 genBinaryIterInstance (Msg name _ fields) = 

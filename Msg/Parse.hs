@@ -60,6 +60,7 @@ sanitize (Msg name md5 fields) = Msg name md5 $
           sanitizeField ("type", t)   = ("_type", t)
           sanitizeField ("class", t)  = ("_class", t)
           sanitizeField ("module", t) = ("_module", t)
+          sanitizeField x             = x
 
 parseMsg :: FilePath -> IO (Either String Msg)
 parseMsg fname = do msgFile <- B.readFile fname
