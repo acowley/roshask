@@ -1,4 +1,5 @@
 module Main (main) where
-import String
+import qualified Ros.Std_msgs.String as S
 
-main = do putStrLn "Hello!"
+main = let s = S.String "'erro"
+       in do putStrLn (S.data s)
