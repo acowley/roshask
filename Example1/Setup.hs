@@ -45,7 +45,7 @@ addRosPaths _ bf =
        paths <- (getRootMsgs rPath :)  . concat <$> 
                 mapM getMsgPaths (splitSearchPath pPaths)
        let binfo = emptyBuildInfo { hsSourceDirs = paths }
-       return (Just binfo, [])
+       return (Nothing, [("RosHask1", binfo)])
 
 main = defaultMainWithHooks $ simpleUserHooks { preBuild = addRosPaths }
 -- main = putStrLn . show . hsSourceDirs . fromJust . fst =<< 

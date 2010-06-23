@@ -12,15 +12,16 @@ import System.FilePath (takeFileName)
 import Text.Printf (printf)
 import Msg.Types
 
-generateMsgType :: Msg -> ByteString
-generateMsgType msg@(Msg name _ fields) = 
+generateMsgType :: ByteString -> Msg -> ByteString
+generateMsgType pkgPath msg@(Msg name _ fields) = 
     B.concat [modLine, "\n", imports, dataLine, fieldSpecs, " }\n\n",
               genBinaryInstance msg, "\n\n", 
               genBinaryIterInstance msg, "\n\n",
               genHasHeader msg]
     where tName = pack $ toUpper (head name) : tail name
-          modLine = B.concat ["module ", tName, " where"]
-          imports = B.concat ["import Control.Applicative\n",
+          modLine = B.concat ["module ", pkgPath, tName, " where"]
+          imports = B.concat ["import qualified Prelude as P\n",
+                              "import Control.Applicative\n",
                               "import Data.Monoid\n",
                               "import BinaryIter\n",
                               "import RosBinary\n",
@@ -72,12 +73,15 @@ deserialize _ = "get"
 
 vectorDeps = S.fromList [ "qualified Data.Vector.Unboxed as V" ]
 
+intImport = singleton "qualified Data.Int as Int"
+wordImport = singleton "qualified Data.Word as Word"
+
 typeDependency :: MsgType -> Set ByteString
-typeDependency RInt8             = singleton "Data.Int"
-typeDependency RUInt8            = singleton "Data.Word"
-typeDependency RInt16            = singleton "Data.Int"
-typeDependency RUInt16           = singleton "Data.Word"
-typeDependency RUInt32           = singleton "Data.Word"
+typeDependency RInt8             = intImport
+typeDependency RUInt8            = wordImport
+typeDependency RInt16            = intImport
+typeDependency RUInt16           = wordImport
+typeDependency RUInt32           = wordImport
 typeDependency RTime             = singleton "ROSTypes"
 typeDependency RDuration         = singleton "ROSTypes"
 typeDependency (RFixedArray _ t) = S.union vectorDeps $
@@ -91,18 +95,18 @@ path2Module :: ByteString -> ByteString
 path2Module = B.map (\c -> if c == '/' then '.' else c)
 
 ros2Hask :: MsgType -> ByteString
-ros2Hask RBool             = "Bool"
-ros2Hask RInt8             = "Int8"
-ros2Hask RUInt8            = "Word8"
-ros2Hask RInt16            = "Int16"
-ros2Hask RUInt16           = "Word16"
-ros2Hask RInt32            = "Int"
-ros2Hask RUInt32           = "Word32"
-ros2Hask RInt64            = "Int64"
-ros2Hask RUInt64           = "Word64"
-ros2Hask RFloat32          = "Float"
-ros2Hask RFloat64          = "Double"
-ros2Hask RString           = "String"
+ros2Hask RBool             = "P.Bool"
+ros2Hask RInt8             = "Int.Int8"
+ros2Hask RUInt8            = "Word.Word8"
+ros2Hask RInt16            = "Int.Int16"
+ros2Hask RUInt16           = "Word.Word16"
+ros2Hask RInt32            = "P.Int"
+ros2Hask RUInt32           = "Word.Word32"
+ros2Hask RInt64            = "Int.Int64"
+ros2Hask RUInt64           = "Word.Word64"
+ros2Hask RFloat32          = "P.Float"
+ros2Hask RFloat64          = "P.Double"
+ros2Hask RString           = "P.String"
 ros2Hask RTime             = "ROSTime"
 ros2Hask RDuration         = "ROSDuration"
 ros2Hask (RFixedArray _ t) = B.append "V.Vector " (ros2Hask t)

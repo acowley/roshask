@@ -52,12 +52,21 @@ testMsg = "# Foo bar\n\n#   \nHeader header  # a header\nuint32 aNum # a number 
 
 test = feed (parse (mkParser "") testMsg) ""
 
+-- Ensure that field names do not coincide with Haskell reserved words.
+sanitize :: Msg -> Msg
+sanitize (Msg name md5 fields) = Msg name md5 $
+                                 map sanitizeField fields
+    where sanitizeField ("data", t)   = ("_data", t)
+          sanitizeField ("type", t)   = ("_type", t)
+          sanitizeField ("class", t)  = ("_class", t)
+          sanitizeField ("module", t) = ("_module", t)
+
 parseMsg :: FilePath -> IO (Either String Msg)
 parseMsg fname = do msgFile <- B.readFile fname
                     let parser = mkParser (dropExtension . takeFileName $ fname)
                     case feed (parse parser msgFile) "" of
                       Done leftOver msg
-                          | B.null leftOver -> return $ Right msg
+                          | B.null leftOver -> return . Right . sanitize $ msg
                           | otherwise -> return $ Left $ "Couldn't parse " ++ 
                                                          unpack leftOver
                       Fail _ ctxt err -> return $ Left err
