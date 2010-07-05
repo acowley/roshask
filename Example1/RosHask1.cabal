@@ -1,18 +1,18 @@
 Name:                RosHask1
 Version:             0.1
-Synopsis:            A ROS node for testing
+Synopsis:            The first RosHask node.
 -- A longer description of the package.
 -- Description:         
 
 
 License:             BSD3
 License-file:        LICENSE
-Cabal-version:       >=1.2
+Cabal-version:       >=1.6
 Author:              Anthony Cowley
 Maintainer:          acowley@seas.upenn.edu
 
 -- A copyright notice.
--- Copyright:           
+Copyright:           (c) 2010 Anthony Cowley
 
 Category:            Robotics
 Build-type:          Custom
@@ -21,12 +21,13 @@ Build-type:          Custom
 -- a README.
 -- Extra-source-files:  
 Executable RosHask1
-  Build-Depends: base >= 4.2,
-                 bytestring,
-                 vector >= 0.6 && < 0.7,
-                 binary
+  Build-Depends:  base >= 4.2 && < 6,
+                  bytestring,
+                  vector >= 0.6 && < 0.7,
+                  binary
 
-  GHC-Options:   -Odph
-  Main-Is:       Main.hs
+  GHC-Options:    -Odph
+  Main-Is:        Main.hs
   Hs-Source-Dirs: ., /Users/acowley/Documents/Haskell/ROS
-  Other-Modules: Setup Ros.Std_msgs.String
+  Other-Modules:  Setup 
+-- Ros.Std_msgs.String
