@@ -23,8 +23,8 @@ generateMsgType pkgPath msg@(Msg name _ fields) =
           imports = B.concat ["import qualified Prelude as P\n",
                               "import Control.Applicative\n",
                               "import Data.Monoid\n",
-                              "import BinaryIter\n",
-                              "import RosBinary\n",
+                              "import Ros.BinaryIter\n",
+                              "import Ros.RosBinary\n",
                               genImports (map snd fields)]
           dataLine = B.concat ["\ndata ", tName, " = ", tName, " { "]
           fieldIndent = B.replicate (B.length dataLine - 3) ' '
@@ -82,8 +82,8 @@ typeDependency RUInt8            = wordImport
 typeDependency RInt16            = intImport
 typeDependency RUInt16           = wordImport
 typeDependency RUInt32           = wordImport
-typeDependency RTime             = singleton "ROSTypes"
-typeDependency RDuration         = singleton "ROSTypes"
+typeDependency RTime             = singleton "Ros.RosTypes"
+typeDependency RDuration         = singleton "Ros.RosTypes"
 typeDependency (RFixedArray _ t) = S.union vectorDeps $
                                    typeDependency t
 typeDependency (RVarArray t)     = S.union vectorDeps $

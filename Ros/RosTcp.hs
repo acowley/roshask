@@ -1,4 +1,4 @@
-module RosTcp (subStream, runServer) where
+module Ros.RosTcp (subStream, runServer) where
 import Control.Applicative ((<$>))
 import Control.Arrow ((***))
 import Control.Concurrent (forkIO, killThread)
@@ -15,8 +15,8 @@ import qualified Network.Socket as Sock
 import Network.Socket.ByteString.Lazy
 import System.IO (IOMode(ReadMode))
 
-import BinaryIter
-import ROSTypes
+import Ros.BinaryIter
+import Ros.RosTypes
 
 -- |Maximum number of items to buffer for each client.
 sendBufferSize :: Int

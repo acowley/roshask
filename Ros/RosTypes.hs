@@ -1,5 +1,5 @@
 -- Utility types for working with ROS.
-module ROSTypes where
+module Ros.RosTypes where
 import Control.Applicative
 import Data.Word
 

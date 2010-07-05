@@ -1,5 +1,5 @@
 {-# LANGUAGE PackageImports #-}
-module SlaveAPI (RosSlave(..), runSlave) where
+module Ros.SlaveAPI (RosSlave(..), runSlave) where
 import Control.Applicative
 import Control.Concurrent (killThread, forkIO, threadDelay)
 import Control.Concurrent.QSem
@@ -14,8 +14,8 @@ import Network.XmlRpc.Internals (Value, toValue)
 import Network.XmlRpc.Server (handleCall, methods, fun)
 import System.IO (hGetContents, hPutStr, hClose)
 import System.Posix.Process (getProcessID)
-import XmlRpcTuples
-import ROSTypes
+import Ros.XmlRpcTuples
+import Ros.RosTypes
 
 class RosSlave a where
     getMaster :: a -> URI

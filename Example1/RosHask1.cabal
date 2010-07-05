@@ -24,7 +24,8 @@ Executable RosHask1
   Build-Depends:  base >= 4.2 && < 6,
                   bytestring,
                   vector >= 0.6 && < 0.7,
-                  binary
+                  binary,
+                  roshask
 
   GHC-Options:    -Odph
   Main-Is:        Main.hs

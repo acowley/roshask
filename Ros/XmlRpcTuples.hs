@@ -2,7 +2,7 @@
 -- |Tuples in Haskell can be represented as heterogenous arrays in the
 -- XML-RPC type system. This module defines instances for tuples up to
 -- length 5.
-module XmlRpcTuples where
+module Ros.XmlRpcTuples where
 import "mtl" Control.Monad.Error
 import Control.Monad
 import Network.XmlRpc.Internals

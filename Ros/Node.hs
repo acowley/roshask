@@ -1,6 +1,6 @@
 {-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables, 
              TupleSections #-}
-module Node (Node, runNode, advertise, subscribe) where
+module Ros.Node (Node, runNode, advertise, subscribe) where
 import Control.Applicative ((<$>))
 import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (atomically)
@@ -13,10 +13,10 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Typeable (Typeable, TypeRep, typeOf)
 import Control.Concurrent (forkIO, ThreadId)
-import BinaryIter
-import ROSTypes
-import RosTcp
-import SlaveAPI
+import Ros.BinaryIter
+import Ros.RosTypes
+import Ros.RosTcp
+import Ros.SlaveAPI
 
 data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , addPub    :: URI -> IO ThreadId

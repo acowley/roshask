@@ -1,6 +1,10 @@
 {-# LANGUAGE ScopedTypeVariables, FlexibleInstances, BangPatterns, 
              TypeSynonymInstances #-}
-module BinaryIter (Iter(..), BinaryIter(..), streamIn, consume') where
+-- |Binary iteratee-style serialization helpers for working with ROS
+-- message types. This module is used by the automatically-generated
+-- code for ROS .msg types.
+
+module Ros.BinaryIter (Iter(..), BinaryIter(..), streamIn, consume') where
 import Control.Applicative
 import Control.Monad.ST (runST)
 import Data.Binary (Binary)
@@ -19,7 +23,7 @@ import GHC.Int (Int64)
 import System.IO (Handle)
 import System.IO.Unsafe (unsafeInterleaveIO)
 import Unsafe.Coerce (unsafeCoerce)
-import ROSTypes
+import Ros.RosTypes
 
 -- |An Iter provides either a continuation asking for more data or a
 -- produced value along with another Iter of the same type.
@@ -42,6 +46,7 @@ instance Monoid a => Applicative (Iter a) where
 class BinaryIter a where
     consume :: ByteString -> Iter ByteString a
 
+-- |Use a type's BinaryIter instance to construct an Iter value.
 consume' :: BinaryIter a => Iter ByteString a
 consume' = More consume
 
@@ -49,7 +54,7 @@ consume' = More consume
 cHUNK_SIZE :: Int
 cHUNK_SIZE = 16 * 1024
 
--- The function that does the work of streaming members of the
+-- |The function that does the work of streaming members of the
 -- BinaryIter class in from a Handle.
 streamIn :: BinaryIter a => Handle -> IO (Stream a)
 streamIn h = go consume

@@ -1,8 +1,12 @@
 {-# LANGUAGE ScopedTypeVariables, TypeSynonymInstances #-}
--- Note that tne endianess of message serialization is unclear. I am
+-- |Binary serialization deserialization utilities for types used in
+-- ROS messages. This module is used by generated code for .msg
+-- types.
+
+-- Note that the endianess of message serialization is unclear. I am
 -- using the native byte ordering of the host to support the common
 -- scenario of same-machine transport.
-module RosBinary where
+module Ros.RosBinary where
 import Control.Applicative ((<$>), (<*>))
 import Control.Monad ((>=>))
 import Data.Binary.Get
@@ -19,7 +23,7 @@ import Foreign.Ptr (Ptr, castPtr)
 import Foreign.Storable (sizeOf, Storable, peekElemOff)
 import System.IO.Unsafe
 
-import ROSTypes
+import Ros.RosTypes
 
 class BinaryCompact a where
     put :: a -> Put
