@@ -6,7 +6,6 @@ import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar
 import Control.Monad (forever, forM_)
-import Data.Binary (Binary, put)
 import Data.Binary.Put (runPut)
 import Data.ByteString.Lazy (ByteString)
 import Network.BSD (getHostByName, hostAddress)
@@ -17,6 +16,7 @@ import System.IO (IOMode(ReadMode))
 
 import Ros.BinaryIter
 import Ros.RosTypes
+import Ros.RosBinary
 
 -- |Maximum number of items to buffer for each client.
 sendBufferSize :: Int
@@ -42,7 +42,8 @@ acceptClients sock clients = forever acceptClient
                                          writeTVar clients . ((cleanup,chan) :)
 
 -- |Publish each item obtained from a Stream to each connected client.
-pubStream :: Binary a => Stream a -> TVar [(b, BoundedChan ByteString)] -> IO ()
+pubStream :: BinaryCompact a => 
+             Stream a -> TVar [(b, BoundedChan ByteString)] -> IO ()
 pubStream s clients = forever $ go s
     where go (Stream x xs) = let bytes = runPut (put x)
                              in atomically (readTVar clients) >>=
@@ -64,7 +65,7 @@ subStream target = do sock <- socket AF_INET Sock.Stream defaultProtocol
 -- clients. Returns an action for cleanup up resources allocated by
 -- this publication server along with the port the server is listening
 -- on.
-runServer :: Binary a => Stream a -> IO (IO (), Int)
+runServer :: BinaryCompact a => Stream a -> IO (IO (), Int)
 runServer stream = withSocketsDo $ do
                      sock <- socket AF_INET Sock.Stream defaultProtocol
                      bindSocket sock (SockAddrInet aNY_PORT iNADDR_ANY)

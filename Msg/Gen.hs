@@ -14,15 +14,18 @@ import Msg.Types
 
 generateMsgType :: ByteString -> Msg -> ByteString
 generateMsgType pkgPath msg@(Msg name _ fields) = 
-    B.concat [modLine, "\n", imports, dataLine, fieldSpecs, " }\n\n",
+    B.concat [modLine, "\n", imports, dataLine, fieldSpecs, 
+              " } deriving Typeable\n\n",
               genBinaryInstance msg, "\n\n", 
               genBinaryIterInstance msg, "\n\n",
               genHasHeader msg]
     where tName = pack $ toUpper (head name) : tail name
-          modLine = B.concat ["module ", pkgPath, tName, " where"]
+          modLine = B.concat ["{-# LANGUAGE DeriveDataTypeable #-}\n",
+                              "module ", pkgPath, tName, " where"]
           imports = B.concat ["import qualified Prelude as P\n",
                               "import Control.Applicative\n",
                               "import Data.Monoid\n",
+                              "import Data.Typeable\n",
                               "import Ros.BinaryIter\n",
                               "import Ros.RosBinary\n",
                               genImports (map snd fields)]

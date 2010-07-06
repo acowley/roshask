@@ -41,7 +41,7 @@ Library
   
   -- Modules not exported by this package.
   Other-modules:      Ros.MasterAPI Ros.RosTcp Ros.SlaveAPI 
-                      Ros.XmlRpcTuples
+                      Ros.XmlRpcTuples Ros.RunNode
   
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         

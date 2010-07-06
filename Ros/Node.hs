@@ -6,7 +6,6 @@ import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar (TVar, readTVar, writeTVar, newTVarIO)
 import "monads-fd" Control.Monad.State
-import Data.Binary (Binary)
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Set (Set)
@@ -14,10 +13,12 @@ import qualified Data.Set as S
 import Data.Typeable (Typeable, TypeRep, typeOf)
 import Control.Concurrent (forkIO, ThreadId)
 import System.IO.Unsafe (unsafeInterleaveIO)
+import Ros.RosBinary (BinaryCompact)
 import Ros.BinaryIter
 import Ros.RosTypes
 import Ros.RosTcp
-import Ros.SlaveAPI
+import Ros.SlaveAPI (RosSlave(..))
+import qualified Ros.RunNode as RN
 
 data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , addPub    :: URI -> IO ThreadId
@@ -110,12 +111,14 @@ mkSub = do c <- newBoundedChan recvBufferSize
            return (stream, sub)
     where list2stream (x:xs) = Stream x (list2stream xs)
 
-mkPub :: forall a. (Typeable a, Binary a) => Stream a -> IO Publication
+mkPub :: forall a. (Typeable a, BinaryCompact a) => Stream a -> IO Publication
 mkPub s = do (cleanup, port) <- runServer s
              known <- newTVarIO S.empty
              let trep = typeOf (undefined::a)
              return $ Publication known trep port cleanup M.empty
 
+-- |Subscribe to the given Topic. Returns the @Stream@ of values
+-- received on over the Topic.
 subscribe :: (Typeable a, BinaryIter a) => TopicName -> Node (Stream a)
 subscribe name = do n <- get
                     let subs = subscriptions n
@@ -125,7 +128,8 @@ subscribe name = do n <- get
                                put n { subscriptions = M.insert name sub subs }
                                return stream
 
-advertise :: (Typeable a, Binary a) => TopicName -> Stream a -> Node ()
+-- |Advertise a Topic publishing a @Stream@ of pure values.
+advertise :: (Typeable a, BinaryCompact a) => TopicName -> Stream a -> Node ()
 advertise name stream = 
     do n <- get
        let pubs = publications n
@@ -139,14 +143,13 @@ streamIO (Stream x xs) = do x' <- x
                             xs' <- unsafeInterleaveIO $ streamIO xs
                             return $ Stream x' xs'
 
-advertiseIO :: (Typeable a, Binary a) => TopicName -> Stream (IO a) -> Node ()
+-- |Advertise a Topic publishing a @Stream@ of @IO@ values.
+advertiseIO :: (Typeable a, BinaryCompact a) => 
+               TopicName -> Stream (IO a) -> Node ()
 advertiseIO name stream = do s <- liftIO $ streamIO stream
                              advertise name s
 
--- | A filtered stream.
-fooBar :: (Num a, Ord a) => Stream a -> Stream a
-fooBar (Stream x xs) = if x < 2 then fooBar xs else Stream x (fooBar xs)
-
+-- |Run a ROS Node.
 runNode :: NodeName -> Node a -> IO ()
 runNode name (Node n) = go $ execStateT n (NodeState name "" M.empty M.empty)
-    where go ns = undefined
+    where go ns = ns >>= RN.runNode

@@ -116,7 +116,6 @@ simpleServe port handler = httpServe (pack "*") port (pack "myserver")
                                      Nothing Nothing handler
     where pack = BU.fromString
 
-
 -- |Run a ROS slave node until it receives a shutdown command.
 runSlave :: RosSlave a => a -> IO ()
 runSlave n = do quitNow <- newQSem 0
