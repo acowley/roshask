@@ -13,6 +13,7 @@ import Data.Set (Set)
 import qualified Data.Set as S
 import Data.Typeable (Typeable, TypeRep, typeOf)
 import Control.Concurrent (forkIO, ThreadId)
+import System.IO.Unsafe (unsafeInterleaveIO)
 import Ros.BinaryIter
 import Ros.RosTypes
 import Ros.RosTcp
@@ -132,6 +133,15 @@ advertise name stream =
          then error $ "Already advertised "++name
          else do pub <- liftIO $ mkPub stream 
                  put n { publications = M.insert name pub pubs }
+
+streamIO :: Stream (IO a) -> IO (Stream a)
+streamIO (Stream x xs) = do x' <- x
+                            xs' <- unsafeInterleaveIO $ streamIO xs
+                            return $ Stream x' xs'
+
+advertiseIO :: (Typeable a, Binary a) => TopicName -> Stream (IO a) -> Node ()
+advertiseIO name stream = do s <- liftIO $ streamIO stream
+                             advertise name s
 
 -- | A filtered stream.
 fooBar :: (Num a, Ord a) => Stream a -> Stream a

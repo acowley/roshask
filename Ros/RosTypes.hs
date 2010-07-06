@@ -16,6 +16,9 @@ takeS :: Int -> Stream a -> [a]
 takeS 0 _ = []
 takeS n (Stream x xs) = x : takeS (n - 1) xs
 
+interleave :: Stream a -> Stream a -> Stream a
+interleave (Stream x xs) (Stream y ys) = Stream x (Stream y (xs `interleave` ys))
+
 instance Functor Stream where
     fmap f (Stream x xs) = Stream (f x) (fmap f xs)
 
