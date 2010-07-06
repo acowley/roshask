@@ -1,6 +1,6 @@
 {-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables, 
              TupleSections #-}
-module Ros.Node (Node, runNode, advertise, subscribe) where
+module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe) where
 import Control.Applicative ((<$>))
 import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (atomically)
