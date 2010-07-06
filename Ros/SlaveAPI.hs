@@ -10,6 +10,8 @@ import qualified Data.ByteString.Lazy.UTF8 as BLU
 import qualified Data.ByteString.Lazy as BL
 import Snap.Http.Server (httpServe)
 import Snap.Types (Snap, getRequestBody, writeBS)
+import Network.Socket hiding (Stream)
+import qualified Network.Socket as Net
 import Network.XmlRpc.Internals (Value, toValue)
 import Network.XmlRpc.Server (handleCall, methods, fun)
 import System.IO (hGetContents, hPutStr, hClose)
@@ -116,14 +118,27 @@ simpleServe port handler = httpServe (pack "*") port (pack "myserver")
                                      Nothing Nothing handler
     where pack = BU.fromString
 
--- |Run a ROS slave node until it receives a shutdown command.
-runSlave :: RosSlave a => a -> IO ()
+-- Find a free port by opening a socket, getting its port, then
+-- closing it.
+findFreePort :: IO Int
+findFreePort = do s <- socket AF_INET Net.Stream defaultProtocol
+                  bindSocket s (SockAddrInet aNY_PORT iNADDR_ANY)
+                  port <- fromInteger . toInteger <$> socketPort s
+                  sClose s
+                  return port
+
+-- |Run a ROS slave node. Returns an action that will wait for the
+-- node to shutdown along with the port the server is running on.
+runSlave :: RosSlave a => a -> IO (IO (), Int)
 runSlave n = do quitNow <- newQSem 0
-                t <- forkIO $ simpleServe 9131 (rpc (slaveRPC n quitNow))
-                waitQSem quitNow
-                threadDelay 1000000 -- Wait a second for the response to flush
-                stopNode n
-                killThread t
+                let port = 9131
+                t <- forkIO $ simpleServe port (rpc (slaveRPC n quitNow))
+                let wait = do waitQSem quitNow
+                              -- Wait a second for the response to flush
+                              threadDelay 1000000 
+                              stopNode n
+                              killThread t
+                return (wait, port)
     where rpc f = do body <- BLU.toString <$> getRequestBody
                      response <- liftIO $ f body
                      writeBS $ BU.fromString response
