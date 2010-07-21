@@ -10,7 +10,9 @@ import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Char (toLower, digitToInt)
 import Data.Digest.Pure.MD5 (md5)
 import Data.List (foldl')
-import System.FilePath (dropExtension, takeFileName)
+import System.Environment (getEnvironment)
+import System.FilePath (dropExtension, takeFileName, splitDirectories, (</>))
+import System.Process (readProcess)
 import Msg.Types
 
 eatLine = manyTill anyChar (eitherP endOfLine endOfInput) *> skipSpace
@@ -47,30 +49,49 @@ fieldParsers = builtIns ++ [comment *> userTypeParser]
     where builtIns = concatMap (\f -> map ((comment *>) . f) simpleFieldTypes)
                                [simpleParser, fixedArrayParser, varArrayParser]
 
-mkParser :: String -> Parser Msg
-mkParser name = Msg name "" <$> many (choice fieldParsers)
+mkParser :: String -> String -> Parser Msg
+mkParser sname lname = Msg sname lname "" <$> many (choice fieldParsers)
 
 testMsg = "# Foo bar\n\n#   \nHeader header  # a header\nuint32 aNum # a number \n  # It's not important"
 
-test = feed (parse (mkParser "") testMsg) ""
+test = feed (parse (mkParser "" "") testMsg) ""
 
 -- Ensure that field names do not coincide with Haskell reserved words.
 sanitize :: Msg -> Msg
-sanitize (Msg name md5 fields) = Msg name md5 $
-                                 map sanitizeField fields
+sanitize (Msg sname lname md5 fields) = Msg sname lname md5 $
+                                        map sanitizeField fields
     where sanitizeField ("data", t)   = ("_data", t)
           sanitizeField ("type", t)   = ("_type", t)
           sanitizeField ("class", t)  = ("_class", t)
           sanitizeField ("module", t) = ("_module", t)
           sanitizeField x             = x
 
-addHash :: ByteString -> Msg -> Msg
-addHash hash (Msg name _ fields) = Msg name hash fields
+addHash :: String -> Msg -> Msg
+addHash hash (Msg sname lname _ fields) = Msg sname lname hash fields
+
+genName :: FilePath -> String
+genName f = let parts = splitDirectories f
+                [pkg,_,msgFile] = drop (length parts - 3) parts
+            in pkg ++ "/" ++ dropExtension msgFile
+
+-- Use roslib/scripts/gendeps to compute the MD5 ROS uses to uniquely
+-- identify versions of msg files.
+genRosMD5 :: FilePath -> IO String
+genRosMD5 fname = 
+    do env <- getEnvironment
+       let ros_root = case lookup "ROS_ROOT" env of
+                        Just s -> s
+                        Nothing -> error "Environment variable ROS_ROOT not set"
+           gendeps = ros_root</>"core"</>"roslib"</>"scripts"</>"gendeps"
+       init <$> readProcess gendeps ["-m", fname] "" 
 
 parseMsg :: FilePath -> IO (Either String Msg)
 parseMsg fname = do msgFile <- B.readFile fname
-                    let hash = pack . show . md5 . BL.fromChunks $ [msgFile]
-                    let parser = mkParser (dropExtension . takeFileName $ fname)
+                    let --hash = pack . show . md5 . BL.fromChunks $ [msgFile]
+                        shortName = dropExtension . takeFileName $ fname
+                        longName = genName fname
+                        parser = mkParser shortName longName
+                    hash <- genRosMD5 fname
                     case feed (parse parser msgFile) "" of
                       Done leftOver msg
                           | B.null leftOver -> return . Right . 

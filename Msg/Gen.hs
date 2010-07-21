@@ -13,7 +13,7 @@ import Text.Printf (printf)
 import Msg.Types
 
 generateMsgType :: ByteString -> Msg -> ByteString
-generateMsgType pkgPath msg@(Msg name md5 fields) = 
+generateMsgType pkgPath msg@(Msg name _ md5 fields) = 
     B.concat [modLine, "\n", imports, dataLine, fieldSpecs, 
               " } deriving Typeable\n\n",
               genBinaryInstance msg, "\n\n", 
@@ -38,7 +38,7 @@ generateMsgType pkgPath msg@(Msg name md5 fields) =
           fieldSpecs = B.intercalate lineSep $ map generateField fields
 
 genHasHeader :: Msg -> ByteString
-genHasHeader (Msg name _ ((hn, RUserType t):_)) 
+genHasHeader (Msg name _ _ ((hn, RUserType t):_)) 
     | t == "Header" = B.concat["instance HasHeader ", pack name, 
                                " where\n  getHeader = header\n",
                                "  setSequence x seq = x { ", hn, 
@@ -47,10 +47,11 @@ genHasHeader (Msg name _ ((hn, RUserType t):_))
 genHasHeader _ = ""
 
 genHasHash :: Msg -> ByteString
-genHasHash (Msg name md5 _) = B.concat ["instance MsgInfo ", pack name,
-                                        " where\n  sourceMD5 _ = \"", md5,
-                                        "\"\n", "msgTypeName _ = \"", pack name,
-                                        "\"\n"]
+genHasHash (Msg sname lname md5 _) = 
+    B.concat ["instance MsgInfo ", pack sname,
+              " where\n  sourceMD5 _ = \"", pack md5,
+              "\"\n  msgTypeName _ = \"", pack lname,
+              "\"\n"]
 
 generateField :: (ByteString, MsgType) -> ByteString
 generateField (name, t) = B.concat [name, " :: ", ros2Hask t]
@@ -61,7 +62,7 @@ genImports fieldTypes = B.concat (concatMap (\i -> ["import ", i, "\n"])
      where allImports = foldl' ((. typeDependency) . flip S.union) S.empty
 
 genBinaryInstance :: Msg -> ByteString
-genBinaryInstance (Msg name _ fields) = 
+genBinaryInstance (Msg name _ _ fields) = 
    B.concat ["instance BinaryCompact ", pack name, " where\n",
              "  put x = do ", 
              B.intercalate (B.append "\n" (pack (replicate 13 ' ')))
@@ -138,7 +139,7 @@ ros2Hask (RUserType t)     = qualify . pack . takeFileName . unpack $ t
     where qualify b = B.concat [b, ".", b]
 
 genBinaryIterInstance :: Msg -> ByteString
-genBinaryIterInstance (Msg name _ fields) = 
+genBinaryIterInstance (Msg name _ _ fields) = 
     B.concat ["instance BinaryIter ", pack name, " where\n",
               "  consume = case ", pack name, " <$> ", 
               B.intercalate " <*> " (replicate (length fields) "consume'"),

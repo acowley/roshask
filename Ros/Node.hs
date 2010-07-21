@@ -3,15 +3,15 @@
 module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe) where
 import Control.Applicative ((<$>))
 import Control.Concurrent.BoundedChan
-import Control.Concurrent.STM (atomically)
-import Control.Concurrent.STM.TVar (TVar, readTVar, writeTVar, newTVarIO)
+import Control.Concurrent.STM (atomically, STM, TVar, readTVar, writeTVar, 
+                               newTVarIO)
 import "monads-fd" Control.Monad.State
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as S
-import Data.Typeable (Typeable, TypeRep, typeOf)
 import Control.Concurrent (forkIO, ThreadId)
+import System.Environment (getEnvironment)
 import System.IO.Unsafe (unsafeInterleaveIO)
 import Msg.MsgInfo
 import Ros.RosBinary (BinaryCompact)
@@ -20,17 +20,18 @@ import Ros.RosTypes
 import Ros.RosTcp
 import Ros.SlaveAPI (RosSlave(..))
 import qualified Ros.RunNode as RN
+import Ros.TopicStats
 
 data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , addPub    :: URI -> IO ThreadId
-                                 , subType   :: TypeRep
-                                 , subStats  :: Map URI (TVar SubStats) }
+                                 , subType   :: String
+                                 , subStats  :: StatMap SubStats }
 
 data Publication = Publication { subscribers :: TVar (Set URI)
-                               , pubType     :: TypeRep
+                               , pubType     :: String
                                , pubPort     :: Int
                                , pubCleanup  :: IO ()
-                               , pubStats    :: Map URI (TVar PubStats) }
+                               , pubStats    :: StatMap PubStats }
 
 data NodeState = NodeState { nodeName      :: String
                            , master        :: URI
@@ -52,34 +53,34 @@ instance MonadState NodeState Node where
 
 instance RosSlave NodeState where
     getMaster = master
-    getSubscriptions = mapM formatSub . M.toList . subscriptions
+    getSubscriptions = atomically . mapM formatSub . M.toList . subscriptions
         where formatSub (name, sub) = let topicType = show $ subType sub
-                                      in do stats <- mapM statSnapshot . 
-                                                     M.toList $
-                                                     subStats sub
-                                            return (name, topicType, stats)
-    getPublications = mapM formatPub . M.toList . publications
+                                      in do stats <- readTVar (subStats sub)
+                                            stats' <- mapM statSnapshot . 
+                                                      M.toList $
+                                                      stats
+                                            return (name, topicType, stats')
+    getPublications = atomically . mapM formatPub . M.toList . publications
         where formatPub (name, pub) = let topicType = show $ pubType pub
-                                      in do stats <- mapM statSnapshot .
-                                                     M.toList $
-                                                     pubStats pub
-                                            return (name, topicType, stats)
+                                      in do stats <- readTVar (pubStats pub)
+                                            stats' <- mapM statSnapshot .
+                                                      M.toList $
+                                                      stats
+                                            return (name, topicType, stats')
     publisherUpdate ns name uris = 
-        case M.lookup name (subscriptions ns) of
-          Nothing -> return ()
-          Just sub -> join . atomically $
-                      do let add = addPub sub >=> \_ -> return ()
-                         known <- readTVar (knownPubs sub) 
-                         (act,known') <- foldM (connectToPub add)
-                                               (return (), known)
-                                               uris
-                         writeTVar (knownPubs sub) known'
-                         return act
-    getTopicPortTCP = (liftM pubPort .) . flip M.lookup . publications
+        let act = atomically $
+                  case M.lookup name (subscriptions ns) of
+                    Nothing -> return (return ())
+                    Just sub -> do let add = addPub sub >=> \_ -> return ()
+                                   known <- readTVar (knownPubs sub) 
+                                   (act,known') <- foldM (connectToPub add)
+                                                         (return (), known)
+                                                         uris
+                                   writeTVar (knownPubs sub) known'
+                                   return act
+        in act >> return ()
+    getTopicPortTCP = ((pubPort <$> ) .) . flip M.lookup . publications
     stopNode = mapM_ (pubCleanup . snd) . M.toList . publications
-
-statSnapshot :: (URI, TVar a) -> IO (URI, a)
-statSnapshot (uri, stat) = (uri,) <$> atomically (readTVar stat)
 
 -- If a given URI is not a part of a Set of known URIs, add an action
 -- to effect a subscription to an accumulated action and add the URI
@@ -98,34 +99,39 @@ recvBufferSize = 10
 -- |Spark a thread that funnels a Stream from a URI into the given
 -- Chan.
 addSource :: (BinaryIter a, MsgInfo a) => 
-             String -> BoundedChan a -> URI -> IO ThreadId
-addSource tname c uri = forkIO $ subStream uri tname >>= go
+             String -> (URI -> Int -> IO ()) -> BoundedChan a -> URI -> 
+             IO ThreadId
+addSource tname updateStats c uri = 
+    forkIO $ subStream uri tname (updateStats uri) >>= go
     where go (Stream x xs) = writeChan c x >> go xs
 
 -- Create a new Subscription value that will act as a named input
 -- channel with zero or more connected publishers.
-mkSub :: forall a. (Typeable a, BinaryIter a, MsgInfo a) => 
+mkSub :: forall a. (BinaryIter a, MsgInfo a) => 
          String -> IO (Stream a, Subscription)
 mkSub tname = do c <- newBoundedChan recvBufferSize
                  stream <- list2stream <$> getChanContents c
                  known <- newTVarIO S.empty
-                 let topicType = typeOf (undefined::a)
-                     sub = Subscription known (addSource tname c) 
-                                        topicType M.empty
+                 stats <- newTVarIO M.empty
+                 let topicType = msgTypeName (undefined::a)
+                     updateStats = recvMessageStat stats
+                     sub = Subscription known (addSource tname updateStats c) 
+                                        topicType stats
                  return (stream, sub)
     where list2stream (x:xs) = Stream x (list2stream xs)
 
-mkPub :: forall a. (Typeable a, BinaryCompact a, MsgInfo a) => 
+mkPub :: forall a. (BinaryCompact a, MsgInfo a) => 
          Stream a -> IO Publication
-mkPub s = do (cleanup, port) <- runServer s
+mkPub s = do stats <- newTVarIO M.empty
+             (cleanup, port) <- runServer s (sendMessageStat stats)
              known <- newTVarIO S.empty
-             let trep = typeOf (undefined::a)
-             return $ Publication known trep port cleanup M.empty
+             --let trep = typeOf (undefined::a)
+             let trep = msgTypeName (undefined::a)
+             return $ Publication known trep port cleanup stats
 
 -- |Subscribe to the given Topic. Returns the @Stream@ of values
 -- received on over the Topic.
-subscribe :: (Typeable a, BinaryIter a, MsgInfo a) => 
-             TopicName -> Node (Stream a)
+subscribe :: (BinaryIter a, MsgInfo a) => TopicName -> Node (Stream a)
 subscribe name = do n <- get
                     let subs = subscriptions n
                     if M.member name subs
@@ -135,8 +141,7 @@ subscribe name = do n <- get
                                return stream
 
 -- |Advertise a Topic publishing a @Stream@ of pure values.
-advertise :: (Typeable a, BinaryCompact a, MsgInfo a) => 
-             TopicName -> Stream a -> Node ()
+advertise :: (BinaryCompact a, MsgInfo a) => TopicName -> Stream a -> Node ()
 advertise name stream = 
     do n <- get
        let pubs = publications n
@@ -151,12 +156,22 @@ streamIO (Stream x xs) = do x' <- x
                             return $ Stream x' xs'
 
 -- |Advertise a Topic publishing a @Stream@ of @IO@ values.
-advertiseIO :: (Typeable a, BinaryCompact a, MsgInfo a) => 
+advertiseIO :: (BinaryCompact a, MsgInfo a) => 
                TopicName -> Stream (IO a) -> Node ()
 advertiseIO name stream = do s <- liftIO $ streamIO stream
                              advertise name s
 
+-- If the master URI is set in the ROS_MASTER_URI environment variable
+-- then use that, otherwise use http://localhost:11311
+findMaster :: IO String
+findMaster = do env <- getEnvironment
+                case lookup "ROS_MASTER_URI" env of
+                  Just uri -> return uri
+                  Nothing -> return "http://localhost:11311"
+
 -- |Run a ROS Node.
 runNode :: NodeName -> Node a -> IO ()
-runNode name (Node n) = go $ execStateT n (NodeState name "" M.empty M.empty)
-    where go ns = ns >>= RN.runNode
+runNode name (Node n) = 
+    do master <- findMaster
+       go $ execStateT n (NodeState name master M.empty M.empty)
+    where go ns = ns >>= RN.runNode name

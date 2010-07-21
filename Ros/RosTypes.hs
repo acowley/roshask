@@ -26,14 +26,6 @@ instance Applicative Stream where
     pure x = Stream x (pure x)
     (Stream f fs) <*> (Stream x xs) = Stream (f x) (fs <*> xs)
 
-data SubStats = SubStats { bytesReceived  :: Int
-                         , subDestination :: URI
-                         , subConnected   :: Bool }
-
-data PubStats = PubStats { bytesSent      :: Int
-                         , numSent        :: Int
-                         , pubConnected   :: Bool }
-
 -- ROSTime is a tuple of (seconds, nanoseconds)
 type ROSTime = (Word32, Word32)
 

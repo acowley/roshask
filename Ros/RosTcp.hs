@@ -6,12 +6,15 @@ import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar
-import Control.Monad (forever, forM_)
-import Data.Binary.Put (runPut)
+import Data.Map (Map)
+import qualified Data.Map as M
+import Control.Monad (forever, forM_, when)
+import Data.Binary.Put (runPut, putWord32le)
 import Data.Binary.Get (runGet, getWord32le)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Char8 as BC8
+import qualified Data.ByteString.Lazy as BL
 import Network.BSD (getHostByName, hostAddress)
 import Network.Socket hiding (send, sendTo, recv, recvFrom, Stream)
 import qualified Network.Socket as Sock
@@ -32,8 +35,14 @@ sendBufferSize = 10
 -- |Push each item from this client's buffer over the connected
 -- socket.
 serviceClient :: BoundedChan ByteString -> Socket -> IO ()
-serviceClient c s = go
-    where go = readChan c >>= sendAll s >> go
+serviceClient c s = forever $ do bs <- readChan c
+                                 let len = runPut $ putWord32le .
+                                                    unsafeCoerce $
+                                                    BL.length bs
+                                 sendAll s (BL.append len bs)
+                                 --sendMany s [len,bs]
+--forever (readChan c >>= sendAll s >> putStrLn "serviced")
+--    where go = readChan c >>= sendAll s >> go
 
 negotiatePub :: String -> String -> Socket -> IO ()
 negotiatePub ttype md5 sock = 
@@ -41,41 +50,66 @@ negotiatePub ttype md5 sock =
                        recv sock 4
        headerBytes <- recv sock headerLength
        let connHeader = parseHeader headerBytes
-       case lookup "type" connHeader of
-         Just t | t == ttype -> return ()
-                | otherwise -> error $ "Disagreeing Topic types: " ++
-                                       "publisher expected "++ttype++
-                                       ", but client asked for "++t
-         Nothing -> error $ "Client did not include the topic type in its "++
-                            "connection request."
-       case lookup "md5sum" connHeader of
-         Just s | s == md5 -> return ()
-                | otherwise -> error "Disagreement on Topic type MD5"
-         Nothing -> error $ "Client did not include MD5 sum in its request."
+           wildCard = case lookup "type" connHeader of
+                        Just t | t == "*" -> True
+                               | t == ttype -> False
+                               | otherwise -> error $ 
+                                              "Disagreeing Topic types: " ++
+                                              "publisher expected "++ttype++
+                                              ", but client asked for "++t
+                        Nothing -> error $ "Client did not include the "++
+                                           "topic type in its "++
+                                           "connection request."
+       when (not wildCard) 
+            (case lookup "md5sum" connHeader of
+               Just s | s == md5 -> return ()
+                      | otherwise -> error "Disagreement on Topic type MD5"
+               Nothing -> error $ "Client did not include MD5 sum "++
+                                  "in its request.")
+       case lookup "tcp_nodelay" connHeader of
+         Just "1" -> setSocketOption sock NoDelay 0
+         _ -> return ()
+       _ <- send sock $ genHeader [("md5sum",md5),("type",ttype)] 
        return ()
 
 -- |Accept new client connections. A new send buffer is allocated for
 -- each new client and added to the client list along with an action
 -- for cleaning up the client connection.
+-- FIXME: cleaning up a disconnected client should be reflected at a
+-- higher level, too.
 acceptClients :: Socket -> TVar [(IO (), BoundedChan ByteString)] -> 
                  (Socket -> IO ()) -> IO ()
 acceptClients sock clients negotiate = forever acceptClient
     where acceptClient = do (client,_) <- accept sock
-                            negotiate sock
+                            putStrLn "Accepted client socket"
+                            negotiate client
                             chan <- newBoundedChan sendBufferSize
-                            t <- forkIO $ serviceClient chan client
-                            let cleanup = shutdown client ShutdownBoth >>
-                                          killThread t
+                            let cleanup1 = 
+                                    do putStrLn "Closing client socket"
+                                       shutdown client ShutdownBoth `catch`
+                                                \_ -> return ()
+                            t <- forkIO $ serviceClient chan client `catch`
+                                          \_ -> cleanup1
+                            let cleanup2 = cleanup1 >>
+                                           killThread t
                             atomically $ readTVar clients >>= 
-                                         writeTVar clients . ((cleanup,chan) :)
+                                         writeTVar clients . ((cleanup2,chan) :)
 
 -- |Publish each item obtained from a Stream to each connected client.
 pubStream :: BinaryCompact a => 
              Stream a -> TVar [(b, BoundedChan ByteString)] -> IO ()
-pubStream s clients = forever $ go s
+pubStream s clients = go s
     where go (Stream x xs) = let bytes = runPut (put x)
-                             in atomically (readTVar clients) >>=
-                                mapM_ (flip writeChan bytes . snd)
+                             in do cs <- atomically (readTVar clients)
+                                   putStrLn $ "Sending "++
+                                              show (BL.length bytes)++
+                                              " bytes to "++
+                                              show (length cs)++
+                                              " clients"
+                                   mapM_ (flip writeChan bytes . snd) cs
+                                   putStrLn "Message sent"
+                                   --mapM_ (flip writeChan bytes . snd) >>
+                                   go xs
 
 -- Negotiate a TCPROS subscriber connection.
 negotiateSub :: Socket -> String -> String -> String -> IO ()
@@ -97,13 +131,15 @@ negotiateSub sock tname ttype md5 =
          Just s | s == md5 -> return ()
                 | otherwise -> error "Disagreement on Topic type MD5"
          Nothing -> error "Server did not include MD5 sum in its response."
-       return ()
+       setSocketOption sock KeepAlive 1
 
 -- |Connect to a publisher and return the stream of data it is
 -- publishing.
+-- FIXME: We actually need to do an XML-RPC call on the URI for the
+-- requestTopic method, passing it (name, tname, [["TCPROS"]])
 subStream :: forall a. (BinaryIter a, MsgInfo a) => 
-             URI -> String -> IO (Stream a)
-subStream target tname = 
+             URI -> String -> (Int -> IO ()) -> IO (Stream a)
+subStream target tname updateStats = 
     do sock <- socket AF_INET Sock.Stream defaultProtocol
        ip <- hostAddress <$> getHostByName host
        connect sock $ SockAddrInet port ip
@@ -121,21 +157,22 @@ subStream target tname =
 -- this publication server along with the port the server is listening
 -- on.
 runServer :: forall a. (BinaryCompact a, MsgInfo a) => 
-             Stream a -> IO (IO (), Int)
-runServer stream = withSocketsDo $ do
-                     sock <- socket AF_INET Sock.Stream defaultProtocol
-                     bindSocket sock (SockAddrInet aNY_PORT iNADDR_ANY)
-                     port <- fromIntegral <$> socketPort sock
-                     listen sock 5
-                     clients <- newTVarIO []
-                     let ttype = msgTypeName (undefined::a)
-                         md5 = sourceMD5 (undefined::a)
-                         negotiate = negotiatePub ttype md5
-                     acceptThread <- forkIO $ 
-                                     acceptClients sock clients negotiate
-                     pubThread <- forkIO $ pubStream stream clients
-                     let cleanup = atomically (readTVar clients) >>= 
-                                   sequence_ . map fst >> 
-                                   shutdown sock ShutdownBoth >>
-                                   killThread acceptThread
-                     return (cleanup, port)
+             Stream a -> (URI -> Int -> IO ()) -> IO (IO (), Int)
+runServer stream updateStats = 
+    withSocketsDo $ do
+      sock <- socket AF_INET Sock.Stream defaultProtocol
+      bindSocket sock (SockAddrInet aNY_PORT iNADDR_ANY)
+      port <- fromInteger . toInteger <$> socketPort sock
+      listen sock 5
+      clients <- newTVarIO []
+      let ttype = msgTypeName (undefined::a)
+          md5 = sourceMD5 (undefined::a)
+          negotiate = negotiatePub ttype md5
+      acceptThread <- forkIO $ 
+                      acceptClients sock clients negotiate
+      pubThread <- forkIO $ pubStream stream clients
+      let cleanup = atomically (readTVar clients) >>= 
+                    sequence_ . map fst >> 
+                    shutdown sock ShutdownBoth >>
+                    killThread acceptThread
+      return (cleanup, port)

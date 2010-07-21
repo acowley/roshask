@@ -18,6 +18,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Unsafe as BU
+import qualified Data.ByteString.Char8 as BC8
 import Foreign.C.String (CStringLen)
 import Foreign.Ptr (Ptr, castPtr)
 import Foreign.Storable (sizeOf, Storable, peekElemOff)
@@ -81,10 +82,19 @@ putAscii :: Char -> Put
 putAscii = putWord8 . toEnum . fromEnum
 
 instance BinaryCompact String where
+    put s = let s' = BC8.pack s
+            in putInt32 (BC8.length s') >> putByteString s'
+    get = getInt32 >>= (BC8.unpack <$>) . getByteString
+{-
     put = mapM_ putAscii >=> const (putAscii '\NUL')
     get = go ""
         where go s = do c <- getAscii
                         if c == '\NUL' then return (reverse s) else go (c:s)
+-}
+
+instance BinaryCompact B.ByteString where
+    put b = putInt32 (B.length b) >> putByteString b
+    get = getInt32 >>= getByteString
 
 instance BinaryCompact ROSTime where
     put (s,n) = putWord32host s >> putWord32host n
@@ -103,8 +113,8 @@ bytesToVec x bs = unsafePerformIO $ BU.unsafeUseAsCStringLen bs go
                          in return $ 
                             V.generate num (unsafePerformIO . peekElemOff ptr')
 
-getInt32 = fromIntegral <$> getWord32host
-putInt32 = putWord32host . fromIntegral
+getInt32 = fromIntegral <$> getWord32le
+putInt32 = putWord32le . fromIntegral
 
 instance (BinaryCompact a, Storable a, V.Unbox a) => 
          BinaryCompact (V.Vector a) where

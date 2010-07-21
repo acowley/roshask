@@ -1,5 +1,5 @@
 {-# LANGUAGE PackageImports #-}
-module Ros.SlaveAPI (RosSlave(..), runSlave) where
+module Ros.SlaveAPI (RosSlave(..), runSlave, requestTopicClient) where
 import Control.Applicative
 import Control.Concurrent (killThread, forkIO, threadDelay)
 import Control.Concurrent.QSem
@@ -14,10 +14,12 @@ import Network.Socket hiding (Stream)
 import qualified Network.Socket as Net
 import Network.XmlRpc.Internals (Value, toValue)
 import Network.XmlRpc.Server (handleCall, methods, fun)
+import Network.XmlRpc.Client (remote)
 import System.IO (hGetContents, hPutStr, hClose)
 import System.Posix.Process (getProcessID)
 import Ros.XmlRpcTuples
 import Ros.RosTypes
+import Ros.TopicStats
 
 class RosSlave a where
     getMaster :: a -> URI
@@ -39,7 +41,7 @@ mkPublishStats (n, _, pstats) = (n, "", map formatStats pstats)
 mkSubStats :: (TopicName, a, [(URI, SubStats)]) -> 
               (String, [(Int, Int, Int, Bool)])
 mkSubStats (n, _, sstats) = (n, map formatStats sstats)
-    where formatStats (_, (SubStats bytesReceived _ conn)) = 
+    where formatStats (_, (SubStats bytesReceived conn)) = 
               (0, bytesReceived, -1, conn)
 
 getBusStats :: (RosSlave a) => a -> CallerID -> RpcResult [[Value]]
@@ -91,8 +93,13 @@ requestTopic :: RosSlave a => a -> CallerID -> TopicName -> [[Value]] ->
                 RpcResult Value
 requestTopic n _ topic protocols = 
     case getTopicPortTCP n topic of
-      Just p -> return (1, "", toValue ("TCPROS", p))
+      Just p -> do putStrLn $ topic++" requested "++show p
+                   return (1, "", toValue ("TCPROS","localhost",p))
       Nothing -> return (0, "Unknown topic", toValue ("TCPROS", 0::Int))
+
+requestTopicClient :: URI -> CallerID -> TopicName -> [[Value]] -> 
+                      RpcResult Value
+requestTopicClient = flip remote "requestTopic"
 
 -- Dispatch an XML-RPC request body and return the response. The first
 -- parameter is a value that provides the necessary reflective API as
@@ -131,7 +138,8 @@ findFreePort = do s <- socket AF_INET Net.Stream defaultProtocol
 -- node to shutdown along with the port the server is running on.
 runSlave :: RosSlave a => a -> IO (IO (), Int)
 runSlave n = do quitNow <- newQSem 0
-                let port = 9131
+                --let port = 9131
+                port <- findFreePort
                 t <- forkIO $ simpleServe port (rpc (slaveRPC n quitNow))
                 let wait = do waitQSem quitNow
                               -- Wait a second for the response to flush

@@ -11,6 +11,6 @@ data MsgType = RBool | RInt8 | RUInt8 | RInt16 | RUInt16
              | RUserType ByteString
                deriving (Show, Eq, Ord)
 
--- |A message has a name, an md5 sum, and a list of named, typed
--- fields.
-data Msg = Msg String ByteString [(ByteString, MsgType)] deriving Show
+-- |A message has a short name, a long name, an md5 sum, and a list of
+-- named, typed fields.
+data Msg = Msg String String String [(ByteString, MsgType)] deriving Show
