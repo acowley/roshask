@@ -13,7 +13,4 @@ data MsgType = RBool | RInt8 | RUInt8 | RInt16 | RUInt16
 
 -- |A message has a name, an md5 sum, and a list of named, typed
 -- fields.
-data Msg = Msg String String [(ByteString, MsgType)] deriving Show
-
-
-
+data Msg = Msg String ByteString [(ByteString, MsgType)] deriving Show

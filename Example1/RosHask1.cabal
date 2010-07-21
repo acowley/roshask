@@ -29,6 +29,6 @@ Executable RosHask1
 
   GHC-Options:    -Odph
   Main-Is:        Main.hs
-  Hs-Source-Dirs: ., /Users/acowley/Documents/Haskell/ROS
+  Hs-Source-Dirs: .
   Other-Modules:  Setup 
 -- Ros.Std_msgs.String

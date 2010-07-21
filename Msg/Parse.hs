@@ -6,7 +6,9 @@ import Data.Attoparsec.Char8
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (pack, unpack)
 import qualified Data.ByteString.Char8 as B
+import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Char (toLower, digitToInt)
+import Data.Digest.Pure.MD5 (md5)
 import Data.List (foldl')
 import System.FilePath (dropExtension, takeFileName)
 import Msg.Types
@@ -62,12 +64,18 @@ sanitize (Msg name md5 fields) = Msg name md5 $
           sanitizeField ("module", t) = ("_module", t)
           sanitizeField x             = x
 
+addHash :: ByteString -> Msg -> Msg
+addHash hash (Msg name _ fields) = Msg name hash fields
+
 parseMsg :: FilePath -> IO (Either String Msg)
 parseMsg fname = do msgFile <- B.readFile fname
+                    let hash = pack . show . md5 . BL.fromChunks $ [msgFile]
                     let parser = mkParser (dropExtension . takeFileName $ fname)
                     case feed (parse parser msgFile) "" of
                       Done leftOver msg
-                          | B.null leftOver -> return . Right . sanitize $ msg
+                          | B.null leftOver -> return . Right . 
+                                               addHash hash . sanitize $ 
+                                               msg
                           | otherwise -> return $ Left $ "Couldn't parse " ++ 
                                                          unpack leftOver
                       Fail _ ctxt err -> return $ Left err

@@ -13,14 +13,16 @@ import Text.Printf (printf)
 import Msg.Types
 
 generateMsgType :: ByteString -> Msg -> ByteString
-generateMsgType pkgPath msg@(Msg name _ fields) = 
+generateMsgType pkgPath msg@(Msg name md5 fields) = 
     B.concat [modLine, "\n", imports, dataLine, fieldSpecs, 
               " } deriving Typeable\n\n",
               genBinaryInstance msg, "\n\n", 
               genBinaryIterInstance msg, "\n\n",
-              genHasHeader msg]
+              genHasHeader msg,
+              genHasHash msg]
     where tName = pack $ toUpper (head name) : tail name
-          modLine = B.concat ["{-# LANGUAGE DeriveDataTypeable #-}\n",
+          modLine = B.concat ["{-# LANGUAGE DeriveDataTypeable, ",
+                              "OverloadedStrings #-}\n",
                               "module ", pkgPath, tName, " where"]
           imports = B.concat ["import qualified Prelude as P\n",
                               "import Control.Applicative\n",
@@ -28,6 +30,7 @@ generateMsgType pkgPath msg@(Msg name _ fields) =
                               "import Data.Typeable\n",
                               "import Ros.BinaryIter\n",
                               "import Ros.RosBinary\n",
+                              "import Msg.MsgInfo\n",
                               genImports (map snd fields)]
           dataLine = B.concat ["\ndata ", tName, " = ", tName, " { "]
           fieldIndent = B.replicate (B.length dataLine - 3) ' '
@@ -39,9 +42,15 @@ genHasHeader (Msg name _ ((hn, RUserType t):_))
     | t == "Header" = B.concat["instance HasHeader ", pack name, 
                                " where\n  getHeader = header\n",
                                "  setSequence x seq = x { ", hn, 
-                               " = (", hn, " x) { Header.seq = seq } }\n"]
+                               " = (", hn, " x) { Header.seq = seq } }\n\n"]
     | otherwise = ""
 genHasHeader _ = ""
+
+genHasHash :: Msg -> ByteString
+genHasHash (Msg name md5 _) = B.concat ["instance MsgInfo ", pack name,
+                                        " where\n  sourceMD5 _ = \"", md5,
+                                        "\"\n", "msgTypeName _ = \"", pack name,
+                                        "\"\n"]
 
 generateField :: (ByteString, MsgType) -> ByteString
 generateField (name, t) = B.concat [name, " :: ", ros2Hask t]

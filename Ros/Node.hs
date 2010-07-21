@@ -13,6 +13,7 @@ import qualified Data.Set as S
 import Data.Typeable (Typeable, TypeRep, typeOf)
 import Control.Concurrent (forkIO, ThreadId)
 import System.IO.Unsafe (unsafeInterleaveIO)
+import Msg.MsgInfo
 import Ros.RosBinary (BinaryCompact)
 import Ros.BinaryIter
 import Ros.RosTypes
@@ -96,22 +97,26 @@ recvBufferSize = 10
 
 -- |Spark a thread that funnels a Stream from a URI into the given
 -- Chan.
-addSource :: BinaryIter a => BoundedChan a -> URI -> IO ThreadId
-addSource c uri = forkIO $ subStream uri >>= go
+addSource :: (BinaryIter a, MsgInfo a) => 
+             String -> BoundedChan a -> URI -> IO ThreadId
+addSource tname c uri = forkIO $ subStream uri tname >>= go
     where go (Stream x xs) = writeChan c x >> go xs
 
 -- Create a new Subscription value that will act as a named input
 -- channel with zero or more connected publishers.
-mkSub :: forall a. (Typeable a, BinaryIter a) => IO (Stream a, Subscription)
-mkSub = do c <- newBoundedChan recvBufferSize
-           stream <- list2stream <$> getChanContents c
-           known <- newTVarIO S.empty
-           let topicType = typeOf (undefined::a)
-               sub = Subscription known (addSource c) topicType M.empty
-           return (stream, sub)
+mkSub :: forall a. (Typeable a, BinaryIter a, MsgInfo a) => 
+         String -> IO (Stream a, Subscription)
+mkSub tname = do c <- newBoundedChan recvBufferSize
+                 stream <- list2stream <$> getChanContents c
+                 known <- newTVarIO S.empty
+                 let topicType = typeOf (undefined::a)
+                     sub = Subscription known (addSource tname c) 
+                                        topicType M.empty
+                 return (stream, sub)
     where list2stream (x:xs) = Stream x (list2stream xs)
 
-mkPub :: forall a. (Typeable a, BinaryCompact a) => Stream a -> IO Publication
+mkPub :: forall a. (Typeable a, BinaryCompact a, MsgInfo a) => 
+         Stream a -> IO Publication
 mkPub s = do (cleanup, port) <- runServer s
              known <- newTVarIO S.empty
              let trep = typeOf (undefined::a)
@@ -119,17 +124,19 @@ mkPub s = do (cleanup, port) <- runServer s
 
 -- |Subscribe to the given Topic. Returns the @Stream@ of values
 -- received on over the Topic.
-subscribe :: (Typeable a, BinaryIter a) => TopicName -> Node (Stream a)
+subscribe :: (Typeable a, BinaryIter a, MsgInfo a) => 
+             TopicName -> Node (Stream a)
 subscribe name = do n <- get
                     let subs = subscriptions n
                     if M.member name subs
                        then error $ "Already subscribed to "++name
-                       else do (stream, sub) <- liftIO mkSub
+                       else do (stream, sub) <- liftIO (mkSub name)
                                put n { subscriptions = M.insert name sub subs }
                                return stream
 
 -- |Advertise a Topic publishing a @Stream@ of pure values.
-advertise :: (Typeable a, BinaryCompact a) => TopicName -> Stream a -> Node ()
+advertise :: (Typeable a, BinaryCompact a, MsgInfo a) => 
+             TopicName -> Stream a -> Node ()
 advertise name stream = 
     do n <- get
        let pubs = publications n
@@ -144,7 +151,7 @@ streamIO (Stream x xs) = do x' <- x
                             return $ Stream x' xs'
 
 -- |Advertise a Topic publishing a @Stream@ of @IO@ values.
-advertiseIO :: (Typeable a, BinaryCompact a) => 
+advertiseIO :: (Typeable a, BinaryCompact a, MsgInfo a) => 
                TopicName -> Stream (IO a) -> Node ()
 advertiseIO name stream = do s <- liftIO $ streamIO stream
                              advertise name s

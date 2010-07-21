@@ -20,7 +20,8 @@ Build-type:          Simple
 
 Library
   -- Modules exported by the library.
-  Exposed-modules:     Ros.RosTypes Ros.Node Ros.BinaryIter Ros.RosBinary
+  Exposed-modules:     Ros.RosTypes Ros.Node Ros.BinaryIter Ros.RosBinary 
+                       Msg.MsgInfo
   
   -- Packages needed in order to build this package.
   Build-depends:       base >= 4 && < 6,
@@ -41,7 +42,7 @@ Library
   
   -- Modules not exported by this package.
   Other-modules:      Ros.MasterAPI Ros.RosTcp Ros.SlaveAPI 
-                      Ros.XmlRpcTuples Ros.RunNode
+                      Ros.XmlRpcTuples Ros.RunNode Ros.ConnectionHeader
   
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         
@@ -54,7 +55,8 @@ Executable roshask
                   binary,
                   filepath > 1.1 && < 1.2,
                   attoparsec > 0.8 && < 0.9,
-                  directory > 1.0 && < 1.1
+                  directory > 1.0 && < 1.1,
+                  pureMD5 >= 1.1 && < 1.2
 
   GHC-Options:    -Odph
   Main-Is:        Msg/Main.hs
