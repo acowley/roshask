@@ -68,7 +68,6 @@ getBusStats :: (RosSlave a) => a -> CallerID ->
                           [(String,Int,[(Int,Int,Int,Bool)])],
                           (Int,Int,Int))
 getBusStats n callerId = do
-    putStrLn $ "getBusStats from "++callerId
     publishStats <- map (mkPublishStats) <$> getPublications n
     subscribeStats <- map (mkSubStats) <$> getSubscriptions n
     let serviceStats = (0,0,0)
@@ -123,7 +122,6 @@ requestTopic n _ topic protocols =
 
 requestTopicClient :: URI -> CallerID -> TopicName -> [[String]] -> 
                       RpcResult (String,String,Int)
---                      RpcResult Value
 requestTopicClient = flip remote "requestTopic"
 
 -- Dispatch an XML-RPC request body and return the response. The first
@@ -131,8 +129,8 @@ requestTopicClient = flip remote "requestTopic"
 -- to ROS Node state. The second parameter is a semaphore indicating
 -- that the node should terminate.
 slaveRPC :: (RosSlave a) => a -> QSem -> String -> IO String
-slaveRPC n = \q s -> putStrLn ("Slave call "++s)>>(handleCall (dispatch q) s)
-    --handleCall . dispatch
+slaveRPC n = -- \q s -> putStrLn ("Slave call "++s)>>(handleCall (dispatch q) s)
+    handleCall . dispatch
     where dispatch q = methods [ ("getBusStats", fun (getBusStats n))
                                , ("getBusInfo", fun (getBusInfo n))
                                , ("getMasterUri", fun (getMaster' n))
@@ -164,7 +162,6 @@ findFreePort = do s <- socket AF_INET Net.Stream defaultProtocol
 -- node to shutdown along with the port the server is running on.
 runSlave :: RosSlave a => a -> IO (IO (), Int)
 runSlave n = do quitNow <- newQSem 0
-                --let port = 9131
                 port <- findFreePort
                 myIP <- init <$> readProcess "hostname" [] ""
                 putMVar (getNodeURI n) $ "http://"++myIP++":"++show port

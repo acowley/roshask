@@ -16,8 +16,8 @@ registerPublication :: RosSlave n =>
                        String -> n -> String -> String -> 
                        (TopicName, TopicType, a) -> IO ()
 registerPublication name n master uri (tname, ttype, _) = 
-    do putStrLn $ "Registering publication on master "++master++
-                  " of "++ttype++" on "++tname
+    do putStrLn $ "Registering publication of "++ttype++" on topic "++
+                  tname++" on master "++master
        subscribers <- registerPublisher master name tname ttype uri
        return ()
 
@@ -28,7 +28,6 @@ registerSubscription :: RosSlave n =>
 registerSubscription name n master uri (tname, ttype, _) = 
     do putStrLn $ "Registring subscription to "++tname++" for "++ttype++"s"
        fr@(r,_,publishers) <- registerSubscriber master name tname ttype uri
-       putStrLn $ "master said "++show fr
        if r == 1 
          then publisherUpdate n tname publishers
          else error "Failed to register subscriber with master"
@@ -38,14 +37,12 @@ registerNode :: RosSlave s => String -> s -> Int -> IO ()
 registerNode name n port = 
     do uri <- readMVar (getNodeURI n)
        let master = getMaster n
-       putStrLn $ "Starting roshask node at " ++ uri
+       putStrLn $ "Starting node "++name++" at " ++ uri
        getPublications n >>= mapM_ (registerPublication name n master uri)
        getSubscriptions n >>= mapM_ (registerSubscription name n master uri)
 
 runNode :: RosSlave s => String -> s -> IO ()
-runNode name s = do putStrLn "Starting XML-RPC Server"
-                    (wait, port) <- runSlave s
-                    putStrLn $ "Registering Node "++name
+runNode name s = do (wait, port) <- runSlave s
                     registerNode name s port 
                     putStrLn "Spinning"
                     let shutdown = putStrLn "Shutting down" >> 

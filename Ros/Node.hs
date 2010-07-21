@@ -117,7 +117,6 @@ mkSub tname = do c <- newBoundedChan recvBufferSize
                  stream <- list2stream <$> getChanContents c
                  known <- newTVarIO S.empty
                  stats <- newTVarIO M.empty
-                 putStrLn $ "Made a Subscription for "++tname
                  let topicType = msgTypeName (undefined::a)
                      updateStats = recvMessageStat stats
                      sub = Subscription known (addSource tname updateStats c) 
