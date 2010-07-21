@@ -19,7 +19,8 @@ import Network.BSD (getHostByName, hostAddress)
 import Network.Socket hiding (send, sendTo, recv, recvFrom, Stream)
 import qualified Network.Socket as Sock
 import Network.Socket.ByteString.Lazy
-import System.IO (IOMode(ReadMode))
+import System.IO (IOMode(ReadMode), hSetBuffering, BufferMode(..))
+import Text.URI (parseURI, uriRegName)
 import Unsafe.Coerce (unsafeCoerce)
 
 import Ros.BinaryIter
@@ -27,6 +28,7 @@ import Ros.RosTypes
 import Ros.RosBinary
 import Ros.ConnectionHeader
 import Msg.MsgInfo
+import Ros.SlaveAPI (requestTopicClient)
 
 -- |Maximum number of items to buffer for each client.
 sendBufferSize :: Int
@@ -101,21 +103,15 @@ pubStream :: BinaryCompact a =>
 pubStream s clients = go s
     where go (Stream x xs) = let bytes = runPut (put x)
                              in do cs <- atomically (readTVar clients)
-                                   putStrLn $ "Sending "++
-                                              show (BL.length bytes)++
-                                              " bytes to "++
-                                              show (length cs)++
-                                              " clients"
                                    mapM_ (flip writeChan bytes . snd) cs
-                                   putStrLn "Message sent"
-                                   --mapM_ (flip writeChan bytes . snd) >>
                                    go xs
 
 -- Negotiate a TCPROS subscriber connection.
 negotiateSub :: Socket -> String -> String -> String -> IO ()
 negotiateSub sock tname ttype md5 = 
     do send sock $ genHeader [ ("callerid", "roshask"), ("topic", tname)
-                             , ("md5sum", md5), ("type", ttype) ]
+                             , ("md5sum", md5), ("type", ttype) 
+                             , ("tcp_nodelay", "1") ]
        responseLength <- runGet (unsafeCoerce <$> getWord32le) <$>
                          recv sock 4
        headerBytes <- recv sock responseLength
@@ -135,21 +131,31 @@ negotiateSub sock tname ttype md5 =
 
 -- |Connect to a publisher and return the stream of data it is
 -- publishing.
--- FIXME: We actually need to do an XML-RPC call on the URI for the
--- requestTopic method, passing it (name, tname, [["TCPROS"]])
 subStream :: forall a. (BinaryIter a, MsgInfo a) => 
              URI -> String -> (Int -> IO ()) -> IO (Stream a)
 subStream target tname updateStats = 
-    do sock <- socket AF_INET Sock.Stream defaultProtocol
+    do putStrLn $ "Opening stream to " ++target++" for "++tname
+       response <- requestTopicClient target "/roshask" tname 
+                                      [["TCPROS"]]
+       let port = case response of
+                    (1,_,("TCPROS",_,port')) -> fromIntegral port'
+                    _ -> error $ "Couldn't get publisher's port for "++tname++
+                                 " from node "++target
+       sock <- socket AF_INET Sock.Stream defaultProtocol
        ip <- hostAddress <$> getHostByName host
        connect sock $ SockAddrInet port ip
        let md5 = sourceMD5 (undefined::a)
            ttype = msgTypeName (undefined::a)
        negotiateSub sock tname ttype md5
        h <- socketToHandle sock ReadMode
+       hSetBuffering h NoBuffering
        streamIn h
-    where (host, port) = parseLocation target
-          parseLocation = (id *** fromIntegral.read) . break (== ':')
+    where host = case parseURI target of
+                   Just u -> case uriRegName u of
+                               Just host -> host
+                               Nothing -> error $ "Couldn't parse hostname "++ 
+                                                  "from "++target
+                   Nothing -> error $ "Couldn't parse URI "++target
 
 -- |The server starts a thread that peels elements off the stream as
 -- they become available and sends them to all connected

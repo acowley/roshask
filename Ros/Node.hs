@@ -1,8 +1,9 @@
-{-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables, 
-             TupleSections #-}
-module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe) where
+{-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables #-}
+module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, 
+                 runHandler) where
 import Control.Applicative ((<$>))
 import Control.Concurrent.BoundedChan
+import Control.Concurrent (MVar, newEmptyMVar)
 import Control.Concurrent.STM (atomically, STM, TVar, readTVar, writeTVar, 
                                newTVarIO)
 import "monads-fd" Control.Monad.State
@@ -35,6 +36,7 @@ data Publication = Publication { subscribers :: TVar (Set URI)
 
 data NodeState = NodeState { nodeName      :: String
                            , master        :: URI
+                           , nodeURI       :: MVar URI
                            , subscriptions :: Map String Subscription
                            , publications  :: Map String Publication }
 
@@ -53,22 +55,24 @@ instance MonadState NodeState Node where
 
 instance RosSlave NodeState where
     getMaster = master
+    getNodeName = nodeName
+    getNodeURI = nodeURI
     getSubscriptions = atomically . mapM formatSub . M.toList . subscriptions
-        where formatSub (name, sub) = let topicType = show $ subType sub
+        where formatSub (name, sub) = let topicType = subType sub
                                       in do stats <- readTVar (subStats sub)
                                             stats' <- mapM statSnapshot . 
                                                       M.toList $
                                                       stats
                                             return (name, topicType, stats')
     getPublications = atomically . mapM formatPub . M.toList . publications
-        where formatPub (name, pub) = let topicType = show $ pubType pub
+        where formatPub (name, pub) = let topicType = pubType pub
                                       in do stats <- readTVar (pubStats pub)
                                             stats' <- mapM statSnapshot .
                                                       M.toList $
                                                       stats
                                             return (name, topicType, stats')
     publisherUpdate ns name uris = 
-        let act = atomically $
+        let act = join.atomically $
                   case M.lookup name (subscriptions ns) of
                     Nothing -> return (return ())
                     Just sub -> do let add = addPub sub >=> \_ -> return ()
@@ -78,7 +82,7 @@ instance RosSlave NodeState where
                                                          uris
                                    writeTVar (knownPubs sub) known'
                                    return act
-        in act >> return ()
+        in act
     getTopicPortTCP = ((pubPort <$> ) .) . flip M.lookup . publications
     stopNode = mapM_ (pubCleanup . snd) . M.toList . publications
 
@@ -90,7 +94,7 @@ connectToPub :: Monad m =>
 connectToPub doSub (act, known) uri = if S.member uri known
                                       then return (act, known)
                                       else let known' = S.insert uri known
-                                           in return (act >> doSub uri, known')
+                                           in return (doSub uri >> act, known')
 
 -- |Maximum number of items to buffer for a subscriber.
 recvBufferSize :: Int
@@ -113,6 +117,7 @@ mkSub tname = do c <- newBoundedChan recvBufferSize
                  stream <- list2stream <$> getChanContents c
                  known <- newTVarIO S.empty
                  stats <- newTVarIO M.empty
+                 putStrLn $ "Made a Subscription for "++tname
                  let topicType = msgTypeName (undefined::a)
                      updateStats = recvMessageStat stats
                      sub = Subscription known (addSource tname updateStats c) 
@@ -125,7 +130,6 @@ mkPub :: forall a. (BinaryCompact a, MsgInfo a) =>
 mkPub s = do stats <- newTVarIO M.empty
              (cleanup, port) <- runServer s (sendMessageStat stats)
              known <- newTVarIO S.empty
-             --let trep = typeOf (undefined::a)
              let trep = msgTypeName (undefined::a)
              return $ Publication known trep port cleanup stats
 
@@ -139,6 +143,11 @@ subscribe name = do n <- get
                        else do (stream, sub) <- liftIO (mkSub name)
                                put n { subscriptions = M.insert name sub subs }
                                return stream
+
+-- |Spin up a thread within a Node. This is typically used for message
+-- handlers.
+runHandler :: IO () -> Node ThreadId
+runHandler = liftIO . forkIO
 
 -- |Advertise a Topic publishing a @Stream@ of pure values.
 advertise :: (BinaryCompact a, MsgInfo a) => TopicName -> Stream a -> Node ()
@@ -173,5 +182,6 @@ findMaster = do env <- getEnvironment
 runNode :: NodeName -> Node a -> IO ()
 runNode name (Node n) = 
     do master <- findMaster
-       go $ execStateT n (NodeState name master M.empty M.empty)
+       myURI <- newEmptyMVar
+       go $ execStateT n (NodeState name master myURI M.empty M.empty)
     where go ns = ns >>= RN.runNode name

@@ -58,7 +58,12 @@ cHUNK_SIZE = 16 * 1024
 -- BinaryIter class in from a Handle.
 streamIn :: BinaryIter a => Handle -> IO (Stream a)
 streamIn h = go consume
-    where go k = B.hGet h cHUNK_SIZE >>= emit . k
+    where -- go k = do bs <- B.hGetNonBlocking h cHUNK_SIZE 
+          --           if B.null bs
+          --             then B.hGet h 4 >>= emit . k
+          --             else emit (k bs)
+          go k = do len <- B.hGet h 4
+                    B.hGet h (runGet getInt len) >>= emit . k
           emit (More k')   = go k'
           emit (Emit x k') = Stream x <$> unsafeInterleaveIO (emit (consume k'))
 
@@ -143,9 +148,7 @@ instance (BinaryIter a, BinaryIter b) => BinaryIter (a,b) where
                 More k -> k
 
 instance BinaryIter String where
-    consume bs = go "" bs
-        where go s b = case B.findIndex (== 0) bs of
-                         Nothing -> More (consume . B.append bs)
-                         Just i -> let (h,t) = B.splitAt i bs
-                                   in Emit (BC8.unpack h) t
+    consume = iterUnpack . consume
+        where iterUnpack (More k) = More (iterUnpack . k)
+              iterUnpack (Emit x t) = Emit (BC8.unpack x) t
                          

@@ -1,4 +1,7 @@
 module Ros.RunNode where
+import Control.Concurrent (readMVar)
+import Control.Concurrent.QSem (signalQSem)
+import System.Posix.Signals (installHandler, Handler(..), sigINT)
 import Ros.RosTypes
 import Ros.MasterAPI
 import Ros.SlaveAPI
@@ -13,10 +16,9 @@ registerPublication :: RosSlave n =>
                        String -> n -> String -> String -> 
                        (TopicName, TopicType, a) -> IO ()
 registerPublication name n master uri (tname, ttype, _) = 
-    do let ttype' = "std_msgs/String"
-       putStrLn $ "Registering publication on master "++master++
-                  " of "++ttype'++" on "++tname
-       subscribers <- registerPublisher master name tname ttype' uri
+    do putStrLn $ "Registering publication on master "++master++
+                  " of "++ttype++" on "++tname
+       subscribers <- registerPublisher master name tname ttype uri
        return ()
 
 -- Inform the master that we are subscribing to a particular topic.
@@ -24,14 +26,18 @@ registerSubscription :: RosSlave n =>
                         String -> n -> String -> String -> 
                         (TopicName, TopicType, a) -> IO ()
 registerSubscription name n master uri (tname, ttype, _) = 
-    do publishers <- registerSubscriber master name tname ttype uri
+    do putStrLn $ "Registring subscription to "++tname++" for "++ttype++"s"
+       fr@(r,_,publishers) <- registerSubscriber master name tname ttype uri
+       putStrLn $ "master said "++show fr
+       if r == 1 
+         then publisherUpdate n tname publishers
+         else error "Failed to register subscriber with master"
        return ()
 
 registerNode :: RosSlave s => String -> s -> Int -> IO ()
 registerNode name n port = 
-    do ip <- myIP
-       let uri = "http://"++ip++":"++show port
-           master = getMaster n
+    do uri <- readMVar (getNodeURI n)
+       let master = getMaster n
        putStrLn $ "Starting roshask node at " ++ uri
        getPublications n >>= mapM_ (registerPublication name n master uri)
        getSubscriptions n >>= mapM_ (registerSubscription name n master uri)
@@ -42,4 +48,8 @@ runNode name s = do putStrLn "Starting XML-RPC Server"
                     putStrLn $ "Registering Node "++name
                     registerNode name s port 
                     putStrLn "Spinning"
+                    let shutdown = putStrLn "Shutting down" >> 
+                                   cleanupNode s
+                                   
+                    installHandler sigINT (CatchOnce shutdown) Nothing
                     wait
