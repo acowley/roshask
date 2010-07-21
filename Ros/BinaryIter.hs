@@ -17,6 +17,7 @@ import Data.Monoid
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Generic as VG
 import qualified Data.Vector.Generic.Mutable as VM
+import qualified Data.Vector.Storable as VS
 import Data.Word
 import Foreign.Storable
 import GHC.Int (Int64)
@@ -24,6 +25,7 @@ import System.IO (Handle)
 import System.IO.Unsafe (unsafeInterleaveIO)
 import Unsafe.Coerce (unsafeCoerce)
 import Ros.RosTypes
+import Ros.Util.BytesToVector
 
 -- |An Iter provides either a continuation asking for more data or a
 -- produced value along with another Iter of the same type.
@@ -131,6 +133,19 @@ instance forall a. (V.Unbox a, Storable a) => BinaryIter (V.Vector a) where
                      else let (h,t) = B.splitAt (fromIntegral (n*sz)) bs
                               v = buildVector n h get'
                           in Emit v t --(consume t)
+
+instance forall a. Storable a => BinaryIter (VS.Vector a) where
+    consume bs = if B.length bs < 4
+                 then More (consume . B.append bs)
+                 else let (h,t) = B.splitAt 4 bs
+                      in getCount (fromIntegral (runGet getInt h)) t
+        where sz = sizeOf (undefined::a)
+              getCount n = let totalBytes = fromIntegral $ n * sz
+                               go bs = if B.length bs < totalBytes
+                                       then More (go . B.append bs)
+                                       else let (h,t) = B.splitAt totalBytes bs
+                                            in Emit (bytesToVectorL n h) t
+                           in go
 
 instance BinaryIter BC8.ByteString where
     consume bs = if B.length bs < 4

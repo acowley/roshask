@@ -43,8 +43,8 @@ Library
   
   -- Modules not exported by this package.
   Other-modules:      Ros.MasterAPI Ros.RosTcp Ros.SlaveAPI 
-                      Ros.XmlRpcTuples Ros.RunNode Ros.ConnectionHeader 
-                      Ros.TopicStats
+                      Ros.Util.XmlRpcTuples Ros.RunNode Ros.ConnectionHeader 
+                      Ros.TopicStats Ros.Util.BytesToVector
   
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         

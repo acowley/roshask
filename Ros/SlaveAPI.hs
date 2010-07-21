@@ -20,7 +20,7 @@ import Network.XmlRpc.Client (remote)
 import System.IO (hGetContents, hPutStr, hClose)
 import System.Posix.Process (getProcessID)
 import System.Process (readProcess)
-import Ros.XmlRpcTuples
+import Ros.Util.XmlRpcTuples
 import Ros.RosTypes
 import Ros.TopicStats
 import Ros.MasterAPI

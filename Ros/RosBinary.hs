@@ -12,7 +12,7 @@ import Control.Monad ((>=>))
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Int
-import qualified Data.Vector.Unboxed as V
+import qualified Data.Vector.Storable as V
 import Data.Word
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -25,6 +25,7 @@ import Foreign.Storable (sizeOf, Storable, peekElemOff)
 import System.IO.Unsafe
 
 import Ros.RosTypes
+import Ros.Util.BytesToVector
 
 class BinaryCompact a where
     put :: a -> Put
@@ -85,12 +86,6 @@ instance BinaryCompact String where
     put s = let s' = BC8.pack s
             in putInt32 (BC8.length s') >> putByteString s'
     get = getInt32 >>= (BC8.unpack <$>) . getByteString
-{-
-    put = mapM_ putAscii >=> const (putAscii '\NUL')
-    get = go ""
-        where go s = do c <- getAscii
-                        if c == '\NUL' then return (reverse s) else go (c:s)
--}
 
 instance BinaryCompact B.ByteString where
     put b = putInt32 (B.length b) >> putByteString b
@@ -106,23 +101,24 @@ instance BinaryCompact ROSDuration where
     get =  (,) <$> getWord32host <*> getWord32host
 -}
 
-bytesToVec :: (Storable a, V.Unbox a) => a -> B.ByteString -> V.Vector a
-bytesToVec x bs = unsafePerformIO $ BU.unsafeUseAsCStringLen bs go
-    where go (ptr,len) = let ptr' = castPtr ptr
-                             num = len `div` (sizeOf x)
-                         in return $ 
-                            V.generate num (unsafePerformIO . peekElemOff ptr')
+--bytesToVec :: forall a. Storable a => Int -> B.ByteString -> V.Vector a
+--unsafePerformIO $ BU.unsafeUseAsCStringLen bs go
+--     where go (ptr,len) = let ptr' = castPtr ptr
+--                              num = len `div` (sizeOf (undefined::a))
+--                          in return $ 
+--                             V.generate num (unsafePerformIO . peekElemOff ptr')
 
 getInt32 = fromIntegral <$> getWord32le
 putInt32 = putWord32le . fromIntegral
 
-instance (BinaryCompact a, Storable a, V.Unbox a) => 
-         BinaryCompact (V.Vector a) where
+instance (BinaryCompact a, Storable a) => BinaryCompact (V.Vector a) where
     put v = putInt32 (V.length v) >> V.mapM_ put v
     get = getInt32 >>= getFixed
 
-getFixed :: forall a. (Storable a, V.Unbox a) => Int -> Get (V.Vector a)
-getFixed n = bytesToVec undefined <$> getBytes (n*(sizeOf (undefined::a)))
+getFixed :: forall a. Storable a => Int -> Get (V.Vector a)
+getFixed n = bytesToVector n <$> getBytes (n*(sizeOf (undefined::a)))
+--getFixed n = bytesToVec undefined <$> getBytes (n*(sizeOf (undefined::a)))
 
-putFixed :: (BinaryCompact a, V.Unbox a) => V.Vector a -> Put
-putFixed = V.mapM_ put
+putFixed :: Storable a => V.Vector a -> Put
+putFixed = putByteString . vectorToBytes
+--putFixed = V.mapM_ put

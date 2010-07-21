@@ -84,7 +84,7 @@ deserialize :: MsgType -> ByteString
 deserialize (RFixedArray n t) = B.append "getFixed " (pack (show n))
 deserialize _ = "get"
 
-vectorDeps = S.fromList [ "qualified Data.Vector.Unboxed as V" ]
+vectorDeps = S.fromList [ "qualified Data.Vector.Storable as V" ]
 
 intImport = singleton "qualified Data.Int as Int"
 wordImport = singleton "qualified Data.Word as Word"
