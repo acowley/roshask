@@ -8,6 +8,15 @@ import System.Directory
 import System.Environment
 import System.FilePath
 
+-- Parse the manifest.xml file to determine what packages we depend
+-- on.
+getManifestPackages :: IO [FilePath]
+getManifestPackages = undefined
+
+-- Compile the msg files for a package dependency.
+buildMsgDependencies :: FilePath -> IO ()
+buildMsgDependencies pkg = undefined
+
 -- The std_msgs directory relative to the ROS root path.
 getRootMsgs :: FilePath -> FilePath
 getRootMsgs = joinPath . flip (++) ["std_msgs", "msg", "haskell"] . splitPath
@@ -33,6 +42,9 @@ getMsgPaths = dir >=> mapM packagePaths >=>
               filterM doesDirectoryExist . map hsDir . concat
     where hsDir = joinPath . flip (:) ["msg", "haskell"]
 
+-- Determine our package dependencies, ensure the message types in
+-- those packages are built, and add the message directories to GHC's
+-- path.
 addRosPaths :: Args -> BuildFlags -> IO HookedBuildInfo
 addRosPaths _ bf = 
     do env <- getEnvironment
