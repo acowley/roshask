@@ -8,7 +8,6 @@ import Data.ByteString.Char8 (pack, unpack)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Char (toLower, digitToInt)
-import Data.Digest.Pure.MD5 (md5)
 import Data.List (foldl')
 import System.Environment (getEnvironment)
 import System.FilePath (dropExtension, takeFileName, splitDirectories, (</>))

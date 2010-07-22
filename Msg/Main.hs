@@ -10,6 +10,7 @@ import System.FilePath (replaceExtension, splitFileName, splitPath,
 import Msg.Types
 import Msg.Parse
 import Msg.Gen
+import Ros.Build.DepFinder (findPackageDeps, buildDepMsgs)
 
 generate :: FilePath -> IO ()
 generate fname = do r <- parseMsg fname
@@ -34,6 +35,14 @@ canonicalizeName fname = if isRelative fname
 
 main = do args <- getArgs
           case args of
-            [name] -> canonicalizeName name >>= generate
-            _ -> do putStrLn "Expected 1 argument: path to .msg file"
+            ["gen",name] -> canonicalizeName name >>= generate
+            ["dep"] -> getCurrentDirectory >>= findPackageDeps >>= buildDepMsgs
+            ["dep",name] -> findPackageDeps name >>= buildDepMsgs
+            _ -> do putStrLn "Usage: roshask command [argument]" 
+                    putStrLn "Available commands:"
+                    putStrLn "  gen file.msg  -- generate Haskell message code"
+                    putStrLn ("  dep           -- build all messages this "++
+                              "package depends on")
+                    putStrLn ("  dep directory -- build all messages the "++
+                              "specified package depends on")
                     exitWith (ExitFailure (-1))
