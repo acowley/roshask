@@ -1,15 +1,11 @@
-module Ros.RunNode where
-import Control.Concurrent (readMVar)
+module Ros.RunNode (runNode) where
+import Control.Concurrent (readMVar, newEmptyMVar, takeMVar, putMVar,
+                           forkIO, killThread)
 import Control.Concurrent.QSem (signalQSem)
 import System.Posix.Signals (installHandler, Handler(..), sigINT)
 import Ros.RosTypes
 import Ros.MasterAPI
 import Ros.SlaveAPI
-
--- FIXME: We should check /etc/hosts for our hostname to see if
--- there's another IP address listed there.
-myIP :: IO String
-myIP = return "127.0.0.1"
 
 -- Inform the master that we are publishing a particular topic.
 registerPublication :: RosSlave n => 
@@ -41,12 +37,18 @@ registerNode name n port =
        getPublications n >>= mapM_ (registerPublication name n master uri)
        getSubscriptions n >>= mapM_ (registerSubscription name n master uri)
 
+-- |Run a ROS Node with the given name. Returns when the Node has
+-- shutdown either by receiving an interrupt signal (e.g. Ctrl-C) or
+-- because the master told it to stop.
 runNode :: RosSlave s => String -> s -> IO ()
 runNode name s = do (wait, port) <- runSlave s
                     registerNode name s port 
                     putStrLn "Spinning"
-                    let shutdown = putStrLn "Shutting down" >> 
-                                   cleanupNode s
-                                   
+                    allDone <- newEmptyMVar
+                    let shutdown = do putStrLn "Shutting down"
+                                      cleanupNode s
+                                      putMVar allDone True
                     installHandler sigINT (CatchOnce shutdown) Nothing
-                    wait
+                    t <- forkIO $ wait >> putMVar allDone True
+                    takeMVar allDone
+                    killThread t `catch` \_ -> return ()
