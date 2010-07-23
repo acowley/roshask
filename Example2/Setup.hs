@@ -1,4 +1,5 @@
 import Control.Applicative
+import Data.List (intercalate)
 import Distribution.Simple
 import Distribution.Simple.Setup
 import Distribution.PackageDescription
@@ -13,6 +14,7 @@ addRosMsgPaths :: Args -> BuildFlags -> IO HookedBuildInfo
 addRosMsgPaths _ bf = 
     do dir <- getCurrentDirectory
        msgPaths <- map (</>"msg"</>"haskell") <$> findPackageDeps dir
+       writeFile ".ghci" $ ":set -i"++ intercalate ":" msgPaths
        let binfo = emptyBuildInfo { hsSourceDirs = msgPaths }
        return (Nothing, [("RosHask2", binfo)])
 
