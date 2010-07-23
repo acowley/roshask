@@ -1,6 +1,6 @@
 {-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables #-}
 module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, 
-                 runHandler) where
+                 runHandler, module Ros.RosTypes) where
 import Control.Applicative (Applicative(..), (<$>))
 import Control.Concurrent.BoundedChan
 import Control.Concurrent (MVar, newEmptyMVar)
