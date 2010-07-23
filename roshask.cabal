@@ -64,4 +64,4 @@ Executable roshask
   GHC-Options:    -Odph
   Main-Is:        Msg/Main.hs
   Hs-Source-Dirs: .
-  Other-Modules:  Build.DepFinder
+
