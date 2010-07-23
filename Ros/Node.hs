@@ -1,7 +1,7 @@
 {-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables #-}
 module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, 
                  runHandler) where
-import Control.Applicative ((<$>))
+import Control.Applicative (Applicative(..), (<$>))
 import Control.Concurrent.BoundedChan
 import Control.Concurrent (MVar, newEmptyMVar)
 import Control.Concurrent.STM (atomically, STM, TVar, readTVar, writeTVar, 
@@ -41,6 +41,13 @@ data NodeState = NodeState { nodeName      :: String
                            , publications  :: Map String Publication }
 
 newtype Node a = Node { unNode :: StateT NodeState IO a }
+
+instance Functor Node where
+    fmap f (Node s) = Node (fmap f s)
+
+instance Applicative Node where
+    pure = Node . pure
+    Node f <*> Node x = Node (f <*> x)
 
 instance Monad Node where
     (Node s) >>= f = Node $ s >>= unNode . f
