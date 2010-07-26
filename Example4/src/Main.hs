@@ -15,5 +15,9 @@ paired (Stream x xs) = go x xs
 transformImage (Stream img imgs) = 
     Stream (img {_data = V.map (*2) (_data img)}) (transformImage imgs)
 
+diffImage (Stream (i1,i2) imgs) = 
+    Stream (i2 {_data = V.zipWith (-) (_data i2) (_data i1)}) (diffImage imgs)
+
 main = runNode "/haskimg" $
-       advertise "/diff"  =<< transformImage <$> subscribe "/images"
+       advertise "/diff"  =<< diffImage . paired <$> subscribe "/images"
+       --advertise "/diff"  =<< transformImage <$> subscribe "/images"
