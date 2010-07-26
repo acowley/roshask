@@ -1,0 +1,14 @@
+Name:                Example4
+Version:             0.0
+Synopsis:            I am code
+Cabal-version:       >=1.6
+Category:            Robotics
+Build-type:          Custom
+
+Executable MyNode
+  Build-Depends:  base >= 4.2 && < 5,
+                  vector,
+                  roshask
+  GHC-Options:    -Odph
+  Main-Is:        Main.hs
+  Hs-Source-Dirs: src
