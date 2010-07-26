@@ -1,9 +1,18 @@
 -- |If a message type's first field is of type Header, its sequence
 -- number is automatically incremented by the ROS Topic machinery.
 module Msg.HeaderSupport where
-import Data.Word
-import Ros.Std_msgs.Header
+import Data.Binary (Put)
+import Data.Word (Word32)
+import Ros.RosBinary (RosBinary, put)
+import Ros.RosTypes (ROSTime)
 
 class HasHeader a where
-    getHeader :: a -> Header
-    setSequence :: a -> Word32 -> a
+    getSequence :: a -> Word32
+    getFrame    :: a -> String
+    getStamp    :: a -> ROSTime
+    setSequence :: Word32 -> a -> a
+
+-- |Serialize a message after setting the sequence number in its
+-- header.
+putStampedMsg :: (HasHeader a, RosBinary a) => Word32 -> a -> Put
+putStampedMsg n v = put $ setSequence n v

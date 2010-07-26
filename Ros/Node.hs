@@ -15,7 +15,7 @@ import Control.Concurrent (forkIO, ThreadId)
 import System.Environment (getEnvironment)
 import System.IO.Unsafe (unsafeInterleaveIO)
 import Msg.MsgInfo
-import Ros.RosBinary (BinaryCompact)
+import Ros.RosBinary (RosBinary)
 import Ros.BinaryIter
 import Ros.RosTypes
 import Ros.RosTcp
@@ -109,7 +109,7 @@ recvBufferSize = 10
 
 -- |Spark a thread that funnels a Stream from a URI into the given
 -- Chan.
-addSource :: (BinaryIter a, MsgInfo a) => 
+addSource :: (RosBinary a, MsgInfo a) => 
              String -> (URI -> Int -> IO ()) -> BoundedChan a -> URI -> 
              IO ThreadId
 addSource tname updateStats c uri = 
@@ -118,7 +118,7 @@ addSource tname updateStats c uri =
 
 -- Create a new Subscription value that will act as a named input
 -- channel with zero or more connected publishers.
-mkSub :: forall a. (BinaryIter a, MsgInfo a) => 
+mkSub :: forall a. (RosBinary a, MsgInfo a) => 
          String -> IO (Stream a, Subscription)
 mkSub tname = do c <- newBoundedChan recvBufferSize
                  stream <- list2stream <$> getChanContents c
@@ -131,7 +131,7 @@ mkSub tname = do c <- newBoundedChan recvBufferSize
                  return (stream, sub)
     where list2stream (x:xs) = Stream x (list2stream xs)
 
-mkPub :: forall a. (BinaryCompact a, MsgInfo a) => 
+mkPub :: forall a. (RosBinary a, MsgInfo a) => 
          Stream a -> IO Publication
 mkPub s = do stats <- newTVarIO M.empty
              (cleanup, port) <- runServer s (sendMessageStat stats)
@@ -141,7 +141,7 @@ mkPub s = do stats <- newTVarIO M.empty
 
 -- |Subscribe to the given Topic. Returns the @Stream@ of values
 -- received on over the Topic.
-subscribe :: (BinaryIter a, MsgInfo a) => TopicName -> Node (Stream a)
+subscribe :: (RosBinary a, MsgInfo a) => TopicName -> Node (Stream a)
 subscribe name = do n <- get
                     let subs = subscriptions n
                     if M.member name subs
@@ -156,7 +156,7 @@ runHandler :: IO () -> Node ThreadId
 runHandler = liftIO . forkIO
 
 -- |Advertise a Topic publishing a @Stream@ of pure values.
-advertise :: (BinaryCompact a, MsgInfo a) => TopicName -> Stream a -> Node ()
+advertise :: (RosBinary a, MsgInfo a) => TopicName -> Stream a -> Node ()
 advertise name stream = 
     do n <- get
        let pubs = publications n
@@ -171,7 +171,7 @@ streamIO (Stream x xs) = do x' <- x
                             return $ Stream x' xs'
 
 -- |Advertise a Topic publishing a @Stream@ of @IO@ values.
-advertiseIO :: (BinaryCompact a, MsgInfo a) => 
+advertiseIO :: (RosBinary a, MsgInfo a) => 
                TopicName -> Stream (IO a) -> Node ()
 advertiseIO name stream = do s <- liftIO $ streamIO stream
                              advertise name s

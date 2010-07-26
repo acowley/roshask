@@ -1,0 +1,75 @@
+{-# LANGUAGE OverloadedStrings #-}
+-- |Initialize a ROS Package with roshask support.
+module Ros.Build.Init (initPkg) where
+import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as B
+import Data.List (intercalate)
+import System.Directory (createDirectory)
+import System.FilePath ((</>))
+import System.Process (system)
+
+-- |Initialize a package with the given name in the eponymous
+-- directory with the given ROS package dependencies.
+initPkg :: String -> [String] -> IO ()
+initPkg pkgName deps = do system pkgCmd
+                          prepCMakeLists pkgName
+                          prepCabal pkgName
+                          prepSetup pkgName
+                          createDirectory (pkgName</>"src")
+                          prepMain pkgName
+                          putStrLn (fyi pkgName)
+                          
+    where pkgCmd = intercalate " " ("roscreate-pkg":pkgName:deps)
+
+fyi pkgName = "Created an empty roshask package.\n" ++
+              "Please edit "++
+              show (pkgName</>pkgName++".cabal") ++
+              " to specify what should be built."
+
+-- Add an entry to the package's CMakeLists.txt file to invoke
+-- roshask.
+prepCMakeLists :: String -> IO ()
+prepCMakeLists pkgName = B.appendFile (pkgName</>"CMakeLists.txt") cmd
+    where cmd = "\nadd_custom_target(roshask ALL roshask dep ${PROJECT_SOURCE_DIR} COMMAND cd ${PROJECT_SOURCE_DIR} && cabal install --bindir=${EXECUTABLE_OUTPUT_PATH} --libdir=${LIBRARY_OUTPUT_PATH})\n"
+
+-- Generate a .cabal file and a Setup.hs that will perform the
+-- necessary dependency tracking and code generation.
+prepCabal :: String -> IO ()
+prepCabal pkgName = B.writeFile (pkgName</>(pkgName++".cabal")) $
+                    B.concat [preamble,"\n",target]
+    where preamble = format [ ("Name", B.pack pkgName)
+                            , ("Version","0.0")
+                            , ("Synopsis","I am code")
+                            , ("Cabal-version",">=1.6")
+                            , ("Category","Robotics")
+                            , ("Build-type","Custom") ]
+          target = B.intercalate "\n" $
+                   [ "Executable MyNode"
+                   , "  Build-Depends:  base >= 4.2 && < 5,"
+                   , "                  roshask"
+                   , "  GHC-Options:    -Odph"
+                   , "  Main-Is:        Main.hs"
+                   , "  Hs-Source-Dirs: src" ]  
+
+-- Format key-value pairs for a .cabal file
+format :: [(ByteString,ByteString)] -> ByteString
+format fields = B.concat $ map indent fields
+    where indent (k,v) = let spaces = flip B.replicate ' ' $
+                                      21 - B.length k - 1
+                         in B.concat [k,":",spaces,v,"\n"]
+
+-- Generate a Setup.hs file for use by Cabal.
+prepSetup :: String -> IO ()
+prepSetup pkgName = B.writeFile (pkgName</>"Setup.hs") $
+                    B.concat [ "import Distribution.Simple\n"
+                             , "import Ros.Build.SetupUtil\n\n"
+                             , "main = defaultMainWithHooks $\n"
+                             , "       simpleUserHooks { preBuild = "
+                             , "addRosMsgPaths (Executables [\"MyNode\"]) }\n" ]
+
+prepMain :: String -> IO ()
+prepMain pkgName = writeFile (pkgName</>"src"</>"Main.hs") $
+                   "module Main (main) where\n\
+                   \import Ros.Node\n\
+                   \\n\
+                   \main = putStrLn \"Hello\"\n"

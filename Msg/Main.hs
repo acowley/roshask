@@ -11,6 +11,7 @@ import Msg.Types
 import Msg.Parse
 import Msg.Gen
 import Ros.Build.DepFinder (findPackageDeps, buildDepMsgs)
+import Ros.Build.Init (initPkg)
 
 generate :: FilePath -> IO ()
 generate fname = do r <- parseMsg fname
@@ -36,6 +37,7 @@ canonicalizeName fname = if isRelative fname
 main = do args <- getArgs
           case args of
             ["gen",name] -> canonicalizeName name >>= generate
+            ("create":pkgName:deps) -> initPkg pkgName deps
             ["dep"] -> getCurrentDirectory >>= findPackageDeps >>= buildDepMsgs
             ["dep",name] -> findPackageDeps name >>= buildDepMsgs
             _ -> do putStrLn "Usage: roshask command [argument]" 

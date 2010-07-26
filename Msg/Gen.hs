@@ -15,16 +15,16 @@ import Msg.Types
 generateMsgType :: ByteString -> Msg -> ByteString
 generateMsgType pkgPath msg@(Msg name _ md5 fields) = 
     B.concat [modLine, "\n", imports, dataLine, fieldSpecs, 
-              " } deriving Typeable\n\n",
+              " } deriving P.Show\n\n",
               genBinaryInstance msg, "\n\n", 
               genBinaryIterInstance msg, "\n\n",
               genHasHeader msg,
               genHasHash msg]
     where tName = pack $ toUpper (head name) : tail name
-          modLine = B.concat ["{-# LANGUAGE DeriveDataTypeable, ",
-                              "OverloadedStrings #-}\n",
+          modLine = B.concat ["{-# LANGUAGE OverloadedStrings #-}\n",
                               "module ", pkgPath, tName, " where"]
           imports = B.concat ["import qualified Prelude as P\n",
+                              "import Prelude ((.))\n",
                               "import Control.Applicative\n",
                               "import Data.Monoid\n",
                               "import Data.Typeable\n",
@@ -37,6 +37,22 @@ generateMsgType pkgPath msg@(Msg name _ md5 fields) =
           lineSep = B.concat ["\n", fieldIndent, ", "]
           fieldSpecs = B.intercalate lineSep $ map generateField fields
 
+hasHeader :: Msg -> Bool
+hasHeader (Msg _ _ _ ((_, RUserType "Header"):_)) = True
+hasHeader _                                       = False
+
+genHasHeader :: Msg -> ByteString
+genHasHeader m@(Msg name _ _ fields) = 
+    if hasHeader m
+    then let hn = fst (head fields) -- The header field name
+         in B.concat ["instance HasHeader ", pack name, " where\n",
+                      "  getSequence = Header.seq . ", hn, "\n",
+                      "  getFrame = Header.frame_id . ", hn, "\n",
+                      "  getStamp = Header.stamp . " , hn, "\n",
+                      "  setSequence seq x = x { ", hn, 
+                      " = (", hn, " x) { Header.seq = seq } }\n\n"]
+    else ""
+{-
 genHasHeader :: Msg -> ByteString
 genHasHeader (Msg name _ _ ((hn, RUserType t):_)) 
     | t == "Header" = B.concat["instance HasHeader ", pack name, 
@@ -45,6 +61,7 @@ genHasHeader (Msg name _ _ ((hn, RUserType t):_))
                                " = (", hn, " x) { Header.seq = seq } }\n\n"]
     | otherwise = ""
 genHasHeader _ = ""
+-}
 
 genHasHash :: Msg -> ByteString
 genHasHash (Msg sname lname md5 _) = 
@@ -62,13 +79,17 @@ genImports fieldTypes = B.concat (concatMap (\i -> ["import ", i, "\n"])
      where allImports = foldl' ((. typeDependency) . flip S.union) S.empty
 
 genBinaryInstance :: Msg -> ByteString
-genBinaryInstance (Msg name _ _ fields) = 
-   B.concat ["instance BinaryCompact ", pack name, " where\n",
+genBinaryInstance m@(Msg name _ _ fields) = 
+   B.concat ["instance RosBinary ", pack name, " where\n",
              "  put x = do ", 
              B.intercalate (B.append "\n" (pack (replicate 13 ' ')))
                            (map putField fields),
              "\n  get = ", pack name, " <$> ",
-             B.intercalate " <*> " (map getField fields)]
+             B.intercalate " <*> " (map getField fields),
+             if hasHeader m then putMsgHeader else ""]
+
+putMsgHeader :: ByteString
+putMsgHeader = "\n  putMsg = putStampedMsg"
 
 putField :: (ByteString, MsgType) -> ByteString
 putField (name, t) = B.concat [serialize t, " (", name, " x)"]
@@ -108,7 +129,7 @@ typeDependency _                 = S.empty
 -- namespace. If a package path is given, then it is converted to a
 -- Haskell hierarchical module name and prefixed by "Ros.".
 path2Module :: ByteString -> Set ByteString
-path2Module "Header" = S.fromList ["qualified Ros.Std_msgs.Header as Header", 
+path2Module "Header" = S.fromList ["qualified Ros.Roslib.Header as Header", 
                                    "Msg.HeaderSupport"]
 path2Module p = singleton $
                 if B.elem '/' p

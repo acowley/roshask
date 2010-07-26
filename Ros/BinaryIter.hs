@@ -25,6 +25,7 @@ import System.IO (Handle)
 import System.IO.Unsafe (unsafeInterleaveIO)
 import Unsafe.Coerce (unsafeCoerce)
 import Ros.RosTypes
+import Ros.RosBinary (RosBinary(get))
 import Ros.Util.BytesToVector
 
 -- |An Iter provides either a continuation asking for more data or a
@@ -58,6 +59,7 @@ cHUNK_SIZE = 16 * 1024
 
 -- |The function that does the work of streaming members of the
 -- BinaryIter class in from a Handle.
+{-
 streamIn :: BinaryIter a => Handle -> IO (Stream a)
 streamIn h = go consume
     where -- go k = do bs <- B.hGetNonBlocking h cHUNK_SIZE 
@@ -68,6 +70,13 @@ streamIn h = go consume
                     B.hGet h (runGet getInt len) >>= emit . k
           emit (More k')   = go k'
           emit (Emit x k') = Stream x <$> unsafeInterleaveIO (emit (consume k'))
+-}
+streamIn :: RosBinary a => Handle -> IO (Stream a)
+streamIn h = go 
+    where go = do len <- runGet getInt <$> B.hGet h 4
+                  item <- runGet get <$> B.hGet h len
+                  Stream item <$> unsafeInterleaveIO go
+                  
 
 -- Unsafe getters for the most common value sizes.
 unsafeGet :: Int -> Get a

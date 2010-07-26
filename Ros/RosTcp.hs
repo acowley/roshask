@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 module Ros.RosTcp (subStream, runServer) where
 import Control.Applicative ((<$>))
 import Control.Arrow ((***))
@@ -98,13 +98,13 @@ acceptClients sock clients negotiate = forever acceptClient
                                          writeTVar clients . ((cleanup2,chan) :)
 
 -- |Publish each item obtained from a Stream to each connected client.
-pubStream :: BinaryCompact a => 
+pubStream :: RosBinary a => 
              Stream a -> TVar [(b, BoundedChan ByteString)] -> IO ()
-pubStream s clients = go s
-    where go (Stream x xs) = let bytes = runPut (put x)
-                             in do cs <- atomically (readTVar clients)
-                                   mapM_ (flip writeChan bytes . snd) cs
-                                   go xs
+pubStream s clients = go 0 s
+    where go !n (Stream x xs) = let bytes = runPut (putMsg n x)
+                                in do cs <- atomically (readTVar clients)
+                                      mapM_ (flip writeChan bytes . snd) cs
+                                      go (n+1) xs
 
 -- Negotiate a TCPROS subscriber connection.
 negotiateSub :: Socket -> String -> String -> String -> IO ()
@@ -131,7 +131,9 @@ negotiateSub sock tname ttype md5 =
 
 -- |Connect to a publisher and return the stream of data it is
 -- publishing.
-subStream :: forall a. (BinaryIter a, MsgInfo a) => 
+-- subStream :: forall a. (BinaryIter a, MsgInfo a) => 
+--              URI -> String -> (Int -> IO ()) -> IO (Stream a)
+subStream :: forall a. (RosBinary a, MsgInfo a) => 
              URI -> String -> (Int -> IO ()) -> IO (Stream a)
 subStream target tname updateStats = 
     do putStrLn $ "Opening stream to " ++target++" for "++tname
@@ -162,7 +164,7 @@ subStream target tname updateStats =
 -- clients. Returns an action for cleanup up resources allocated by
 -- this publication server along with the port the server is listening
 -- on.
-runServer :: forall a. (BinaryCompact a, MsgInfo a) => 
+runServer :: forall a. (RosBinary a, MsgInfo a) => 
              Stream a -> (URI -> Int -> IO ()) -> IO (IO (), Int)
 runServer stream updateStats = 
     withSocketsDo $ do

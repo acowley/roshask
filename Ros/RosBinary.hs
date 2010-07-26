@@ -27,52 +27,63 @@ import System.IO.Unsafe
 import Ros.RosTypes
 import Ros.Util.BytesToVector
 
-class BinaryCompact a where
+-- |A type class for binary serialization of ROS messages. Very like
+-- the standard Data.Binary type class, but with different, more
+-- compact, instances for base types and an extra class method for
+-- dealing with message headers.
+class RosBinary a where
+    -- |Serialize a value to a ByteString.
     put :: a -> Put
+    -- |Deserialize a value from a ByteString.
     get :: Get a
+    -- |Serialize a ROS message given a sequence number. This number
+    -- may be used by message types with headers. The default
+    -- implementation ignores the sequence number.
+    putMsg :: Word32 -> a -> Put
+    putMsg _ = put
 
-instance BinaryCompact Bool where
+instance RosBinary Bool where
     put True = putWord8 1
     put False = putWord8 0
     get = (> 0) <$> getWord8
 
-instance BinaryCompact Int8 where
+instance RosBinary Int8 where
     put = putWord8 . fromIntegral
     get = fromIntegral <$> getWord8
 
-instance BinaryCompact Word8 where
+instance RosBinary Word8 where
     put = putWord8
     get = getWord8
 
-instance BinaryCompact Int16 where
+instance RosBinary Int16 where
     put = putWord16host . fromIntegral
     get = fromIntegral <$> getWord16host
 
-instance BinaryCompact Word16 where
+instance RosBinary Word16 where
     put = putWord16host
     get = getWord16host
 
-instance BinaryCompact Int where
+instance RosBinary Int where
     put = putWord32host . fromIntegral
     get = fromIntegral <$> getWord32host
 
-instance BinaryCompact Word32 where
+instance RosBinary Word32 where
     put = putWord32host
     get = getWord32host
 
-instance BinaryCompact Int64 where
+instance RosBinary Int64 where
     put = putWord64host . fromIntegral
     get = fromIntegral <$> getWord64host
 
-instance BinaryCompact Word64 where
+instance RosBinary Word64 where
     put = putWord64host
     get = getWord64host
 
-instance BinaryCompact Float where
+instance RosBinary Float where
     put = putWord32le . unsafeCoerce
     get = unsafeCoerce <$> getWord32le
 
-instance BinaryCompact Double where
+instance RosBinary Double where
     put = putWord64le . unsafeCoerce
     get = unsafeCoerce <$> getWord64le
 
@@ -82,43 +93,36 @@ getAscii = toEnum . fromEnum <$> getWord8
 putAscii :: Char -> Put
 putAscii = putWord8 . toEnum . fromEnum
 
-instance BinaryCompact String where
+instance RosBinary String where
     put s = let s' = BC8.pack s
             in putInt32 (BC8.length s') >> putByteString s'
     get = getInt32 >>= (BC8.unpack <$>) . getByteString
 
-instance BinaryCompact B.ByteString where
+instance RosBinary B.ByteString where
     put b = putInt32 (B.length b) >> putByteString b
     get = getInt32 >>= getByteString
 
-instance BinaryCompact ROSTime where
+instance RosBinary ROSTime where
     put (s,n) = putWord32host s >> putWord32host n
     get = (,) <$> getWord32host <*> getWord32host
 
 {-
-instance BinaryCompact ROSDuration where
+instance RosBinary ROSDuration where
     put (s,n) = putWord32host s >> putWord32host n
     get =  (,) <$> getWord32host <*> getWord32host
 -}
 
---bytesToVec :: forall a. Storable a => Int -> B.ByteString -> V.Vector a
---unsafePerformIO $ BU.unsafeUseAsCStringLen bs go
---     where go (ptr,len) = let ptr' = castPtr ptr
---                              num = len `div` (sizeOf (undefined::a))
---                          in return $ 
---                             V.generate num (unsafePerformIO . peekElemOff ptr')
-
 getInt32 = fromIntegral <$> getWord32le
 putInt32 = putWord32le . fromIntegral
 
-instance (BinaryCompact a, Storable a) => BinaryCompact (V.Vector a) where
+instance (RosBinary a, Storable a) => RosBinary (V.Vector a) where
     put v = putInt32 (V.length v) >> V.mapM_ put v
     get = getInt32 >>= getFixed
 
 getFixed :: forall a. Storable a => Int -> Get (V.Vector a)
 getFixed n = bytesToVector n <$> getBytes (n*(sizeOf (undefined::a)))
---getFixed n = bytesToVec undefined <$> getBytes (n*(sizeOf (undefined::a)))
 
-putFixed :: Storable a => V.Vector a -> Put
-putFixed = putByteString . vectorToBytes
---putFixed = V.mapM_ put
+--putFixed :: Storable a => V.Vector a -> Put
+--putFixed = putByteString . vectorToBytes
+putFixed :: (Storable a, RosBinary a) => V.Vector a -> Put
+putFixed = V.mapM_ put

@@ -21,13 +21,14 @@ Build-type:          Simple
 Library
   -- Modules exported by the library.
   Exposed-modules:     Ros.RosTypes Ros.Node Ros.BinaryIter Ros.RosBinary 
-                       Msg.MsgInfo Ros.Build.DepFinder
+                       Msg.MsgInfo Ros.Build.DepFinder Ros.Build.SetupUtil Msg.HeaderSupport
   
   -- Packages needed in order to build this package.
   Build-depends:       base >= 4 && < 6,
                        containers,
                        unix,
                        network,
+                       Cabal >= 1.8 && < 1.9,
                        stm,
                        mtl,
                        monads-fd,
@@ -44,7 +45,7 @@ Library
   -- Modules not exported by this package.
   Other-modules:      Ros.MasterAPI Ros.RosTcp Ros.SlaveAPI 
                       Ros.Util.XmlRpcTuples Ros.RunNode Ros.ConnectionHeader 
-                      Ros.TopicStats Ros.Util.BytesToVector
+                      Ros.TopicStats Ros.Util.BytesToVector Ros.Build.Init
   
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         

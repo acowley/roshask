@@ -58,7 +58,7 @@ getRosPaths =
            rPath = case lookup "ROS_ROOT" env of
                      Just s -> s
                      Nothing -> error "ROS_ROOT not set in environment"
-           allPaths = rPath : (rPath </> "core") : splitSearchPath pPaths
+           allPaths = rPath : (rPath</>"core") : splitSearchPath pPaths
        concat <$> mapM packagePaths allPaths
 
 -- |Find the paths to the packages this package depends on as
@@ -75,7 +75,8 @@ findPackageDeps pkgRoot =
                        Nothing -> error "Couldn't parse manifest.xml"
                        Just pkgs -> pkgs
           searchPaths <- getRosPaths
-          pkgPaths <- mapM (findPackagePath searchPaths) pkgs
+          -- Add an implicit dependency on the "roslib" package.
+          pkgPaths <- mapM (findPackagePath searchPaths) ("roslib":pkgs)
           case findIndex isNothing pkgPaths of
             Just i -> error $ "Couldn't find path to package " ++ (pkgs !! i)
             Nothing -> return $ map fromJust pkgPaths
