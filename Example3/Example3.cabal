@@ -26,6 +26,6 @@ Executable RosHask3
 
   GHC-Options:    -Odph
   Main-Is:        Main.hs
-  Hs-Source-Dirs: ., src
-  Other-Modules:  Setup
+  Hs-Source-Dirs: src
+
 
