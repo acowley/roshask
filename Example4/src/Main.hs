@@ -12,12 +12,11 @@ import Ros.Node
 paired :: Stream a -> Stream (a,a)
 paired s = (,) <$> s <*> S.tail s
 
-transformImage (Cons img imgs) = 
-    Cons (img {_data = V.map (*2) (_data img)}) (transformImage imgs)
+transformImage img = img { _data = V.map (*2) (_data img) }
 
 -- Function that computes the difference from one image to another.
 diffImage (i1,i2) = i2 { _data = V.zipWith (-) (_data i2) (_data i1) }
 
 main = runNode "/haskimg" $
        advertise "/diff"  =<< S.map diffImage . paired <$> subscribe "/images"
-       --advertise "/diff"  =<< transformImage <$> subscribe "/images"
+       --advertise "/diff"  =<< S.map transformImage <$> subscribe "/images"
