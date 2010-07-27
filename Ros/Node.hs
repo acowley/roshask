@@ -114,7 +114,7 @@ addSource :: (RosBinary a, MsgInfo a) =>
              IO ThreadId
 addSource tname updateStats c uri = 
     forkIO $ subStream uri tname (updateStats uri) >>= go
-    where go (Stream x xs) = writeChan c x >> go xs
+    where go (Cons x xs) = writeChan c x >> go xs
 
 -- Create a new Subscription value that will act as a named input
 -- channel with zero or more connected publishers.
@@ -129,7 +129,7 @@ mkSub tname = do c <- newBoundedChan recvBufferSize
                      sub = Subscription known (addSource tname updateStats c) 
                                         topicType stats
                  return (stream, sub)
-    where list2stream (x:xs) = Stream x (list2stream xs)
+    where list2stream (x:xs) = Cons x (list2stream xs)
 
 mkPub :: forall a. (RosBinary a, MsgInfo a) => 
          Stream a -> IO Publication
@@ -166,9 +166,9 @@ advertise name stream =
                  put n { publications = M.insert name pub pubs }
 
 streamIO :: Stream (IO a) -> IO (Stream a)
-streamIO (Stream x xs) = do x' <- x
-                            xs' <- unsafeInterleaveIO $ streamIO xs
-                            return $ Stream x' xs'
+streamIO (Cons x xs) = do x' <- x
+                          xs' <- unsafeInterleaveIO $ streamIO xs
+                          return $ Cons x' xs'
 
 -- |Advertise a Topic publishing a @Stream@ of @IO@ values.
 advertiseIO :: (RosBinary a, MsgInfo a) => 

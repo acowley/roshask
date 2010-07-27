@@ -3,7 +3,6 @@
 -- |Binary iteratee-style serialization helpers for working with ROS
 -- message types. This module is used by the automatically-generated
 -- code for ROS .msg types.
-
 module Ros.BinaryIter (Iter(..), BinaryIter(..), streamIn, consume') where
 import Control.Applicative
 import Control.Monad.ST (runST)
@@ -75,7 +74,7 @@ streamIn :: RosBinary a => Handle -> IO (Stream a)
 streamIn h = go 
     where go = do len <- runGet getInt <$> B.hGet h 4
                   item <- runGet get <$> B.hGet h len
-                  Stream item <$> unsafeInterleaveIO go
+                  Cons item <$> unsafeInterleaveIO go
                   
 
 -- Unsafe getters for the most common value sizes.

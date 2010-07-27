@@ -101,10 +101,10 @@ acceptClients sock clients negotiate = forever acceptClient
 pubStream :: RosBinary a => 
              Stream a -> TVar [(b, BoundedChan ByteString)] -> IO ()
 pubStream s clients = go 0 s
-    where go !n (Stream x xs) = let bytes = runPut (putMsg n x)
-                                in do cs <- atomically (readTVar clients)
-                                      mapM_ (flip writeChan bytes . snd) cs
-                                      go (n+1) xs
+    where go !n (Cons x xs) = let bytes = runPut (putMsg n x)
+                              in do cs <- atomically (readTVar clients)
+                                    mapM_ (flip writeChan bytes . snd) cs
+                                    go (n+1) xs
 
 -- Negotiate a TCPROS subscriber connection.
 negotiateSub :: Socket -> String -> String -> String -> IO ()

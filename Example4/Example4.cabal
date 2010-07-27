@@ -8,6 +8,7 @@ Build-type:          Custom
 Executable MyNode
   Build-Depends:  base >= 4.2 && < 5,
                   vector,
+                  Stream,
                   roshask
   GHC-Options:    -Odph
   Main-Is:        Main.hs

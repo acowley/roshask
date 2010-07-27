@@ -38,7 +38,8 @@ Library
                        snap-server >= 0.2.7.2 && < 0.3,
                        haxr == 3000.*,
                        utf8-string >= 0.3.6 && < 4,
-                       uri >= 0.1.5 && < 0.2
+                       uri >= 0.1.5 && < 0.2,
+                       Stream >= 0.4.1 && < 0.5
 
   Hs-Source-Dirs:      ., Ros
   
