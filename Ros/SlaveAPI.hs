@@ -112,12 +112,16 @@ pubUpdate :: RosSlave a => a -> CallerID -> TopicName -> [URI] -> RpcResult Int
 pubUpdate n _ topic publishers = do publisherUpdate n topic publishers
                                     return (1, "", 1)
 
+myName :: IO String
+myName = init <$> readProcess "hostname" [] ""
+
 requestTopic :: RosSlave a => a -> CallerID -> TopicName -> [[Value]] -> 
                 RpcResult (String,String,Int)
 requestTopic n _ topic protocols = 
     case getTopicPortTCP n topic of
       Just p -> do putStrLn $ topic++" requested "++show p
-                   return (1, "", ("TCPROS","localhost",p))
+                   host <- myName
+                   return (1, "", ("TCPROS",host,p))
       Nothing -> return (0, "Unknown topic", ("TCPROS", "", 0))
 
 requestTopicClient :: URI -> CallerID -> TopicName -> [[String]] -> 
