@@ -34,17 +34,25 @@ canonicalizeName fname = if isRelative fname
                          then (</> fname) <$> getCurrentDirectory
                          else return fname
 
+help = [ "Usage: roshask command [[arguments]]"
+       , "Available commands:"
+       , "  create pkgName [[dependencies]]  -- Create a new ROS package with "
+       , "                                      roskell support"
+       , ""
+       , "  gen file.msg                     -- Generate Haskell message code"
+       , ""
+       , "  dep                              -- Build all messages this package "
+       , "                                      depends on"
+       , ""
+       , "  dep directory                    -- Build all messages the specified "
+       , "                                      package depends on" ]
+
+
 main = do args <- getArgs
           case args of
             ["gen",name] -> canonicalizeName name >>= generate
             ("create":pkgName:deps) -> initPkg pkgName deps
             ["dep"] -> getCurrentDirectory >>= findPackageDeps >>= buildDepMsgs
             ["dep",name] -> findPackageDeps name >>= buildDepMsgs
-            _ -> do putStrLn "Usage: roshask command [argument]" 
-                    putStrLn "Available commands:"
-                    putStrLn "  gen file.msg  -- generate Haskell message code"
-                    putStrLn ("  dep           -- build all messages this "++
-                              "package depends on")
-                    putStrLn ("  dep directory -- build all messages the "++
-                              "specified package depends on")
+            _ -> do mapM_ putStrLn help
                     exitWith (ExitFailure (-1))

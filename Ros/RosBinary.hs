@@ -125,4 +125,4 @@ getFixed n = bytesToVector n <$> getBytes (n*(sizeOf (undefined::a)))
 --putFixed :: Storable a => V.Vector a -> Put
 --putFixed = putByteString . vectorToBytes
 putFixed :: (Storable a, RosBinary a) => V.Vector a -> Put
-putFixed = V.mapM_ put
+putFixed = putByteString . vectorToBytes

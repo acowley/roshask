@@ -90,6 +90,8 @@ getMaster' n _ = return (1, "", getMaster n)
 shutdown' :: RosSlave a => a -> QSem -> CallerID -> IO (Int, String, Bool)
 shutdown' n q _ = stopNode n >> signalQSem q >> return (1, "", True)
 
+-- This requires a dependency on the unix package and so is not cross
+-- platform.
 getPid' :: CallerID -> RpcResult Int
 getPid' _ = do pid <- getProcessID
                return (1, "", fromEnum pid)

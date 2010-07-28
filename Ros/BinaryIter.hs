@@ -9,6 +9,8 @@ import Control.Monad.ST (runST)
 import Data.Binary (Binary)
 import Data.Binary.Get
 import Data.ByteString.Lazy (ByteString)
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Lazy as B
 import qualified Data.ByteString.Lazy.Char8 as BC8
 import Data.Int
@@ -26,6 +28,7 @@ import Unsafe.Coerce (unsafeCoerce)
 import Ros.RosTypes
 import Ros.RosBinary (RosBinary(get))
 import Ros.Util.BytesToVector
+
 
 -- |An Iter provides either a continuation asking for more data or a
 -- produced value along with another Iter of the same type.
@@ -46,15 +49,22 @@ instance Monoid a => Applicative (Iter a) where
 -- |This is like Get, but augmented to support partial reads via the
 -- Iter datatype.
 class BinaryIter a where
-    consume :: ByteString -> Iter ByteString a
+    consume :: BL.ByteString -> Iter BL.ByteString a
 
 -- |Use a type's BinaryIter instance to construct an Iter value.
-consume' :: BinaryIter a => Iter ByteString a
+consume' :: BinaryIter a => Iter BL.ByteString a
 consume' = More consume
 
 -- The maximum number of bytes read from the Handle at a time.
 cHUNK_SIZE :: Int
 cHUNK_SIZE = 16 * 1024
+
+hGetAll :: Handle -> Int -> IO BL.ByteString
+hGetAll h n = go n []
+    where go n' acc = do bs <- BS.hGet h n'
+                         if BS.length bs < n'
+                           then go (n' - BS.length bs) (bs:acc)
+                           else return $ BL.fromChunks (reverse (bs:acc))
 
 -- |The function that does the work of streaming members of the
 -- BinaryIter class in from a Handle.
@@ -72,8 +82,8 @@ streamIn h = go consume
 -}
 streamIn :: RosBinary a => Handle -> IO (Stream a)
 streamIn h = go 
-    where go = do len <- runGet getInt <$> B.hGet h 4
-                  item <- runGet get <$> B.hGet h len
+    where go = do len <- runGet getInt <$> hGetAll h 4
+                  item <- runGet get <$> hGetAll h len
                   Cons item <$> unsafeInterleaveIO go
                   
 
@@ -84,11 +94,11 @@ unsafeGet 2 = unsafeCoerce <$> getWord16host
 unsafeGet 4 = unsafeCoerce <$> getWord32host
 unsafeGet 8 = unsafeCoerce <$> getWord64host
 
-{-# SPECIALIZE getStorable :: ByteString -> Iter ByteString Word8  #-}
-{-# SPECIALIZE getStorable :: ByteString -> Iter ByteString Word16 #-}
-{-# SPECIALIZE getStorable :: ByteString -> Iter ByteString Int    #-}
-{-# SPECIALIZE getStorable :: ByteString -> Iter ByteString Float  #-}
-{-# SPECIALIZE getStorable :: ByteString -> Iter ByteString Double #-}
+{-# SPECIALIZE getStorable :: BL.ByteString -> Iter BL.ByteString Word8  #-}
+{-# SPECIALIZE getStorable :: BL.ByteString -> Iter BL.ByteString Word16 #-}
+{-# SPECIALIZE getStorable :: BL.ByteString -> Iter BL.ByteString Int    #-}
+{-# SPECIALIZE getStorable :: BL.ByteString -> Iter BL.ByteString Float  #-}
+{-# SPECIALIZE getStorable :: BL.ByteString -> Iter BL.ByteString Double #-}
 
 -- Storables may all be made instances of the BinaryIter class in the
 -- same way.

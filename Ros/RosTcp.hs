@@ -3,11 +3,11 @@ module Ros.RosTcp (subStream, runServer) where
 import Control.Applicative ((<$>))
 import Control.Arrow ((***))
 import Control.Concurrent (forkIO, killThread)
-import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar
 import Data.Map (Map)
 import qualified Data.Map as M
+import Data.Word (Word32)
 import Control.Monad (forever, forM_, when)
 import Data.Binary.Put (runPut, putWord32le)
 import Data.Binary.Get (runGet, getWord32le)
@@ -18,39 +18,49 @@ import qualified Data.ByteString.Lazy as BL
 import Network.BSD (getHostByName, hostAddress)
 import Network.Socket hiding (send, sendTo, recv, recvFrom, Stream)
 import qualified Network.Socket as Sock
-import Network.Socket.ByteString.Lazy
+import Network.Socket.ByteString -- .Lazy
 import System.IO (IOMode(ReadMode), hSetBuffering, BufferMode(..))
 import Text.URI (parseURI, uriRegName)
 import Unsafe.Coerce (unsafeCoerce)
 
-import Ros.BinaryIter
+import Ros.BinaryIter (streamIn)
 import Ros.RosTypes
 import Ros.RosBinary
 import Ros.ConnectionHeader
 import Msg.MsgInfo
 import Ros.SlaveAPI (requestTopicClient)
 
+import Ros.Util.RingChan
+
 -- |Maximum number of items to buffer for each client.
 sendBufferSize :: Int
 sendBufferSize = 10
 
+toWord32 :: Integral a => a -> Word32
+toWord32 x = unsafeCoerce (fromIntegral x :: Int)
+
 -- |Push each item from this client's buffer over the connected
 -- socket.
-serviceClient :: BoundedChan ByteString -> Socket -> IO ()
+serviceClient :: RingChan ByteString -> Socket -> IO ()
 serviceClient c s = forever $ do bs <- readChan c
-                                 let len = runPut $ putWord32le .
-                                                    unsafeCoerce $
-                                                    BL.length bs
-                                 sendAll s (BL.append len bs)
-                                 --sendMany s [len,bs]
---forever (readChan c >>= sendAll s >> putStrLn "serviced")
---    where go = readChan c >>= sendAll s >> go
+                                 let len = runPut $ 
+                                           putWord32le . toWord32 $ 
+                                           BL.length bs
+                                 --sendAll s (BL.append len bs)
+                                 sendMany s (BL.toChunks (BL.append len bs))
+
+recvAll :: Socket -> Int -> IO B.ByteString
+recvAll s len = go len []
+    where go len acc = do bs <- recv s len
+                          if B.length bs < len
+                            then go (len - B.length bs) (bs:acc)
+                            else return $ B.concat (reverse (bs:acc))
 
 negotiatePub :: String -> String -> Socket -> IO ()
 negotiatePub ttype md5 sock = 
     do headerLength <- runGet (unsafeCoerce <$> getWord32le) <$>
-                       recv sock 4
-       headerBytes <- recv sock headerLength
+                       BL.fromChunks . (:[]) <$> recvAll sock 4
+       headerBytes <- BL.fromChunks . (:[]) <$> recvAll sock headerLength
        let connHeader = parseHeader headerBytes
            wildCard = case lookup "type" connHeader of
                         Just t | t == "*" -> True
@@ -71,7 +81,7 @@ negotiatePub ttype md5 sock =
        case lookup "tcp_nodelay" connHeader of
          Just "1" -> setSocketOption sock NoDelay 0
          _ -> return ()
-       _ <- send sock $ genHeader [("md5sum",md5),("type",ttype)] 
+       _ <- sendMany sock $ BL.toChunks $ genHeader [("md5sum",md5),("type",ttype)] 
        return ()
 
 -- |Accept new client connections. A new send buffer is allocated for
@@ -79,13 +89,13 @@ negotiatePub ttype md5 sock =
 -- for cleaning up the client connection.
 -- FIXME: cleaning up a disconnected client should be reflected at a
 -- higher level, too.
-acceptClients :: Socket -> TVar [(IO (), BoundedChan ByteString)] -> 
+acceptClients :: Socket -> TVar [(IO (), RingChan ByteString)] -> 
                  (Socket -> IO ()) -> IO ()
 acceptClients sock clients negotiate = forever acceptClient
     where acceptClient = do (client,_) <- accept sock
                             putStrLn "Accepted client socket"
                             negotiate client
-                            chan <- newBoundedChan sendBufferSize
+                            chan <- newRingChan sendBufferSize
                             let cleanup1 = 
                                     do putStrLn "Closing client socket"
                                        shutdown client ShutdownBoth `catch`
@@ -99,22 +109,23 @@ acceptClients sock clients negotiate = forever acceptClient
 
 -- |Publish each item obtained from a Stream to each connected client.
 pubStream :: RosBinary a => 
-             Stream a -> TVar [(b, BoundedChan ByteString)] -> IO ()
+             Stream a -> TVar [(b, RingChan ByteString)] -> IO ()
 pubStream s clients = go 0 s
-    where go !n (Cons x xs) = let bytes = runPut (putMsg n x)
-                              in do cs <- atomically (readTVar clients)
-                                    mapM_ (flip writeChan bytes . snd) cs
-                                    go (n+1) xs
+    where go !n (Cons !x xs) = let bytes = runPut (putMsg n x)
+                               in do cs <- readTVarIO clients
+                                     mapM_ (flip writeChan bytes . snd) cs
+                                     go (n+1) xs
 
 -- Negotiate a TCPROS subscriber connection.
 negotiateSub :: Socket -> String -> String -> String -> IO ()
 negotiateSub sock tname ttype md5 = 
-    do send sock $ genHeader [ ("callerid", "roshask"), ("topic", tname)
-                             , ("md5sum", md5), ("type", ttype) 
-                             , ("tcp_nodelay", "1") ]
+    do sendMany sock $ BL.toChunks $ 
+                genHeader [ ("callerid", "roshask"), ("topic", tname)
+                          , ("md5sum", md5), ("type", ttype) 
+                          , ("tcp_nodelay", "1") ]
        responseLength <- runGet (unsafeCoerce <$> getWord32le) <$>
-                         recv sock 4
-       headerBytes <- recv sock responseLength
+                         BL.fromChunks . (:[]) <$> recvAll sock 4
+       headerBytes <- BL.fromChunks . (:[]) <$> recvAll sock responseLength
        let connHeader = parseHeader headerBytes
        case lookup "type" connHeader of
          Just t | t == ttype -> return ()
@@ -131,8 +142,6 @@ negotiateSub sock tname ttype md5 =
 
 -- |Connect to a publisher and return the stream of data it is
 -- publishing.
--- subStream :: forall a. (BinaryIter a, MsgInfo a) => 
---              URI -> String -> (Int -> IO ()) -> IO (Stream a)
 subStream :: forall a. (RosBinary a, MsgInfo a) => 
              URI -> String -> (Int -> IO ()) -> IO (Stream a)
 subStream target tname updateStats = 
@@ -150,7 +159,8 @@ subStream target tname updateStats =
            ttype = msgTypeName (undefined::a)
        negotiateSub sock tname ttype md5
        h <- socketToHandle sock ReadMode
-       hSetBuffering h NoBuffering
+       --hSetBuffering h NoBuffering
+       putStrLn $ "Streaming "++tname++" from "++target
        streamIn h
     where host = case parseURI target of
                    Just u -> case uriRegName u of

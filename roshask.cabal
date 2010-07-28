@@ -46,7 +46,8 @@ Library
   -- Modules not exported by this package.
   Other-modules:      Ros.MasterAPI Ros.RosTcp Ros.SlaveAPI 
                       Ros.Util.XmlRpcTuples Ros.RunNode Ros.ConnectionHeader 
-                      Ros.TopicStats Ros.Util.BytesToVector Ros.Build.Init
+                      Ros.TopicStats Ros.Util.BytesToVector Ros.Build.Init 
+                      Ros.Util.RingChan
   
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         
@@ -66,4 +67,5 @@ Executable roshask
   GHC-Options:    -Odph
   Main-Is:        Msg/Main.hs
   Hs-Source-Dirs: .
+
 

@@ -2,7 +2,6 @@
 module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, 
                  runHandler, module Ros.RosTypes) where
 import Control.Applicative (Applicative(..), (<$>))
-import Control.Concurrent.BoundedChan
 import Control.Concurrent (MVar, newEmptyMVar)
 import Control.Concurrent.STM (atomically, STM, TVar, readTVar, writeTVar, 
                                newTVarIO)
@@ -16,12 +15,12 @@ import System.Environment (getEnvironment)
 import System.IO.Unsafe (unsafeInterleaveIO)
 import Msg.MsgInfo
 import Ros.RosBinary (RosBinary)
-import Ros.BinaryIter
 import Ros.RosTypes
 import Ros.RosTcp
 import Ros.SlaveAPI (RosSlave(..))
 import qualified Ros.RunNode as RN
 import Ros.TopicStats
+import Ros.Util.RingChan
 
 data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , addPub    :: URI -> IO ThreadId
@@ -110,7 +109,7 @@ recvBufferSize = 10
 -- |Spark a thread that funnels a Stream from a URI into the given
 -- Chan.
 addSource :: (RosBinary a, MsgInfo a) => 
-             String -> (URI -> Int -> IO ()) -> BoundedChan a -> URI -> 
+             String -> (URI -> Int -> IO ()) -> RingChan a -> URI -> 
              IO ThreadId
 addSource tname updateStats c uri = 
     forkIO $ subStream uri tname (updateStats uri) >>= go
@@ -120,7 +119,7 @@ addSource tname updateStats c uri =
 -- channel with zero or more connected publishers.
 mkSub :: forall a. (RosBinary a, MsgInfo a) => 
          String -> IO (Stream a, Subscription)
-mkSub tname = do c <- newBoundedChan recvBufferSize
+mkSub tname = do c <- newRingChan recvBufferSize
                  stream <- list2stream <$> getChanContents c
                  known <- newTVarIO S.empty
                  stats <- newTVarIO M.empty

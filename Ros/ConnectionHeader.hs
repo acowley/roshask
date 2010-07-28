@@ -11,7 +11,7 @@ import Data.ByteString.Lazy.Char8 (ByteString, pack, unpack)
 import qualified Data.ByteString.Lazy.Char8 as B
 import Data.Word (Word32)
 import Unsafe.Coerce (unsafeCoerce)
-import Ros.BinaryIter (BinaryIter(..), Iter(..))
+--import Ros.BinaryIter (BinaryIter(..), Iter(..))
 
 -- |Wrapper for the Connection Header type that is a list of key-value
 -- pairs.
@@ -25,10 +25,13 @@ genHeader = tagLength .
             map (tagLength . uncurry B.append . 
                  second (B.cons '=') . (pack *** pack))
 
+toWord32 :: Integral a => a -> Word32
+toWord32 x = unsafeCoerce (fromIntegral x :: Int)
+
 -- Prefix a ByteString with its length encoded as a 4-byte little
 -- endian integer.
 tagLength :: ByteString -> ByteString
-tagLength x = let len = runPut $ putWord32le (unsafeCoerce (B.length x))
+tagLength x = let len = runPut $ putWord32le (toWord32 (B.length x))
               in B.append len x
 
 getInt :: Get Int
@@ -49,7 +52,7 @@ parsePair = do len <- fromIntegral <$> getInt
 parseHeader bs | B.null bs = []
                | otherwise = let (p,rst,_) = runGetState parsePair bs 0
                              in p : parseHeader rst
-
+{-
 -- A simple example to demonstrate round-tripping.
 test = let h = genHeader [("callerid","roshask"),("topic","foo")]
        in case consume h of
@@ -66,3 +69,4 @@ instance BinaryIter ConnHeader where
                   if B.length bs < n then More (getCount n . B.append bs)
                   else let (h,t) = B.splitAt n bs
                        in Emit (ConnHeader (parseHeader h)) t
+-}

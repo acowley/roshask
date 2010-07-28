@@ -30,7 +30,7 @@ fyi pkgName = "Created an empty roshask package.\n" ++
 -- roshask.
 prepCMakeLists :: String -> IO ()
 prepCMakeLists pkgName = B.appendFile (pkgName</>"CMakeLists.txt") cmd
-    where cmd = "\nadd_custom_target(roshask ALL roshask dep ${PROJECT_SOURCE_DIR} COMMAND cd ${PROJECT_SOURCE_DIR} && cabal install --bindir=${EXECUTABLE_OUTPUT_PATH} --libdir=${LIBRARY_OUTPUT_PATH})\n"
+    where cmd = "\nadd_custom_target(roshask ALL roshask dep ${PROJECT_SOURCE_DIR} COMMAND cd ${PROJECT_SOURCE_DIR} && cabal install)\n"
 
 -- Generate a .cabal file and a Setup.hs that will perform the
 -- necessary dependency tracking and code generation.
@@ -64,8 +64,8 @@ prepSetup pkgName = B.writeFile (pkgName</>"Setup.hs") $
                     B.concat [ "import Distribution.Simple\n"
                              , "import Ros.Build.SetupUtil\n\n"
                              , "main = defaultMainWithHooks $\n"
-                             , "       simpleUserHooks { preBuild = "
-                             , "addRosMsgPaths (Executables [\"MyNode\"]) }\n" ]
+                             , "       simpleUserHooks { confHook = "
+                             , "rosConf, buildHook = rosBuild }\n" ]
 
 prepMain :: String -> IO ()
 prepMain pkgName = writeFile (pkgName</>"src"</>"Main.hs") $
