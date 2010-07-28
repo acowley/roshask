@@ -17,7 +17,10 @@ if __name__ == '__main__':
         rospy.init_node('CamSub')
         cv.NamedWindow("Cam")
         cv.StartWindowThread()
-        rospy.Subscriber("/cam", Image, show_image)
+        # Usage: rosrun CamSub CamSub.py _topic:=/foo
+        topic = rospy.get_param("~topic","/diff")
+        print "Subscribing to "+topic
+        rospy.Subscriber(topic, Image, show_image)
         rospy.spin()
         cv.DestroyWindow("Cam")
     except rospy.ROSInterruptException:
