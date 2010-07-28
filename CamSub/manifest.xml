@@ -1,0 +1,17 @@
+<package>
+  <description brief="CamSub">
+
+     CamSub
+
+  </description>
+  <author>Anthony Cowley</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/CamSub</url>
+  <depend package="rospy"/>
+  <depend package="sensor_msgs"/>
+<depend package="cv_bridge" />
+
+</package>
+
+
