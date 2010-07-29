@@ -21,7 +21,8 @@ Build-type:          Simple
 Library
   -- Modules exported by the library.
   Exposed-modules:     Ros.RosTypes Ros.Node Ros.BinaryIter Ros.RosBinary 
-                       Msg.MsgInfo Ros.Build.DepFinder Ros.Build.SetupUtil Msg.HeaderSupport
+                       Msg.MsgInfo Ros.Build.DepFinder Ros.Build.SetupUtil 
+                       Msg.HeaderSupport Ros.StreamCombinators
   
   -- Packages needed in order to build this package.
   Build-depends:       base >= 4 && < 6,

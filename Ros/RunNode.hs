@@ -7,8 +7,6 @@ import Ros.RosTypes
 import Ros.MasterAPI
 import Ros.SlaveAPI
 
-import Debug.Trace
-
 -- Inform the master that we are publishing a particular topic.
 registerPublication :: RosSlave n => 
                        String -> n -> String -> String -> 

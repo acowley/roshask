@@ -20,7 +20,11 @@ import Ros.RosTcp
 import Ros.SlaveAPI (RosSlave(..))
 import qualified Ros.RunNode as RN
 import Ros.TopicStats
-import Ros.Util.RingChan
+--import Ros.Util.RingChan
+import Control.Concurrent.BoundedChan
+
+type RingChan = BoundedChan
+newRingChan = newBoundedChan
 
 data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , addPub    :: URI -> IO ThreadId

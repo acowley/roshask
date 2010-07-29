@@ -1,30 +1,33 @@
 -- |Demonstration of working with raw ROS images.
 module Main (main) where
 import Control.Applicative
-import qualified Data.Stream as S
+import Data.Word (Word8)
 import qualified Data.Vector.Storable as V
 import Ros.Sensor_msgs.Image
 import Ros.Node
+import Ros.StreamCombinators (paired)
 
--- Turn a stream of values into a stream of pairs of consecutive
--- values.
-paired :: Stream a -> Stream (a,a)
-paired s = (,) <$> s <*> S.tail s
+-- Convert a 32-bit signed integer to an 8-bit unsigned integer.
+toAbsWord :: Int -> Word8
+toAbsWord = fromIntegral . abs
 
--- Absolute difference between two integral numbers. If the numbers
--- are unsigned, then we sign extend them before doing the
--- subtraction, then convert back to the original type.
-absDiff :: Integral a => a -> a -> a
-absDiff x y = fromIntegral $ abs (x' - y')
-    where x' = fromIntegral x :: Int
-          y' = fromIntegral y :: Int
+-- Convert an 8-bit unsigned integer to a signed 32-bit integer.
+toInt :: Word8 -> Int
+toInt = fromIntegral
+
+-- Binarize integer values using a threshold.
+threshold x | x > 20 = 255
+            | otherwise = 0
 
 -- Function that computes the difference from one image to another.
 diffImage (i1,i2) = i2 { _data = mask }
-    where mask = V.map threshold $ V.zipWith absDiff (_data i2) (_data i1)
-          threshold x | x > 20 = 255
-                      | otherwise = 0
+    where mask = toBinary . toWords $ diff (toInts pixels1) (toInts pixels2)
+          pixels1 = _data i1
+          pixels2 = _data i2
+          toWords = V.map toAbsWord
+          toInts = V.map toInt
+          diff = V.zipWith (-)
+          toBinary = V.map threshold
 
 main = runNode "/differ" $
        advertise "/diff"  =<< fmap diffImage . paired <$> subscribe "/cam"
-
