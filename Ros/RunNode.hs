@@ -48,6 +48,7 @@ runNode name s = do (wait, port) <- runSlave s
                     let shutdown = do putStrLn "Shutting down"
                                       cleanupNode s `catch` \_ -> return ()
                                       putMVar allDone True
+                    setShutdownAction s shutdown
                     installHandler sigINT (CatchOnce shutdown) Nothing
                     t <- forkIO $ wait >> putMVar allDone True
                     takeMVar allDone

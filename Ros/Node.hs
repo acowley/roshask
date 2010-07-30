@@ -2,7 +2,7 @@
 module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, 
                  runHandler, module Ros.RosTypes) where
 import Control.Applicative (Applicative(..), (<$>))
-import Control.Concurrent (MVar, newEmptyMVar)
+import Control.Concurrent (MVar, newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent.STM (atomically, STM, TVar, readTVar, writeTVar, 
                                newTVarIO)
 import "monads-fd" Control.Monad.State
@@ -37,11 +37,12 @@ data Publication = Publication { subscribers :: TVar (Set URI)
                                , pubCleanup  :: IO ()
                                , pubStats    :: StatMap PubStats }
 
-data NodeState = NodeState { nodeName      :: String
-                           , master        :: URI
-                           , nodeURI       :: MVar URI
-                           , subscriptions :: Map String Subscription
-                           , publications  :: Map String Publication }
+data NodeState = NodeState { nodeName       :: String
+                           , master         :: URI
+                           , nodeURI        :: MVar URI
+                           , signalShutdown :: MVar (IO ())
+                           , subscriptions  :: Map String Subscription
+                           , publications   :: Map String Publication }
 
 newtype Node a = Node { unNode :: StateT NodeState IO a }
 
@@ -94,6 +95,7 @@ instance RosSlave NodeState where
                                    return act
         in act
     getTopicPortTCP = ((pubPort <$> ) .) . flip M.lookup . publications
+    setShutdownAction ns a = putMVar (signalShutdown ns) a
     stopNode = mapM_ (pubCleanup . snd) . M.toList . publications
 
 -- If a given URI is not a part of a Set of known URIs, add an action
@@ -135,12 +137,13 @@ mkSub tname = do c <- newRingChan recvBufferSize
     where list2stream (x:xs) = Cons x (list2stream xs)
 
 mkPub :: forall a. (RosBinary a, MsgInfo a) => 
-         Stream a -> IO Publication
-mkPub s = do stats <- newTVarIO M.empty
-             (cleanup, port) <- runServer s (sendMessageStat stats)
-             known <- newTVarIO S.empty
-             let trep = msgTypeName (undefined::a)
-             return $ Publication known trep port cleanup stats
+         Stream a -> Int -> IO Publication
+mkPub s bufferSize = 
+    do stats <- newTVarIO M.empty
+       (cleanup, port) <- runServer s (sendMessageStat stats) bufferSize
+       known <- newTVarIO S.empty
+       let trep = msgTypeName (undefined::a)
+       return $ Publication known trep port cleanup stats
 
 -- |Subscribe to the given Topic. Returns the @Stream@ of values
 -- received on over the Topic.
@@ -158,15 +161,22 @@ subscribe name = do n <- get
 runHandler :: IO () -> Node ThreadId
 runHandler = liftIO . forkIO
 
--- |Advertise a Topic publishing a @Stream@ of pure values.
-advertise :: (RosBinary a, MsgInfo a) => TopicName -> Stream a -> Node ()
-advertise name stream = 
+-- |Advertise a Topic publishing a 'Stream' of pure values with a
+-- per-client transmit buffer of the specified size.
+advertiseBuffered :: (RosBinary a, MsgInfo a) => 
+                     Int -> TopicName -> Stream a -> Node ()
+advertiseBuffered bufferSize name stream = 
     do n <- get
        let pubs = publications n
        if M.member name pubs 
          then error $ "Already advertised "++name
-         else do pub <- liftIO $ mkPub stream 
+         else do pub <- liftIO $ mkPub stream bufferSize
                  put n { publications = M.insert name pub pubs }
+
+
+-- |Advertise a Topic publishing a 'Stream' of pure values.
+advertise :: (RosBinary a, MsgInfo a) => TopicName -> Stream a -> Node ()
+advertise = advertiseBuffered 1
 
 streamIO :: Stream (IO a) -> IO (Stream a)
 streamIO (Cons x xs) = unsafeInterleaveIO $
@@ -174,11 +184,21 @@ streamIO (Cons x xs) = unsafeInterleaveIO $
                           xs' <- streamIO xs
                           return $ Cons x' xs'
 
--- |Advertise a Topic publishing a @Stream@ of @IO@ values.
+-- |Advertise a Topic publishing a 'Stream' of 'IO' values.
 advertiseIO :: (RosBinary a, MsgInfo a) => 
                TopicName -> Stream (IO a) -> Node ()
-advertiseIO name stream = do s <- liftIO $ streamIO stream
-                             advertise name s
+advertiseIO = advertiseBufferedIO 1
+
+-- |Advertise a Topic publishing a 'Stream' of 'IO' values with a
+-- per-client transmit buffer of the specified size.
+advertiseBufferedIO :: (RosBinary a, MsgInfo a) =>
+                       Int -> TopicName -> Stream (IO a) -> Node ()
+advertiseBufferedIO bufferSize name stream = 
+    advertiseBuffered bufferSize name =<< liftIO (streamIO stream)
+
+-- |Get an action that will shutdown this Node.
+getShutdownAction :: Node (IO ())
+getShutdownAction = get >>= liftIO . readMVar . signalShutdown
 
 -- If the master URI is set in the ROS_MASTER_URI environment variable
 -- then use that, otherwise use http://localhost:11311
@@ -193,5 +213,6 @@ runNode :: NodeName -> Node a -> IO ()
 runNode name (Node n) = 
     do master <- findMaster
        myURI <- newEmptyMVar
-       go $ execStateT n (NodeState name master myURI M.empty M.empty)
+       sigStop <- newEmptyMVar
+       go $ execStateT n (NodeState name master myURI sigStop M.empty M.empty)
     where go ns = ns >>= RN.runNode name

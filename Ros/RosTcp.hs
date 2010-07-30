@@ -32,10 +32,6 @@ import Ros.SlaveAPI (requestTopicClient)
 
 import Ros.Util.RingChan
 
--- |Maximum number of items to buffer for each client.
-sendBufferSize :: Int
-sendBufferSize = 1
-
 toWord32 :: Integral a => a -> Word32
 toWord32 x = unsafeCoerce (fromIntegral x :: Int)
 
@@ -90,12 +86,12 @@ negotiatePub ttype md5 sock =
 -- FIXME: cleaning up a disconnected client should be reflected at a
 -- higher level, too.
 acceptClients :: Socket -> TVar [(IO (), RingChan ByteString)] -> 
-                 (Socket -> IO ()) -> IO ()
-acceptClients sock clients negotiate = forever acceptClient
+                 (Socket -> IO ()) -> IO (RingChan ByteString) -> IO ()
+acceptClients sock clients negotiate mkBuffer = forever acceptClient
     where acceptClient = do (client,_) <- accept sock
                             putStrLn "Accepted client socket"
                             negotiate client
-                            chan <- newRingChan sendBufferSize
+                            chan <- mkBuffer
                             let cleanup1 = 
                                     do putStrLn "Closing client socket"
                                        shutdown client ShutdownBoth `catch`
@@ -175,8 +171,8 @@ subStream target tname updateStats =
 -- this publication server along with the port the server is listening
 -- on.
 runServer :: forall a. (RosBinary a, MsgInfo a) => 
-             Stream a -> (URI -> Int -> IO ()) -> IO (IO (), Int)
-runServer stream updateStats = 
+             Stream a -> (URI -> Int -> IO ()) -> Int -> IO (IO (), Int)
+runServer stream updateStats bufferSize = 
     withSocketsDo $ do
       sock <- socket AF_INET Sock.Stream defaultProtocol
       bindSocket sock (SockAddrInet aNY_PORT iNADDR_ANY)
@@ -186,8 +182,9 @@ runServer stream updateStats =
       let ttype = msgTypeName (undefined::a)
           md5 = sourceMD5 (undefined::a)
           negotiate = negotiatePub ttype md5
+          mkBuffer = newRingChan bufferSize
       acceptThread <- forkIO $ 
-                      acceptClients sock clients negotiate
+                      acceptClients sock clients negotiate mkBuffer
       pubThread <- forkIO $ pubStream stream clients
       let cleanup = atomically (readTVar clients) >>= 
                     sequence_ . map fst >> 

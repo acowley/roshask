@@ -33,6 +33,7 @@ class RosSlave a where
     getPublications :: a -> IO [(TopicName, TopicType, [(URI, PubStats)])]
     publisherUpdate :: a -> TopicName -> [URI] -> IO ()
     getTopicPortTCP :: a -> TopicName -> Maybe Int
+    setShutdownAction :: a -> IO () -> IO ()
     stopNode :: a -> IO ()
 
 -- |Unregister all of a node's publishers and subscribers, then stop
