@@ -81,4 +81,25 @@ weightedMean2 alpha invAlpha plus scale = warmup
                                in Cons avg' (go avg' xs)
 {-# INLINE weightedMean2 #-}
 
+-- |Compute a running \"average\" of a 'Stream' using a user-provided
+-- normalization function applied to the sum of products. The
+-- arguments are a constat @alpha@ that is used to scale the current
+-- average, a constant @invAlpha@ used to scale the newest value, a
+-- function for adding two scaled values, a function for scaling
+-- input values, a function for normalizing the sum of scaled values,
+-- and finally the stream to average. Parameterizing over all the
+-- arithmetic to this extent allows for the use of denormalizing
+-- scaling factors, as might be used to keep all arithmetic
+-- integral. An example would be scaling the average by the integer
+-- 7, the new value by the integer 1, then normalizing by dividing
+-- the sum of scaled values by 8.
+weightedMeanNormalized :: n -> n -> (b -> b -> c) -> (n -> a -> b) -> 
+                          (c -> a) -> Stream a -> Stream a
+weightedMeanNormalized alpha invAlpha plus scale normalize = warmup
+    where warmup (Cons x xs) = go x xs
+          go avg (Cons x xs) = let !avg' = normalize $ plus (scale alpha avg)
+                                                            (scale invAlpha x)
+                               in Cons avg' (go avg' xs)
+{-# INLINE weightedMeanNormalized #-}
+
                                     

@@ -169,8 +169,9 @@ advertise name stream =
                  put n { publications = M.insert name pub pubs }
 
 streamIO :: Stream (IO a) -> IO (Stream a)
-streamIO (Cons x xs) = do x' <- x
-                          xs' <- unsafeInterleaveIO $ streamIO xs
+streamIO (Cons x xs) = unsafeInterleaveIO $
+                       do x' <- x
+                          xs' <- streamIO xs
                           return $ Cons x' xs'
 
 -- |Advertise a Topic publishing a @Stream@ of @IO@ values.

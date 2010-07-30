@@ -34,7 +34,7 @@ import Ros.Util.RingChan
 
 -- |Maximum number of items to buffer for each client.
 sendBufferSize :: Int
-sendBufferSize = 10
+sendBufferSize = 1
 
 toWord32 :: Integral a => a -> Word32
 toWord32 x = unsafeCoerce (fromIntegral x :: Int)
