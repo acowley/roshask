@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- |Initialize a ROS Package with roshask support.
 module Ros.Build.Init (initPkg) where
-import Data.ByteString.Char8 (ByteString)
+import Data.ByteString.Char8 (ByteString, pack)
 import qualified Data.ByteString.Char8 as B
+import Data.Char (toUpper)
 import Data.List (intercalate)
 import System.Directory (createDirectory)
 import System.FilePath ((</>))
@@ -44,12 +45,14 @@ prepCabal pkgName = B.writeFile (pkgName</>(pkgName++".cabal")) $
                             , ("Category","Robotics")
                             , ("Build-type","Custom") ]
           target = B.intercalate "\n" $
-                   [ "Executable MyNode"
+                   [ B.concat ["Executable ", pack pkgName]
                    , "  Build-Depends:  base >= 4.2 && < 5,"
                    , "                  roshask"
-                   , "  GHC-Options:    -Odph"
-                   , "  Main-Is:        Main.hs"
+                   , B.concat ["  GHC-Options:    -Odph -main-is ", 
+                               pack pkgName']
+                   , B.concat ["  Main-Is:        ", pack pkgName', ".hs"]
                    , "  Hs-Source-Dirs: src" ]  
+          pkgName' = toUpper (head pkgName) : tail pkgName
 
 -- Format key-value pairs for a .cabal file
 format :: [(ByteString,ByteString)] -> ByteString
@@ -68,8 +71,10 @@ prepSetup pkgName = B.writeFile (pkgName</>"Setup.hs") $
                              , "rosConf, buildHook = rosBuild }\n" ]
 
 prepMain :: String -> IO ()
-prepMain pkgName = writeFile (pkgName</>"src"</>"Main.hs") $
-                   "module Main (main) where\n\
+prepMain pkgName = writeFile (pkgName</>"src"</>pkgName'++".hs") $
+                   "module "++pkgName'++" (main) where\n\
                    \import Ros.Node\n\
                    \\n\
                    \main = putStrLn \"Hello\"\n"
+    where pkgName' = toUpper (head pkgName) : tail pkgName
+                       
