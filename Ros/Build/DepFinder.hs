@@ -59,7 +59,7 @@ getRosPaths =
                      Just s -> s
                      Nothing -> error "ROS_ROOT not set in environment"
            allPaths = rPath : (rPath</>"core") : splitSearchPath pPaths
-       concat <$> mapM packagePaths allPaths
+       concat <$> (mapM packagePaths =<< filterM doesDirectoryExist allPaths)
 
 -- |Find the paths to the packages this package depends on as
 -- indicated by the manifest.xml file in this package's root
