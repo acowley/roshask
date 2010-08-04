@@ -11,7 +11,6 @@ Executable BackSub
                   Stream,
                   HOpenCV,
                   roshask
-  GHC-Options:    -Odph -threaded
+  GHC-Options:    -Odph -threaded -ddump-simpl-stats
   Main-Is:        Main.hs
   Hs-Source-Dirs: src
-  Other-Modules:  ImageProc
