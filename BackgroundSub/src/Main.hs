@@ -24,9 +24,6 @@ intToImage (IntImage w h p) = Image header h w "mono8" 0 w $
 add :: IntImage -> IntImage -> IntImage
 add (IntImage _ _ i1) (IntImage w h i2) = IntImage w h $ V.zipWith (+) i1 i2
 
-scale :: Float -> IntImage -> IntImage
-scale c (IntImage w h pix) = IntImage w h $ V.map (truncate.(*c).fromIntegral) pix
-
 iscale c (IntImage w h pix) = IntImage w h $ V.map (*c) pix
 shift x (IntImage w h pix) = IntImage w h (V.map (`div` x) pix)
 
