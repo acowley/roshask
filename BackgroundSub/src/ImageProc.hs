@@ -1,13 +1,13 @@
 -- |High level wrappers for OpenCV erosion and dilation morphological
 -- operators.
 module ImageProc where
-import AI.CV.OpenCV.HIplImage hiding (erode, dilate)
-import qualified AI.CV.OpenCV.HIplImage as H
+import AI.CV.OpenCV.HIplImage
+import qualified AI.CV.OpenCV.HighCV as H
 import Data.Word (Word8)
 import qualified Data.Vector.Storable as V
 
-erode :: Integral a => a -> a -> V.Vector Word8 -> Int -> V.Vector Word8
-erode w h pix n = pixels $ H.erode (fromPixels w h pix) n
+erode :: Integral a => a -> a -> Int -> V.Vector Word8 -> V.Vector Word8
+erode w h n pix = pixels $ H.erode n (fromPixels w h pix)
 
-dilate :: Integral a => a -> a -> V.Vector Word8 -> Int -> V.Vector Word8
-dilate w h pix n = pixels $ H.dilate (fromPixels w h pix) n
+dilate :: Integral a => a -> a -> Int -> V.Vector Word8 -> V.Vector Word8
+dilate w h n pix = pixels $ H.dilate n (fromPixels w h pix)

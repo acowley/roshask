@@ -33,7 +33,7 @@ shift x (IntImage w h pix) = IntImage w h (V.map (`div` x) pix)
 maskMotion :: IntImage -> IntImage -> Image
 maskMotion (IntImage _ _ i1) (IntImage w h i2) = 
     intToImage $ IntImage w h (V.zipWith applyMask mask i1)
-    where mask = dilate w h (erode w h (V.zipWith threshold diffs i2) 8) 8
+    where mask = dilate w h 8 . erode w h 8 $ V.zipWith threshold diffs i2
           applyMask m pix = if m > 0 then pix else 0
           diffs = V.map abs $ V.zipWith (-) i1 i2
           threshold diff avg = if diff > max 1 (avg `div` 32) then 255 else 0
