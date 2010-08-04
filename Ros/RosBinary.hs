@@ -114,13 +114,13 @@ putInt32 :: Int -> Put
 putInt32 = putWord32le . fromIntegral
 
 instance (RosBinary a, Storable a) => RosBinary (V.Vector a) where
-    put v = putInt32 (V.length v) >> putByteString (vectorToBytes v)
+    put v = putInt32 (V.length v) >> putByteString (vectorToBytesCopy v)
     get = getInt32 >>= getFixed
 
 getFixed :: forall a. Storable a => Int -> Get (V.Vector a)
-getFixed n = bytesToVector n <$> getByteString (n*(sizeOf (undefined::a)))
+getFixed n = bytesToVectorCopy n <$> getByteString (n*(sizeOf (undefined::a)))
 
 --putFixed :: Storable a => V.Vector a -> Put
 --putFixed = putByteString . vectorToBytes
 putFixed :: (Storable a, RosBinary a) => V.Vector a -> Put
-putFixed = putByteString . vectorToBytes
+putFixed = putByteString . vectorToBytesCopy
