@@ -44,6 +44,7 @@ everyNew s t = do mvx <- newEmptyMVar
 -- 'Stream'. This can be useful for finite difference analyses.
 finiteDifference :: (a -> a -> b) -> Stream a -> Stream b
 finiteDifference f s = fmap (uncurry f) $ consecutive s
+{-# INLINE finiteDifference #-}
 
 -- |Perform numerical integration of a 'Stream' using Simpson's rule
 -- applied at three consecutive points. This requires a function for
@@ -56,6 +57,7 @@ simpsonsRule plus scale s = go s
           c = 1 / 6
           simpson [a,mid,b] = scale c $ plus (plus a (scale 4 mid)) b
           simpson _ = error "Impossible pattern in simpson"
+{-# INLINE simpsonsRule #-}
 
 -- |Compute a running \"average\" of a 'Stream' by summing the product
 -- of @alpha@ and the current average with the product of @1 - alpha@
