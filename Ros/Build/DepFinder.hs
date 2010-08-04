@@ -2,14 +2,13 @@
 -- which this package is dependent.
 module Ros.Build.DepFinder (findPackageDeps, buildDepMsgs) where
 import Control.Applicative ((<$>))
-import Control.Monad (when, filterM, (>=>), (=<<))
+import Control.Monad (when, filterM, (>=>))
 import Data.Maybe (mapMaybe, isNothing, fromJust)
 import Data.List (find, findIndex)
-import qualified Data.Set as S
 import System.Directory (doesFileExist, doesDirectoryExist, 
                          getDirectoryContents)
 import System.Environment (getEnvironment)
-import System.FilePath (splitDirectories, (</>), splitSearchPath, takeExtension)
+import System.FilePath ((</>), splitSearchPath, takeExtension)
 import System.Process (runCommand)
 import Text.XML.Light
 

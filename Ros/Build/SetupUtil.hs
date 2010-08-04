@@ -39,7 +39,7 @@ rosBuild pkg lbi uh bfs = do binfo <- addRosMsgPaths targets
     where exeTargets = map exeName $ executables pkg
           targets = case library pkg of
                       Nothing -> Executables exeTargets
-                      Just l -> LibraryAndExecutables exeTargets
+                      Just _ -> LibraryAndExecutables exeTargets
 
 -- |The @confHook@ override takes over @cabal install@'s @--bindir@ and
 -- @--libdir@ options to force binary outputs into the @bin@ and @lib@

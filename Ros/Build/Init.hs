@@ -12,7 +12,7 @@ import System.Process (system)
 -- |Initialize a package with the given name in the eponymous
 -- directory with the given ROS package dependencies.
 initPkg :: String -> [String] -> IO ()
-initPkg pkgName deps = do system pkgCmd
+initPkg pkgName deps = do _ <- system pkgCmd
                           prepCMakeLists pkgName
                           prepCabal pkgName
                           prepSetup pkgName
@@ -22,6 +22,7 @@ initPkg pkgName deps = do system pkgCmd
                           
     where pkgCmd = intercalate " " ("roscreate-pkg":pkgName:deps)
 
+fyi :: String -> String
 fyi pkgName = "Created an empty roshask package.\n" ++
               "Please edit "++
               show (pkgName</>pkgName++".cabal") ++

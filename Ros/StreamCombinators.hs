@@ -24,19 +24,19 @@ everyNew s t = do mvx <- newEmptyMVar
                   mvy <- newEmptyMVar
                   c <- newChan
                   let feedX stream = 
-                          let go (Cons x xs) = do swapMVar mvx x
+                          let go (Cons x xs) = do _ <- swapMVar mvx x
                                                   y <- readMVar mvy
                                                   writeChan c (x,y)
                                                   go xs
                           in go stream
                       feedY stream = 
-                          let go (Cons y ys) = do swapMVar mvy y
+                          let go (Cons y ys) = do _ <- swapMVar mvy y
                                                   x <- readMVar mvx
                                                   writeChan c (x,y)
                                                   go ys
                           in go stream
-                  t1 <- forkIO $ feedX s
-                  t2 <- forkIO $ feedY t
+                  _ <- forkIO $ feedX s
+                  _ <- forkIO $ feedY t
                   let merged = Cons (readChan c) merged
                   return merged
 
@@ -55,6 +55,7 @@ simpsonsRule plus scale s = go s
     where go stream = Cons (simpson (S.take 3 stream)) (go (S.tail stream))
           c = 1 / 6
           simpson [a,mid,b] = scale c $ plus (plus a (scale 4 mid)) b
+          simpson _ = error "Impossible pattern in simpson"
 
 -- |Compute a running \"average\" of a 'Stream' by summing the product
 -- of @alpha@ and the current average with the product of @1 - alpha@

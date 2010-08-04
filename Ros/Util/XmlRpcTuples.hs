@@ -4,7 +4,6 @@
 -- length 5.
 module Ros.Util.XmlRpcTuples where
 import "mtl" Control.Monad.Error
-import Control.Monad
 import Network.XmlRpc.Internals
 
 instance (XmlRpcType a, XmlRpcType b, XmlRpcType c, XmlRpcType d, 

@@ -1,25 +1,22 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 module Ros.RosTcp (subStream, runServer) where
 import Control.Applicative ((<$>))
-import Control.Arrow ((***))
 import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar
-import Data.Map (Map)
-import qualified Data.Map as M
+import Control.Monad (forever, when)
 import Data.Word (Word32)
-import Control.Monad (forever, forM_, when)
 import Data.Binary.Put (runPut, putWord32le)
 import Data.Binary.Get (runGet, getWord32le)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Char8 as BC8
 import qualified Data.ByteString.Lazy as BL
 import Network.BSD (getHostByName, hostAddress)
 import Network.Socket hiding (send, sendTo, recv, recvFrom, Stream)
 import qualified Network.Socket as Sock
-import Network.Socket.ByteString -- .Lazy
-import System.IO (IOMode(ReadMode), hSetBuffering, BufferMode(..))
+import Network.Socket.ByteString
+--import System.IO (IOMode(ReadMode), hSetBuffering, BufferMode(..))
+import System.IO (IOMode(ReadMode))
 import Text.URI (parseURI, uriRegName)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -140,7 +137,7 @@ negotiateSub sock tname ttype md5 =
 -- publishing.
 subStream :: forall a. (RosBinary a, MsgInfo a) => 
              URI -> String -> (Int -> IO ()) -> IO (Stream a)
-subStream target tname updateStats = 
+subStream target tname _updateStats = 
     do putStrLn $ "Opening stream to " ++target++" for "++tname
        response <- requestTopicClient target "/roshask" tname 
                                       [["TCPROS"]]
@@ -172,7 +169,7 @@ subStream target tname updateStats =
 -- on.
 runServer :: forall a. (RosBinary a, MsgInfo a) => 
              Stream a -> (URI -> Int -> IO ()) -> Int -> IO (IO (), Int)
-runServer stream updateStats bufferSize = 
+runServer stream _updateStats bufferSize = 
     withSocketsDo $ do
       sock <- socket AF_INET Sock.Stream defaultProtocol
       bindSocket sock (SockAddrInet aNY_PORT iNADDR_ANY)
@@ -189,5 +186,6 @@ runServer stream updateStats bufferSize =
       let cleanup = atomically (readTVar clients) >>= 
                     sequence_ . map fst >> 
                     shutdown sock ShutdownBoth >>
-                    killThread acceptThread
+                    killThread acceptThread >>
+                    killThread pubThread
       return (cleanup, port)

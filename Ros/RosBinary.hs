@@ -8,7 +8,6 @@
 -- scenario of same-machine transport.
 module Ros.RosBinary where
 import Control.Applicative ((<$>), (<*>))
-import Control.Monad ((>=>))
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Int
@@ -17,12 +16,8 @@ import Data.Word
 import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Data.ByteString as B
-import qualified Data.ByteString.Unsafe as BU
 import qualified Data.ByteString.Char8 as BC8
-import Foreign.C.String (CStringLen)
-import Foreign.Ptr (Ptr, castPtr)
-import Foreign.Storable (sizeOf, Storable, peekElemOff)
-import System.IO.Unsafe
+import Foreign.Storable (sizeOf, Storable)
 
 import Ros.RosTypes
 import Ros.Util.BytesToVector
@@ -112,7 +107,10 @@ instance RosBinary ROSDuration where
     get =  (,) <$> getWord32host <*> getWord32host
 -}
 
+getInt32 :: Get Int
 getInt32 = fromIntegral <$> getWord32le
+
+putInt32 :: Int -> Put 
 putInt32 = putWord32le . fromIntegral
 
 instance (RosBinary a, Storable a) => RosBinary (V.Vector a) where

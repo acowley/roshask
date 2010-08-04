@@ -1,10 +1,8 @@
 module Ros.Util.RingChan (RingChan, newRingChan, writeChan, 
                           readChan, getChanContents) where
-import Control.Applicative
 import Control.Monad (join)
 import Control.Concurrent.MVar
 import Control.Concurrent.QSem
-import Control.Monad (when)
 import Data.Sequence (Seq, (|>), viewl, ViewL(..))
 import qualified Data.Sequence as Seq
 import System.IO.Unsafe
@@ -26,8 +24,8 @@ newRingChan n = do sem <- newQSem 0
                    q <- newMVar Seq.empty
                    return (n,sem,q)
 
--- |If the chan is full, drop the oldest element. NOTE: Or just don't
--- add the new element?
+-- |If the chan is full, does nothing. NOTE: An alternative would be
+-- to drop the oldest element before adding the new one.
 writeChan :: RingChan a -> a -> IO ()
 writeChan (n,sem,mv) x = 
     join $ modifyMVar mv (\q -> if Seq.length q < n

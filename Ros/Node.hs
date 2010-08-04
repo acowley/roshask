@@ -1,10 +1,10 @@
 {-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables #-}
 module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, 
-                 runHandler, module Ros.RosTypes) where
+                 getShutdownAction, runHandler, module Ros.RosTypes) where
 import Control.Applicative (Applicative(..), (<$>))
 import Control.Concurrent (MVar, newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent.BoundedChan
-import Control.Concurrent.STM (atomically, STM, TVar, readTVar, writeTVar, 
+import Control.Concurrent.STM (atomically, TVar, readTVar, writeTVar, 
                                newTVarIO)
 import "monads-fd" Control.Monad.State
 import Data.Map (Map)
@@ -131,6 +131,7 @@ mkSub tname = do c <- newBoundedChan recvBufferSize
                                         topicType stats
                  return (stream, sub)
     where list2stream (x:xs) = Cons x (list2stream xs)
+          list2stream [] = error "mkSub expected an infinite list"
 
 mkPub :: forall a. (RosBinary a, MsgInfo a) => 
          Stream a -> Int -> IO Publication

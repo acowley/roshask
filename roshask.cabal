@@ -42,6 +42,7 @@ Library
                        uri >= 0.1.5 && < 0.2,
                        Stream >= 0.4.1 && < 0.5
 
+  GHC-Options:         -Odph -Wall -fno-warn-name-shadowing
   Hs-Source-Dirs:      ., Ros
   
   -- Modules not exported by this package.

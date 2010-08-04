@@ -2,7 +2,7 @@
 module Ros.MasterAPI where
 import Network.XmlRpc.Client
 import Ros.RosTypes
-import Ros.Util.XmlRpcTuples
+import Ros.Util.XmlRpcTuples ()
 
 -- |Subscribe the caller to the specified topic. In addition to
 -- receiving a list of current publishers, the subscriber will also

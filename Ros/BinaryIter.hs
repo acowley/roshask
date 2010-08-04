@@ -6,7 +6,6 @@
 module Ros.BinaryIter (Iter(..), BinaryIter(..), streamIn, consume') where
 import Control.Applicative
 import Control.Monad.ST (runST)
-import Data.Binary (Binary)
 import Data.Binary.Get
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString as BS
@@ -21,7 +20,6 @@ import qualified Data.Vector.Generic.Mutable as VM
 import qualified Data.Vector.Storable as VS
 import Data.Word
 import Foreign.Storable
-import GHC.Int (Int64)
 import System.IO (Handle)
 import System.IO.Unsafe (unsafeInterleaveIO)
 import Unsafe.Coerce (unsafeCoerce)
@@ -55,9 +53,11 @@ class BinaryIter a where
 consume' :: BinaryIter a => Iter BL.ByteString a
 consume' = More consume
 
+{-
 -- The maximum number of bytes read from the Handle at a time.
 cHUNK_SIZE :: Int
 cHUNK_SIZE = 16 * 1024
+-}
 
 hGetAll :: Handle -> Int -> IO BL.ByteString
 hGetAll h n = go n []
@@ -93,6 +93,7 @@ unsafeGet 1 = unsafeCoerce <$> getWord8
 unsafeGet 2 = unsafeCoerce <$> getWord16host
 unsafeGet 4 = unsafeCoerce <$> getWord32host
 unsafeGet 8 = unsafeCoerce <$> getWord64host
+unsafeGet x = error $ "No unsafe getter for values of "++show x++" bytes"
 
 {-# SPECIALIZE getStorable :: BL.ByteString -> Iter BL.ByteString Word8  #-}
 {-# SPECIALIZE getStorable :: BL.ByteString -> Iter BL.ByteString Word16 #-}
@@ -132,6 +133,7 @@ buildVector n bs g =
                                    in VM.unsafeWrite m i x >> go (i+1) t
        go 0 bs
 
+getInt :: Get Int
 getInt = unsafeCoerce <$> getWord32host
 
 -- Build Vectors by reading in the number of elements and then the
@@ -156,7 +158,7 @@ instance forall a. Storable a => BinaryIter (VS.Vector a) where
     consume bs = if B.length bs < 4
                  then More (consume . B.append bs)
                  else let (h,t) = B.splitAt 4 bs
-                      in getCount (fromIntegral (runGet getInt h)) t
+                      in getCount (runGet getInt h) t
         where sz = sizeOf (undefined::a)
               getCount n = let totalBytes = fromIntegral $ n * sz
                                go bs = if B.length bs < totalBytes

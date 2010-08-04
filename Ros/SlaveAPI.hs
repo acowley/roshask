@@ -6,21 +6,18 @@ import Control.Concurrent (killThread, forkIO, threadDelay,
                            MVar, putMVar, readMVar)
 import Control.Concurrent.QSem
 import "monads-fd" Control.Monad.Trans (liftIO)
-import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as BU
 import qualified Data.ByteString.Lazy.UTF8 as BLU
-import qualified Data.ByteString.Lazy as BL
 import Snap.Http.Server (httpServe)
 import Snap.Types (Snap, getRequestBody, writeBS)
 import Network.Socket hiding (Stream)
 import qualified Network.Socket as Net
-import Network.XmlRpc.Internals (Value, toValue)
+import Network.XmlRpc.Internals (Value)
 import Network.XmlRpc.Server (handleCall, methods, fun)
 import Network.XmlRpc.Client (remote)
-import System.IO (hGetContents, hPutStr, hClose)
 import System.Posix.Process (getProcessID)
 import System.Process (readProcess)
-import Ros.Util.XmlRpcTuples
+import Ros.Util.XmlRpcTuples ()
 import Ros.RosTypes
 import Ros.TopicStats
 import Ros.MasterAPI
@@ -49,7 +46,6 @@ cleanupNode n = do pubs <- getPublications n
                    mapM_ (stop (unregisterSubscriber master)) subs
                    stopNode n
 
-type MessageData = String
 type RpcResult a = IO (Int, String, a)
 
 mkPublishStats :: (TopicName, a, [(URI, PubStats)]) -> 
@@ -68,7 +64,7 @@ getBusStats :: (RosSlave a) => a -> CallerID ->
                RpcResult ([(String,Int,[(Int,Int,Int,Bool)])],
                           [(String,Int,[(Int,Int,Int,Bool)])],
                           (Int,Int,Int))
-getBusStats n callerId = do
+getBusStats n _ = do
     publishStats <- map (mkPublishStats) <$> getPublications n
     subscribeStats <- map (mkSubStats) <$> getSubscriptions n
     let serviceStats = (0,0,0)
@@ -108,8 +104,9 @@ getPublications' n _ = do
   return (1, "", pubs)
 
 paramUpdate' :: RosSlave a => a -> CallerID -> String -> Value -> RpcResult Bool
-paramUpdate' n _ paramKey paramVal = do putStrLn "paramUpdate not implemented!"
-                                        return (1, "", True)
+paramUpdate' _n _ _paramKey _paramVal = do 
+  putStrLn "paramUpdate not implemented!"
+  return (1, "", True)
 
 pubUpdate :: RosSlave a => a -> CallerID -> TopicName -> [URI] -> RpcResult Int
 pubUpdate n _ topic publishers = do publisherUpdate n topic publishers
@@ -120,7 +117,7 @@ myName = init <$> readProcess "hostname" [] ""
 
 requestTopic :: RosSlave a => a -> CallerID -> TopicName -> [[Value]] -> 
                 RpcResult (String,String,Int)
-requestTopic n _ topic protocols = 
+requestTopic n _ topic _protocols = 
     case getTopicPortTCP n topic of
       Just p -> do putStrLn $ topic++" requested "++show p
                    host <- myName

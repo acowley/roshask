@@ -5,7 +5,7 @@
 module Ros.ConnectionHeader (genHeader, ConnHeader(..), parseHeader) where
 import Control.Applicative ((<$>))
 import Control.Arrow (second, (***))
-import Data.Binary.Get (getWord32le, runGet, Get, getLazyByteString, runGetState)
+import Data.Binary.Get (getWord32le, Get, getLazyByteString, runGetState)
 import Data.Binary.Put (runPut, putWord32le)
 import Data.ByteString.Lazy.Char8 (ByteString, pack, unpack)
 import qualified Data.ByteString.Lazy.Char8 as B
@@ -49,6 +49,7 @@ parsePair = do len <- fromIntegral <$> getInt
                  Nothing -> error "Didn't find '=' in connection header field"
 
 -- Keep parsing header entries until we run out of bytes.
+parseHeader :: ByteString -> [(String, String)]
 parseHeader bs | B.null bs = []
                | otherwise = let (p,rst,_) = runGetState parsePair bs 0
                              in p : parseHeader rst
