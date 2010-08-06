@@ -27,7 +27,7 @@ add (IntImage _ _ i1) (IntImage w h i2) = IntImage w h $ V.zipWith (+) i1 i2
 iscale c (IntImage w h pix) = IntImage w h $ V.map (*c) pix
 shift x (IntImage w h pix) = IntImage w h (V.map (`div` x) pix)
 
-despeckle w h pix = H.pixels . H.dilate 8 . H.erode 8 $ H.fromPixels w h pix
+despeckle w h = H.pixels . H.dilate 8 . H.erode 8 . H.fromGrayPixels w h
 
 maskMotion :: IntImage -> IntImage -> Image
 maskMotion (IntImage _ _ i1) (IntImage w h i2) = 
