@@ -1,5 +1,5 @@
 {-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables #-}
-module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, 
+module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, streamIO,
                  getShutdownAction, runHandler, module Ros.RosTypes) where
 import Control.Applicative (Applicative(..), (<$>))
 import Control.Concurrent (MVar, newEmptyMVar, readMVar, putMVar)
@@ -175,6 +175,7 @@ advertiseBuffered bufferSize name stream =
 advertise :: (RosBinary a, MsgInfo a) => TopicName -> Stream a -> Node ()
 advertise = advertiseBuffered 1
 
+-- |Convert a 'Stream' of 'IO' actions to a 'Stream' of pure values.
 streamIO :: Stream (IO a) -> IO (Stream a)
 streamIO (Cons x xs) = unsafeInterleaveIO $
                        do x' <- x

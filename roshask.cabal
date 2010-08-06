@@ -22,7 +22,7 @@ Library
   -- Modules exported by the library.
   Exposed-modules:     Ros.RosTypes Ros.Node Ros.BinaryIter Ros.RosBinary 
                        Msg.MsgInfo Ros.Build.DepFinder Ros.Build.SetupUtil 
-                       Msg.HeaderSupport Ros.StreamCombinators
+                       Msg.HeaderSupport Ros.StreamCombinators Ros.Stream
   
   -- Packages needed in order to build this package.
   Build-depends:       base >= 4 && < 6,
@@ -39,11 +39,10 @@ Library
                        snap-server >= 0.2.7.2 && < 0.3,
                        haxr == 3000.*,
                        utf8-string >= 0.3.6 && < 4,
-                       uri >= 0.1.5 && < 0.2,
-                       Stream >= 0.4.1 && < 0.5
+                       uri >= 0.1.5 && < 0.2
 
   GHC-Options:         -Odph -Wall -fno-warn-name-shadowing
-  Hs-Source-Dirs:      ., Ros
+  Hs-Source-Dirs:      .,Ros
   
   -- Modules not exported by this package.
   Other-modules:      Ros.MasterAPI Ros.RosTcp Ros.SlaveAPI 
