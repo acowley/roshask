@@ -1,7 +1,7 @@
 module Main (main) where
 import Control.Applicative
 import qualified Data.Vector.Storable as V
-import qualified Data.Stream as S
+import qualified Ros.Stream as S
 import Data.Word
 import Ros.Node
 import Ros.Roslib.Header
