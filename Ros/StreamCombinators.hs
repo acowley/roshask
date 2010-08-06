@@ -104,5 +104,3 @@ weightedMeanNormalized alpha invAlpha plus scale normalize = warmup
                                                             (scale invAlpha x)
                                in Cons avg' (go avg' xs)
 {-# INLINE weightedMeanNormalized #-}
-
-                                    
