@@ -2,8 +2,10 @@
 module Ros.StreamCombinators where
 import Control.Applicative
 import Control.Concurrent
-import Data.Stream (Stream(..))
-import qualified Data.Stream as S
+import Control.Concurrent.STM
+import Control.Monad (join)
+import Ros.Stream (Stream(..))
+import qualified Ros.Stream as S
 
 -- |Turn a stream of values into a stream of pairs of consecutive
 -- values.
@@ -18,27 +20,72 @@ lockstep s1 s2 = (,) <$> s1 <*> s2
 
 -- |Stream a new pair every time either of the component 'Stream's
 -- produces a new value. The value of the other element of the pair
--- will be the newest available value.
+-- will be the newest available value. The resulting 'Stream' will
+-- produce a new value at the rate of the faster component 'Stream',
+-- and may contain duplicate consecutive elements.
 everyNew :: Stream a -> Stream b -> IO (Stream (IO (a,b)))
-everyNew s t = do mvx <- newEmptyMVar
-                  mvy <- newEmptyMVar
+everyNew s t = do mvx <- newEmptyTMVarIO
+                  mvy <- newEmptyTMVarIO
                   c <- newChan
-                  let feedX stream = 
-                          let go (Cons x xs) = do _ <- swapMVar mvx x
-                                                  y <- readMVar mvy
-                                                  writeChan c (x,y)
-                                                  go xs
-                          in go stream
-                      feedY stream = 
-                          let go (Cons y ys) = do _ <- swapMVar mvy y
-                                                  x <- readMVar mvx
-                                                  writeChan c (x,y)
-                                                  go ys
-                          in go stream
+                  let feedX (Cons x xs) = 
+                          do atomically $
+                               do _ <- tryTakeTMVar mvx
+                                  putTMVar mvx x
+                             join . atomically $
+                               do y <- readTMVar mvy
+                                  return $ writeChan c (x,y)
+                             feedX xs
+                      feedY (Cons y ys) = 
+                          do atomically $
+                               do _ <- tryTakeTMVar mvy
+                                  putTMVar mvy y
+                             join . atomically $
+                               do x <- readTMVar mvx
+                                  return $ writeChan c (x,y)
+                             feedY ys
                   _ <- forkIO $ feedX s
                   _ <- forkIO $ feedY t
                   let merged = Cons (readChan c) merged
                   return merged
+
+-- |Stream a new pair every time both of the component 'Stream's have
+-- produced a new value. The composite 'Stream' will produce pairs at
+-- the rate of the slower component 'Stream' consisting of the most
+-- recent value from each 'Stream'.
+bothNew :: Stream a -> Stream b -> IO (Stream (IO (a,b)))
+bothNew s t = do mvx <- newEmptyTMVarIO
+                 mvy <- newEmptyTMVarIO
+                 c <- newChan
+                 let feedX (Cons x xs) = 
+                         do act <- atomically $ 
+                                   do _ <- tryTakeTMVar mvx
+                                      y <- tryTakeTMVar mvy
+                                      case y of
+                                        Nothing -> do putTMVar mvx x
+                                                      return $ return ()
+                                        Just y' -> return $ writeChan c (x,y')
+                            act 
+                            feedX xs
+                 let feedY (Cons y ys) =
+                         do act <- atomically $
+                                   do x <- tryTakeTMVar mvx
+                                      _ <- tryTakeTMVar mvy
+                                      case x of
+                                        Nothing -> do putTMVar mvy y
+                                                      return $ return ()
+                                        Just x' -> return $ writeChan c (x',y)
+                            act 
+                            feedY ys
+                 _ <- forkIO $ feedX s
+                 _ <- forkIO $ feedY t
+                 let merged = Cons (readChan c) merged
+                 return merged
+
+infixl 7 <|>
+-- |Merge two 'Stream's into one. Items from each component 'Stream'
+-- will be added to the combined 'Stream' as they become available.
+(<|>) :: Stream a -> Stream a -> IO (Stream a)
+s <|> t = S.fromList <$> mergeIO (S.toList s) (S.toList t)
 
 -- |Apply a function to each consecutive pair of elements from a
 -- 'Stream'. This can be useful for finite difference analyses.
