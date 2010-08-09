@@ -70,7 +70,7 @@ mkPub s bufferSize =
 -- received on over the Topic.
 subscribe :: (RosBinary a, MsgInfo a) => TopicName -> Node (Stream a)
 subscribe name = do n <- get
-                    name' <- remapName name
+                    name' <- canonicalizeName =<< remapName name
                     let subs = subscriptions n
                     if M.member name' subs
                        then error $ "Already subscribed to "++name'
@@ -89,7 +89,7 @@ advertiseBuffered :: (RosBinary a, MsgInfo a) =>
                      Int -> TopicName -> Stream a -> Node ()
 advertiseBuffered bufferSize name stream = 
     do n <- get
-       name' <- remapName name
+       name' <- canonicalizeName =<< remapName name
        let pubs = publications n
        if M.member name' pubs 
          then error $ "Already advertised "++name'
@@ -144,7 +144,12 @@ getServerParam var = do state <- get
                         let masterUri = master state
                             ns = namespace state
                             myName = ns ++ nodeName state
-                        liftIO $ P.getParam masterUri myName var
+                        -- Call hasParam first because getParam only returns 
+                        -- a partial result (just the return code) in failure.
+                        hasParam <- liftIO $ P.hasParam masterUri myName var
+                        case hasParam of
+                          Right True -> liftIO $ P.getParam masterUri myName var
+                          _ -> return Nothing
 
 -- |Get the value associated with the given parameter name.
 getParam :: (XmlRpcType a, FromParam a) => String -> Node (Maybe a)
@@ -167,10 +172,11 @@ runNode name (Node n) =
        sigStop <- newEmptyMVar
        env <- liftIO getEnvironment
        args <- liftIO getArgs
+       putStrLn $ "args = " ++ show args
        let getConfig' var def = maybe def id $ lookup var env
            getConfig = flip lookup env
            master = getConfig' "ROS_MASTER_URI" "http://localhost:11311"
-           namespace = let ns = getConfig' "ROS_MASTER_URI" "/"
+           namespace = let ns = getConfig' "ROS_NAMESPACE" "/"
                        in if last ns == '/' then ns else ns ++ "/"
            (nameMap, params) = parseRemappings args
            name' = case lookup "__name" params of
@@ -178,14 +184,18 @@ runNode name (Node n) =
                      Nothing -> name
            -- Name remappings apply to exact strings and resolved names.
            resolve p@(('/':_),_) = [p]
-           resolve (('~':n),v) = [(namespace ++ name' ++ "/" ++ n,v), ('_':n,v)]
+           resolve (('_':n),v) = [(namespace++name'++"/"++n, v)]
+           resolve (('~':n),v) = [(namespace++name'++"/"++ n, v)] --, ('_':n,v)]
            resolve (n,v) = [(namespace ++ n,v), (n,v)]
            nameMap' = concatMap resolve nameMap
+           params' = concatMap resolve params
+       putStrLn $ "Got remappings "++show nameMap'
+       putStrLn $ "Got parameter bindings "++show params'
        case getConfig "ROS_IP" of
          Nothing -> case getConfig "ROS_HOSTNAME" of
                       Nothing -> return ()
                       Just n -> putMVar myURI $ "http://"++n
          Just ip -> putMVar myURI $ "http://"++ip
-       go . execStateT (runReaderT n (params, nameMap')) $
+       go . execStateT (runReaderT n (params', nameMap')) $
          NodeState name' namespace master myURI sigStop M.empty M.empty
     where go ns = ns >>= RN.runNode name

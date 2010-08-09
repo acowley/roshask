@@ -50,7 +50,7 @@ Library
                       Ros.Util.XmlRpcTuples Ros.RunNode Ros.ConnectionHeader 
                       Ros.TopicStats Ros.Util.BytesToVector Ros.Build.Init 
                       Ros.Util.RingChan Ros.Util.ArgRemapping 
-                      Ros.ParameterServerAPI
+                      Ros.ParameterServerAPI Ros.NodeType
   
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         

@@ -97,7 +97,7 @@ parseVal :: Parsec String () ParamVal
 parseVal = choice [ either PInt PDouble <$> intOrFloat'
                   , const (PBool True) <$> reserved lexer "true"
                   , const (PBool False) <$> reserved lexer "false" 
-                  , PString <$> stringLiteral lexer
+                  , PString <$> (stringLiteral lexer <|> identifier lexer)
                   , PList <$> brackets lexer (commaSep lexer parseVal) ]
 
 parseBinding :: Parsec String () (Either (String, String) (String, ParamVal))
@@ -117,14 +117,16 @@ parseRemappings args = if null errors
                        else error $ "Couldn't parse remapping "++ show errors
     where remaps = map (runParser parseBinding () "") args
           errors = lefts remaps
+
 -- parseRemappings :: String -> (Names, Params)
 -- parseRemappings args = case runParser (many1 parseBinding) () "" args of
 --                          Left m -> error (show m)
 --                          Right bindings -> partitionEithers bindings
-{-
+
 test :: (Names, Params)
 test = parseRemappings [ "_joe:=42.1"
                        , "chatter:=/foo"
                        , "_susy:=[1,2,3]"
-                       , "__name:=\"toby\"" ]
--}
+                       , "__name:=\"toby\"" 
+                       , "_topic:=bar" ]
+
