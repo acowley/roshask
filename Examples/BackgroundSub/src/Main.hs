@@ -37,8 +37,9 @@ maskMotion (IntImage _ _ i1) (IntImage w h i2) =
           diffs = V.map abs $ V.zipWith (-) i1 i2
           threshold diff avg = if diff > max 1 (avg `div` 32) then 255 else 0
 
-main = runNode "/backsub" $ do
-       raw <- fmap toIntPixels <$> subscribe "/cam"
+main = runNode "backsub" $ do
+       raw <- fmap toIntPixels <$> subscribe "cam"
        let avg = weightedMeanNormalized 7 1 add iscale (shift 8) raw
            streamMotion = fmap (uncurry maskMotion)
-       advertise "/motion" $ streamMotion (lockstep (S.drop 1 raw) avg)
+       tname <- getParam' "~topic" "motion"
+       advertise tname $ streamMotion (lockstep (S.drop 1 raw) avg)
