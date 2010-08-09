@@ -1,4 +1,5 @@
-{-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables #-}
+{-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables, 
+             FlexibleInstances #-}
 module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, streamIO,
                  getShutdownAction, runHandler, module Ros.RosTypes) where
 import Control.Applicative (Applicative(..), (<$>))
@@ -7,6 +8,7 @@ import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (atomically, TVar, readTVar, writeTVar, 
                                newTVarIO)
 import "monads-fd" Control.Monad.State
+import "monads-fd" Control.Monad.Reader
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Set (Set)
@@ -15,94 +17,13 @@ import Control.Concurrent (forkIO, ThreadId)
 import System.Environment (getEnvironment)
 import System.IO.Unsafe (unsafeInterleaveIO)
 import Msg.MsgInfo
+import Ros.NodeType
 import Ros.RosBinary (RosBinary)
 import Ros.RosTypes
 import Ros.RosTcp
 import Ros.SlaveAPI (RosSlave(..))
 import qualified Ros.RunNode as RN
 import Ros.TopicStats
-
-data Subscription = Subscription { knownPubs :: TVar (Set URI)
-                                 , addPub    :: URI -> IO ThreadId
-                                 , subType   :: String
-                                 , subStats  :: StatMap SubStats }
-
-data Publication = Publication { subscribers :: TVar (Set URI)
-                               , pubType     :: String
-                               , pubPort     :: Int
-                               , pubCleanup  :: IO ()
-                               , pubStats    :: StatMap PubStats }
-
-data NodeState = NodeState { nodeName       :: String
-                           , master         :: URI
-                           , nodeURI        :: MVar URI
-                           , signalShutdown :: MVar (IO ())
-                           , subscriptions  :: Map String Subscription
-                           , publications   :: Map String Publication }
-
-newtype Node a = Node { unNode :: StateT NodeState IO a }
-
-instance Functor Node where
-    fmap f (Node s) = Node (fmap f s)
-
-instance Applicative Node where
-    pure = Node . pure
-    Node f <*> Node x = Node (f <*> x)
-
-instance Monad Node where
-    (Node s) >>= f = Node $ s >>= unNode . f
-    return = Node . return
-
-instance MonadIO Node where
-    liftIO m = Node $ liftIO m
-
-instance MonadState NodeState Node where
-    get = Node get
-    put = Node . put
-
-instance RosSlave NodeState where
-    getMaster = master
-    getNodeName = nodeName
-    getNodeURI = nodeURI
-    getSubscriptions = atomically . mapM formatSub . M.toList . subscriptions
-        where formatSub (name, sub) = let topicType = subType sub
-                                      in do stats <- readTVar (subStats sub)
-                                            stats' <- mapM statSnapshot . 
-                                                      M.toList $
-                                                      stats
-                                            return (name, topicType, stats')
-    getPublications = atomically . mapM formatPub . M.toList . publications
-        where formatPub (name, pub) = let topicType = pubType pub
-                                      in do stats <- readTVar (pubStats pub)
-                                            stats' <- mapM statSnapshot .
-                                                      M.toList $
-                                                      stats
-                                            return (name, topicType, stats')
-    publisherUpdate ns name uris = 
-        let act = join.atomically $
-                  case M.lookup name (subscriptions ns) of
-                    Nothing -> return (return ())
-                    Just sub -> do let add = addPub sub >=> \_ -> return ()
-                                   known <- readTVar (knownPubs sub) 
-                                   (act,known') <- foldM (connectToPub add)
-                                                         (return (), known)
-                                                         uris
-                                   writeTVar (knownPubs sub) known'
-                                   return act
-        in act
-    getTopicPortTCP = ((pubPort <$> ) .) . flip M.lookup . publications
-    setShutdownAction ns a = putMVar (signalShutdown ns) a
-    stopNode = mapM_ (pubCleanup . snd) . M.toList . publications
-
--- If a given URI is not a part of a Set of known URIs, add an action
--- to effect a subscription to an accumulated action and add the URI
--- to the Set.
-connectToPub :: Monad m => 
-                (URI -> IO ()) -> (IO (), Set URI) -> URI -> m (IO (), Set URI)
-connectToPub doSub (act, known) uri = if S.member uri known
-                                      then return (act, known)
-                                      else let known' = S.insert uri known
-                                           in return (doSub uri >> act, known')
 
 -- |Maximum number of items to buffer for a subscriber.
 recvBufferSize :: Int
@@ -198,19 +119,42 @@ advertiseBufferedIO bufferSize name stream =
 getShutdownAction :: Node (IO ())
 getShutdownAction = get >>= liftIO . readMVar . signalShutdown
 
+-- |Get a variable binding from the environment.
+getConfig :: String -> Node (Maybe String)
+getConfig = asks . (. fst) . lookup
+
+-- |Get a variable binding from the environment. If the variable named
+-- by the first parameter is not found, the supplied default value
+-- will be returned.
+getConfig' :: String -> String -> Node String
+getConfig' var def = asks (maybe def id . lookup var . fst)
+
 -- If the master URI is set in the ROS_MASTER_URI environment variable
 -- then use that, otherwise use http://localhost:11311
-findMaster :: IO String
-findMaster = do env <- getEnvironment
-                case lookup "ROS_MASTER_URI" env of
-                  Just uri -> return uri
-                  Nothing -> return "http://localhost:11311"
+findMaster :: [(String, String)] -> String
+findMaster = maybe "http://localhost:11311" id . lookup "ROS_MASTER_URI"
+
+-- |Get the namespace of this node.
+getNamespace = getConfig' "ROS_NAMESPACE" "/"
+
+-- |Resolve a name. If the name is absolute (begins with a forward
+-- slash, '/'), it is returned unchanged. Otherwise, it is prefixed by
+-- the current namespace.
+resolveName :: String -> Node String
+resolveName n@('/':_) = return n
+resolveName name = (++ name) <$> getNamespace
+
+-- |Apply any matching renames to a given name.
+remapName :: String -> Node String
+remapName name = asks (maybe name id . lookup name . snd)
 
 -- |Run a ROS Node.
 runNode :: NodeName -> Node a -> IO ()
 runNode name (Node n) = 
-    do master <- findMaster
-       myURI <- newEmptyMVar
+    do myURI <- newEmptyMVar
        sigStop <- newEmptyMVar
-       go $ execStateT n (NodeState name master myURI sigStop M.empty M.empty)
+       env <- liftIO getEnvironment
+       let master = findMaster env
+       go . execStateT (runReaderT n (env,[])) $
+         NodeState name master myURI sigStop M.empty M.empty
     where go ns = ns >>= RN.runNode name

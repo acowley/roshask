@@ -1,0 +1,105 @@
+{-# LANGUAGE PackageImports, MultiParamTypeClasses, FlexibleInstances #-}
+module Ros.NodeType where
+import Control.Applicative (Applicative(..), (<$>))
+import Control.Concurrent (MVar, putMVar)
+import Control.Concurrent.STM (atomically, TVar, readTVar, writeTVar)
+import "monads-fd" Control.Monad.State
+import "monads-fd" Control.Monad.Reader
+import Data.Map (Map)
+import qualified Data.Map as M
+import Data.Set (Set)
+import qualified Data.Set as S
+import Control.Concurrent (ThreadId)
+import Ros.RosTypes (URI)
+import Ros.SlaveAPI (RosSlave(..))
+import Ros.TopicStats
+
+data Subscription = Subscription { knownPubs :: TVar (Set URI)
+                                 , addPub    :: URI -> IO ThreadId
+                                 , subType   :: String
+                                 , subStats  :: StatMap SubStats }
+
+data Publication = Publication { subscribers :: TVar (Set URI)
+                               , pubType     :: String
+                               , pubPort     :: Int
+                               , pubCleanup  :: IO ()
+                               , pubStats    :: StatMap PubStats }
+
+data NodeState = NodeState { nodeName       :: String
+                           , master         :: URI
+                           , nodeURI        :: MVar URI
+                           , signalShutdown :: MVar (IO ())
+                           , subscriptions  :: Map String Subscription
+                           , publications   :: Map String Publication }
+
+type Env = [(String,String)]
+type Remap = [(String,String)]
+
+--newtype Node a = Node { unNode :: StateT NodeState IO a }
+newtype Node a = Node { unNode :: ReaderT (Env, Remap) (StateT NodeState IO) a }
+
+instance Functor Node where
+    fmap f (Node s) = Node (fmap f s)
+
+instance Applicative Node where
+    pure = Node . pure
+    Node f <*> Node x = Node (f <*> x)
+
+instance Monad Node where
+    (Node s) >>= f = Node $ s >>= unNode . f
+    return = Node . return
+
+instance MonadIO Node where
+    liftIO m = Node $ liftIO m
+
+instance MonadState NodeState Node where
+    get = Node get
+    put = Node . put
+
+instance MonadReader (Env, Remap) Node where
+    ask = Node ask
+    local f m = Node $ withReaderT f (unNode m)
+
+instance RosSlave NodeState where
+    getMaster = master
+    getNodeName = nodeName
+    getNodeURI = nodeURI
+    getSubscriptions = atomically . mapM formatSub . M.toList . subscriptions
+        where formatSub (name, sub) = let topicType = subType sub
+                                      in do stats <- readTVar (subStats sub)
+                                            stats' <- mapM statSnapshot . 
+                                                      M.toList $
+                                                      stats
+                                            return (name, topicType, stats')
+    getPublications = atomically . mapM formatPub . M.toList . publications
+        where formatPub (name, pub) = let topicType = pubType pub
+                                      in do stats <- readTVar (pubStats pub)
+                                            stats' <- mapM statSnapshot .
+                                                      M.toList $
+                                                      stats
+                                            return (name, topicType, stats')
+    publisherUpdate ns name uris = 
+        let act = join.atomically $
+                  case M.lookup name (subscriptions ns) of
+                    Nothing -> return (return ())
+                    Just sub -> do let add = addPub sub >=> \_ -> return ()
+                                   known <- readTVar (knownPubs sub) 
+                                   (act,known') <- foldM (connectToPub add)
+                                                         (return (), known)
+                                                         uris
+                                   writeTVar (knownPubs sub) known'
+                                   return act
+        in act
+    getTopicPortTCP = ((pubPort <$> ) .) . flip M.lookup . publications
+    setShutdownAction ns a = putMVar (signalShutdown ns) a
+    stopNode = mapM_ (pubCleanup . snd) . M.toList . publications
+
+-- If a given URI is not a part of a Set of known URIs, add an action
+-- to effect a subscription to an accumulated action and add the URI
+-- to the Set.
+connectToPub :: Monad m => 
+                (URI -> IO ()) -> (IO (), Set URI) -> URI -> m (IO (), Set URI)
+connectToPub doSub (act, known) uri = if S.member uri known
+                                      then return (act, known)
+                                      else let known' = S.insert uri known
+                                           in return (doSub uri >> act, known')
