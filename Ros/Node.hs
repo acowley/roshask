@@ -1,29 +1,32 @@
 {-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables, 
              FlexibleInstances #-}
+-- |The primary entrypoint to the ROS client library portion of
+-- roshask. This module defines the actions used to configure a ROS
+-- Node.
 module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, streamIO,
-                 getShutdownAction, runHandler, module Ros.RosTypes) where
-import Control.Applicative (Applicative(..), (<$>))
-import Control.Concurrent (MVar, newEmptyMVar, readMVar, putMVar)
+                 getShutdownAction, runHandler, getParam, getParam', 
+                 module Ros.RosTypes) where
+import Control.Applicative ((<$>))
+import Control.Concurrent (newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent.BoundedChan
-import Control.Concurrent.STM (atomically, TVar, readTVar, writeTVar, 
-                               newTVarIO)
-import "monads-fd" Control.Monad.State
-import "monads-fd" Control.Monad.Reader
-import Data.Map (Map)
+import Control.Concurrent.STM (newTVarIO)
+import "monads-fd" Control.Monad.State (liftIO, get, put, execStateT)
+import "monads-fd" Control.Monad.Reader (ask, asks, runReaderT)
 import qualified Data.Map as M
-import Data.Set (Set)
 import qualified Data.Set as S
 import Control.Concurrent (forkIO, ThreadId)
-import System.Environment (getEnvironment)
+import System.Environment (getEnvironment, getArgs)
 import System.IO.Unsafe (unsafeInterleaveIO)
+import Network.XmlRpc.Internals (XmlRpcType)
 import Msg.MsgInfo
 import Ros.NodeType
+import qualified Ros.ParameterServerAPI as P
 import Ros.RosBinary (RosBinary)
 import Ros.RosTypes
-import Ros.RosTcp
-import Ros.SlaveAPI (RosSlave(..))
+import Ros.RosTcp (subStream, runServer)
 import qualified Ros.RunNode as RN
-import Ros.TopicStats
+import Ros.TopicStats (recvMessageStat, sendMessageStat)
+import Ros.Util.ArgRemapping
 
 -- |Maximum number of items to buffer for a subscriber.
 recvBufferSize :: Int
@@ -67,11 +70,12 @@ mkPub s bufferSize =
 -- received on over the Topic.
 subscribe :: (RosBinary a, MsgInfo a) => TopicName -> Node (Stream a)
 subscribe name = do n <- get
+                    name' <- remapName name
                     let subs = subscriptions n
-                    if M.member name subs
-                       then error $ "Already subscribed to "++name
-                       else do (stream, sub) <- liftIO (mkSub name)
-                               put n { subscriptions = M.insert name sub subs }
+                    if M.member name' subs
+                       then error $ "Already subscribed to "++name'
+                       else do (stream, sub) <- liftIO (mkSub name')
+                               put n { subscriptions = M.insert name' sub subs }
                                return stream
 
 -- |Spin up a thread within a Node. This is typically used for message
@@ -85,11 +89,12 @@ advertiseBuffered :: (RosBinary a, MsgInfo a) =>
                      Int -> TopicName -> Stream a -> Node ()
 advertiseBuffered bufferSize name stream = 
     do n <- get
+       name' <- remapName name
        let pubs = publications n
-       if M.member name pubs 
-         then error $ "Already advertised "++name
+       if M.member name' pubs 
+         then error $ "Already advertised "++name'
          else do pub <- liftIO $ mkPub stream bufferSize
-                 put n { publications = M.insert name pub pubs }
+                 put n { publications = M.insert name' pub pubs }
 
 
 -- |Advertise a Topic publishing a 'Stream' of pure values.
@@ -119,42 +124,68 @@ advertiseBufferedIO bufferSize name stream =
 getShutdownAction :: Node (IO ())
 getShutdownAction = get >>= liftIO . readMVar . signalShutdown
 
--- |Get a variable binding from the environment.
-getConfig :: String -> Node (Maybe String)
-getConfig = asks . (. fst) . lookup
-
--- |Get a variable binding from the environment. If the variable named
--- by the first parameter is not found, the supplied default value
--- will be returned.
-getConfig' :: String -> String -> Node String
-getConfig' var def = asks (maybe def id . lookup var . fst)
-
--- If the master URI is set in the ROS_MASTER_URI environment variable
--- then use that, otherwise use http://localhost:11311
-findMaster :: [(String, String)] -> String
-findMaster = maybe "http://localhost:11311" id . lookup "ROS_MASTER_URI"
-
--- |Get the namespace of this node.
-getNamespace = getConfig' "ROS_NAMESPACE" "/"
-
--- |Resolve a name. If the name is absolute (begins with a forward
--- slash, '/'), it is returned unchanged. Otherwise, it is prefixed by
--- the current namespace.
-resolveName :: String -> Node String
-resolveName n@('/':_) = return n
-resolveName name = (++ name) <$> getNamespace
-
 -- |Apply any matching renames to a given name.
 remapName :: String -> Node String
 remapName name = asks (maybe name id . lookup name . snd)
 
+-- |Convert relative names to absolute names. Leaves absolute names
+-- unchanged.
+canonicalizeName :: String -> Node String
+canonicalizeName n@('/':_) = return n
+canonicalizeName ('~':n) = do state <- get
+                              let node = nodeName state
+                                  ns = namespace state
+                              return $ ns ++ node ++ "/" ++ n
+canonicalizeName n = do (++n) . namespace <$> get
+
+-- |Get a parameter value from the Parameter Server.
+getServerParam :: XmlRpcType a => String -> Node (Maybe a)
+getServerParam var = do state <- get
+                        let masterUri = master state
+                            ns = namespace state
+                            myName = ns ++ nodeName state
+                        liftIO $ P.getParam masterUri myName var
+
+-- |Get the value associated with the given parameter name.
+getParam :: (XmlRpcType a, FromParam a) => String -> Node (Maybe a)
+getParam var = do var' <- canonicalizeName =<< remapName var
+                  params <- fst <$> ask
+                  case lookup var' params of
+                    Just val -> return . Just $ fromParam val
+                    Nothing -> getServerParam var'
+
+-- |Get the value associated with the given parameter name. If the
+-- parameter is not set, return the second argument as the default
+-- value.
+getParam' :: (XmlRpcType a, FromParam a) => String -> a -> Node a
+getParam' var def = maybe def id <$> getParam var
+                        
 -- |Run a ROS Node.
 runNode :: NodeName -> Node a -> IO ()
 runNode name (Node n) = 
     do myURI <- newEmptyMVar
        sigStop <- newEmptyMVar
        env <- liftIO getEnvironment
-       let master = findMaster env
-       go . execStateT (runReaderT n (env,[])) $
-         NodeState name master myURI sigStop M.empty M.empty
+       args <- liftIO getArgs
+       let getConfig' var def = maybe def id $ lookup var env
+           getConfig = flip lookup env
+           master = getConfig' "ROS_MASTER_URI" "http://localhost:11311"
+           namespace = let ns = getConfig' "ROS_MASTER_URI" "/"
+                       in if last ns == '/' then ns else ns ++ "/"
+           (nameMap, params) = parseRemappings args
+           name' = case lookup "__name" params of
+                     Just x -> fromParam x
+                     Nothing -> name
+           -- Name remappings apply to exact strings and resolved names.
+           resolve p@(('/':_),_) = [p]
+           resolve (('~':n),v) = [(namespace ++ name' ++ "/" ++ n,v), ('_':n,v)]
+           resolve (n,v) = [(namespace ++ n,v), (n,v)]
+           nameMap' = concatMap resolve nameMap
+       case getConfig "ROS_IP" of
+         Nothing -> case getConfig "ROS_HOSTNAME" of
+                      Nothing -> return ()
+                      Just n -> putMVar myURI $ "http://"++n
+         Just ip -> putMVar myURI $ "http://"++ip
+       go . execStateT (runReaderT n (params, nameMap')) $
+         NodeState name' namespace master myURI sigStop M.empty M.empty
     where go ns = ns >>= RN.runNode name

@@ -35,6 +35,7 @@ Library
                        monads-fd,
                        BoundedChan >= 1.0.0.2 && < 1.1,
                        network-bytestring >= 0.1.3 && < 0.2,
+                       parsec >= 3.1 && < 3.2,
                        snap-core >= 0.2.7.1 && < 0.3, 
                        snap-server >= 0.2.7.2 && < 0.3,
                        haxr == 3000.*,
@@ -48,7 +49,8 @@ Library
   Other-modules:      Ros.MasterAPI Ros.RosTcp Ros.SlaveAPI 
                       Ros.Util.XmlRpcTuples Ros.RunNode Ros.ConnectionHeader 
                       Ros.TopicStats Ros.Util.BytesToVector Ros.Build.Init 
-                      Ros.Util.RingChan
+                      Ros.Util.RingChan Ros.Util.ArgRemapping 
+                      Ros.ParameterServerAPI
   
   -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
   -- Build-tools:         

@@ -1,16 +1,18 @@
-{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances, PackageImports #-}
 -- |Parses the ROS argument remapping syntax. This is the language used
 -- to remap names and assign private parameter values from a command
 -- line invocation of a Node.
-module Ros.Util.ArgRemapping (parseRemappings, FromParam(..)) where
+module Ros.Util.ArgRemapping (parseRemappings, FromParam(..), ParamVal) where
 import Control.Applicative ((<$>))
-import Data.Either (partitionEithers)
+import "mtl" Control.Monad.Identity (Identity)
+import Data.Either (partitionEithers, lefts, rights)
 import Text.Parsec.Language (emptyDef)
 import Text.Parsec.Token
 import Text.Parsec (letter, char, alphaNum, (<|>))
-import Text.Parsec.Combinator (choice, optional, many1)
+import Text.Parsec.Combinator (choice)
 import Text.Parsec.Prim (Parsec, runParser)
 
+-- |The types of values supported as parameters.
 data ParamVal = PInt Int
               | PBool Bool
               | PString String
@@ -65,6 +67,7 @@ type Names = [(String, String)]
 type Params = [(String, ParamVal)]
 
 -- The ROS argument remapping syntax.
+lexer :: GenTokenParser String u Identity
 lexer = makeTokenParser $ 
         emptyDef { reservedNames = ["true", "false"] 
                  , identStart = letter <|> char '_' <|> char '/'
@@ -108,10 +111,20 @@ parseBinding = do name <- identifier lexer
 
 -- |Parse program arguments to determine name remappings and parameter
 -- settings.
-parseRemappings :: String -> (Names, Params)
-parseRemappings args = case runParser (many1 parseBinding) () "" args of
-                         Left m -> error (show m)
-                         Right bindings -> partitionEithers bindings
-
+parseRemappings :: [String] -> (Names, Params)
+parseRemappings args = if null errors
+                       then partitionEithers (rights remaps)
+                       else error $ "Couldn't parse remapping "++ show errors
+    where remaps = map (runParser parseBinding () "") args
+          errors = lefts remaps
+-- parseRemappings :: String -> (Names, Params)
+-- parseRemappings args = case runParser (many1 parseBinding) () "" args of
+--                          Left m -> error (show m)
+--                          Right bindings -> partitionEithers bindings
+{-
 test :: (Names, Params)
-test = parseRemappings "_joe:=42.1 chatter:=/foo _susy:=[1,2,3] __name:=\"toby\""
+test = parseRemappings [ "_joe:=42.1"
+                       , "chatter:=/foo"
+                       , "_susy:=[1,2,3]"
+                       , "__name:=\"toby\"" ]
+-}

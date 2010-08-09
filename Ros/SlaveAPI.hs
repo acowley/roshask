@@ -2,8 +2,8 @@
 module Ros.SlaveAPI (RosSlave(..), runSlave, requestTopicClient, 
                      cleanupNode) where
 import Control.Applicative
-import Control.Concurrent (killThread, forkIO, threadDelay, 
-                           MVar, putMVar, readMVar)
+import Control.Concurrent (killThread, forkIO, threadDelay, MVar, putMVar,
+                           isEmptyMVar, readMVar, modifyMVar_)
 import Control.Concurrent.QSem
 import "monads-fd" Control.Monad.Trans (liftIO)
 import qualified Data.ByteString.UTF8 as BU
@@ -168,7 +168,12 @@ runSlave :: RosSlave a => a -> IO (IO (), Int)
 runSlave n = do quitNow <- newQSem 0
                 port <- findFreePort
                 myIP <- init <$> readProcess "hostname" [] ""
-                putMVar (getNodeURI n) $ "http://"++myIP++":"++show port
+                let myUri = getNodeURI n
+                    myPort = ":" ++ show port
+                myURIEmpty <- isEmptyMVar myUri
+                if myURIEmpty 
+                  then putMVar myUri ("http://"++myIP++myPort)
+                  else modifyMVar_ myUri (return . (++myPort))
                 t <- forkIO $ simpleServe port (rpc (slaveRPC n quitNow))
                 let wait = do waitQSem quitNow
                               -- Wait a second for the response to flush

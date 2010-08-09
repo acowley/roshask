@@ -1,4 +1,5 @@
-{-# LANGUAGE PackageImports, MultiParamTypeClasses, FlexibleInstances #-}
+{-# LANGUAGE PackageImports, MultiParamTypeClasses, FlexibleInstances, 
+             ExistentialQuantification #-}
 module Ros.NodeType where
 import Control.Applicative (Applicative(..), (<$>))
 import Control.Concurrent (MVar, putMVar)
@@ -13,6 +14,7 @@ import Control.Concurrent (ThreadId)
 import Ros.RosTypes (URI)
 import Ros.SlaveAPI (RosSlave(..))
 import Ros.TopicStats
+import Ros.Util.ArgRemapping (ParamVal)
 
 data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , addPub    :: URI -> IO ThreadId
@@ -26,17 +28,19 @@ data Publication = Publication { subscribers :: TVar (Set URI)
                                , pubStats    :: StatMap PubStats }
 
 data NodeState = NodeState { nodeName       :: String
+                           , namespace      :: String
                            , master         :: URI
                            , nodeURI        :: MVar URI
                            , signalShutdown :: MVar (IO ())
                            , subscriptions  :: Map String Subscription
                            , publications   :: Map String Publication }
 
-type Env = [(String,String)]
+
+type Params = [(String, ParamVal)]
 type Remap = [(String,String)]
 
 --newtype Node a = Node { unNode :: StateT NodeState IO a }
-newtype Node a = Node { unNode :: ReaderT (Env, Remap) (StateT NodeState IO) a }
+newtype Node a = Node { unNode :: ReaderT (Params, Remap) (StateT NodeState IO) a }
 
 instance Functor Node where
     fmap f (Node s) = Node (fmap f s)
@@ -56,7 +60,7 @@ instance MonadState NodeState Node where
     get = Node get
     put = Node . put
 
-instance MonadReader (Env, Remap) Node where
+instance MonadReader (Params, Remap) Node where
     ask = Node ask
     local f m = Node $ withReaderT f (unNode m)
 
