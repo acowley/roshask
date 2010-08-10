@@ -7,7 +7,6 @@ import Ros.Geometry_msgs.Point (Point(..))
 import Ros.Geometry_msgs.Pose (position)
 import Ros.Geometry_msgs.PoseStamped (PoseStamped, pose)
 import Ros.Nav_msgs.Path (Path, poses)
-import qualified Ros.Stream as S
 import Ros.StreamCombinators (everyNew, filterBy, gate, concats)
 
 (<->) :: Point -> Point -> Point
