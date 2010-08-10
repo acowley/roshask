@@ -8,6 +8,7 @@
 -- scenario of same-machine transport.
 module Ros.RosBinary where
 import Control.Applicative ((<$>), (<*>))
+import Control.Monad (replicateM)
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Int
@@ -100,6 +101,19 @@ instance RosBinary B.ByteString where
 instance RosBinary ROSTime where
     put (s,n) = putWord32host s >> putWord32host n
     get = (,) <$> getWord32host <*> getWord32host
+
+putList :: RosBinary a => [a] -> Put
+putList xs = putInt32 (length xs) >> mapM_ put xs
+
+getList :: RosBinary a => Get [a]
+getList = getInt32 >>= flip replicateM get
+
+putFixedList :: RosBinary a => [a] -> Put
+putFixedList = mapM_ put
+
+getFixedList :: RosBinary a => Int -> Get [a]
+getFixedList = flip replicateM get
+
 
 {-
 instance RosBinary ROSDuration where

@@ -17,7 +17,7 @@ generateMsgType pkgPath pkgMsgs msg@(Msg name _ md5 fields) =
     B.concat [modLine, "\n", imports, dataLine, fieldSpecs, 
               " } deriving P.Show\n\n",
               genBinaryInstance msg, "\n\n", 
-              genBinaryIterInstance msg, "\n\n",
+              --genBinaryIterInstance msg, "\n\n",
               genHasHeader msg,
               genHasHash msg]
     where tName = pack $ toUpper (head name) : tail name
@@ -87,14 +87,18 @@ putField :: (ByteString, MsgType) -> ByteString
 putField (name, t) = B.concat [serialize t, " (", name, " x')"]
 
 serialize :: MsgType -> ByteString
+serialize (RFixedArray _ (RUserType _)) = "putFixedList"
 serialize (RFixedArray _ t) = "putFixed"
+serialize (RVarArray (RUserType _)) = "putList"
 serialize _ = "put"
 
 getField :: (ByteString, MsgType) -> ByteString
 getField = deserialize . snd
 
 deserialize :: MsgType -> ByteString
+deserialize (RFixedArray n (RUserType _)) = B.append "getFixedList " (pack (show n))
 deserialize (RFixedArray n t) = B.append "getFixed " (pack (show n))
+deserialize (RVarArray (RUserType _)) = "getList"
 deserialize _ = "get"
 
 vectorDeps = S.fromList [ "qualified Data.Vector.Storable as V" ]
@@ -152,8 +156,12 @@ ros2Hask RFloat64          = "P.Double"
 ros2Hask RString           = "P.String"
 ros2Hask RTime             = "ROSTime"
 ros2Hask RDuration         = "ROSDuration"
-ros2Hask (RFixedArray _ t) = B.append "V.Vector " (ros2Hask t)
-ros2Hask (RVarArray t)     = B.append "V.Vector " (ros2Hask t)
+ros2Hask (RFixedArray _ t) = case t of
+                               RUserType _ -> B.concat ["[", ros2Hask t, "]"]
+                               _ -> B.append "V.Vector " (ros2Hask t)
+ros2Hask (RVarArray t)     = case t of
+                               RUserType _ -> B.concat ["[", ros2Hask t, "]"]
+                               _ -> B.append "V.Vector " (ros2Hask t)
 ros2Hask (RUserType t)     = qualify . pack . takeFileName . unpack $ t
     where qualify b = B.concat [b, ".", b]
 
