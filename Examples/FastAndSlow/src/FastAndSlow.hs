@@ -28,8 +28,8 @@ funnel = do fp <- streamIO fastProducer
 discriminated :: Stream a -> Stream b -> IO (Stream (Either a b))
 discriminated xs ys = fmap Left xs <|> fmap Right ys
 
--- Produce a Stream of the same type as the first but with the same
--- production rate as the second, on average.
+-- Produce a Stream that interpolates consecutive elements of the
+-- first argument at the points given by the second.
 interpolate :: (a -> a -> [b] -> [c]) -> Stream a -> Stream b -> IO (Stream c)
 interpolate f xs clock = 
     do fused <- discriminated xs clock
