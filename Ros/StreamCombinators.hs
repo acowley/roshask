@@ -4,6 +4,7 @@ import Control.Applicative
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Monad (join)
+import qualified Data.Foldable as F
 import Ros.Stream (Stream(..))
 import qualified Ros.Stream as S
 
@@ -88,7 +89,7 @@ infixl 7 <|>
 s <|> t = S.fromList <$> mergeIO (S.toList s) (S.toList t)
 
 -- |Apply a function to each consecutive pair of elements from a
--- 'Stream'. This can be useful for finite difference analyses.
+-- 'Stream'.
 finiteDifference :: (a -> a -> b) -> Stream a -> Stream b
 finiteDifference f s = fmap (uncurry f) $ consecutive s
 {-# INLINE finiteDifference #-}
@@ -151,3 +152,23 @@ weightedMeanNormalized alpha invAlpha plus scale normalize = warmup
                                                             (scale invAlpha x)
                                in Cons avg' (go avg' xs)
 {-# INLINE weightedMeanNormalized #-}
+
+-- |Use a 'Stream' of functions to filter a 'Stream' of values. Each
+-- function is applied to the second 'Stream' until it returns
+-- 'True'. At that point, 'filterBy' produces the accepted value of
+-- the second 'Stream' and moves on to the next function which is
+-- applied to the rest of the second 'Stream'.
+filterBy :: Stream (a -> Bool) -> Stream a -> Stream a
+filterBy (Cons f fs) xs = Cons x $ filterBy fs xs'
+    where Cons x xs' = S.dropWhile (not . f) xs
+
+-- |Produce elements of the first 'Stream' no faster than elements of
+-- the second 'Stream' become available.
+gate :: Stream a -> Stream b -> Stream a
+gate = curry $ fmap fst . uncurry lockstep
+
+-- |Flatten a 'Stream' of 'F.Foldable' values. For example, turn a
+-- @Stream [a]@ of finite lists into a @Stream a@ by taking each
+-- element from each list in sequence.
+concats :: F.Foldable f => Stream (f a) -> Stream a
+concats (Cons x xs) = F.foldr Cons (concats xs) x
