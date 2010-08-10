@@ -4,7 +4,7 @@
 -- roshask. This module defines the actions used to configure a ROS
 -- Node.
 module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, streamIO,
-                 getShutdownAction, runHandler, getParam, getParam', 
+                 getShutdownAction, runHandler, getParam, getParam', liftIO,
                  module Ros.RosTypes) where
 import Control.Applicative ((<$>))
 import Control.Concurrent (newEmptyMVar, readMVar, putMVar)

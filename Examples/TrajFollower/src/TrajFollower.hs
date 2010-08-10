@@ -1,7 +1,4 @@
-{-# LANGUAGE PackageImports #-}
 module TrajFollower (main) where
-import Control.Applicative
-import "monads-fd" Control.Monad.State (liftIO)
 import Ros.Node
 import Ros.Geometry_msgs.Point (Point(..))
 import Ros.Geometry_msgs.Pose (position)
@@ -23,6 +20,7 @@ arrived goal pos = norm (pp goal <-> pp pos) < threshold
     where pp = position . pose
           threshold = 1
 
+-- Emit a new goal every time we arrive at the previous goal.
 goalStream :: Stream Path -> Stream PoseStamped -> Stream PoseStamped
 goalStream plans pos = Cons g $ gate goals arrivals
     where gs@(Cons g goals) = concats $ fmap poses plans
@@ -36,5 +34,5 @@ main = runNode "traj" $
        do plans <- subscribe "/plan"
           currentPos <- subscribe "/pos"
           let goals = goalStream plans currentPos
-          followerState <- liftIO $ streamIO =<< everyNew goals currentPos
+          followerState <- liftIO $ everyNew goals currentPos
           runHandler $ move followerState

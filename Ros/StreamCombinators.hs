@@ -1,9 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 module Ros.StreamCombinators where
-import Control.Applicative
+import Control.Applicative ((<$>), (<*>))
 import Control.Concurrent
-import Control.Concurrent.STM
-import Control.Monad (join)
 import qualified Data.Foldable as F
 import Ros.Stream (Stream(..))
 import qualified Ros.Stream as S
@@ -24,69 +22,44 @@ lockstep s1 s2 = (,) <$> s1 <*> s2
 -- will be the newest available value. The resulting 'Stream' will
 -- produce a new value at the rate of the faster component 'Stream',
 -- and may contain duplicate consecutive elements.
-everyNew :: Stream a -> Stream b -> IO (Stream (IO (a,b)))
-everyNew s t = do mvx <- newEmptyTMVarIO
-                  mvy <- newEmptyTMVarIO
-                  c <- newChan
-                  let feedX (Cons x xs) = 
-                          do atomically $
-                               do _ <- tryTakeTMVar mvx
-                                  putTMVar mvx x
-                             join . atomically $
-                               do y <- readTMVar mvy
-                                  return $ writeChan c (x,y)
-                             feedX xs
-                      feedY (Cons y ys) = 
-                          do atomically $
-                               do _ <- tryTakeTMVar mvy
-                                  putTMVar mvy y
-                             join . atomically $
-                               do x <- readTMVar mvx
-                                  return $ writeChan c (x,y)
-                             feedY ys
-                  _ <- forkIO $ feedX s
-                  _ <- forkIO $ feedY t
-                  let merged = Cons (readChan c) merged
-                  return merged
+everyNew :: Stream a -> Stream b -> IO (Stream (a,b))
+everyNew s t = warmup <$> (s <|> t)
+    where warmup (Cons (Left x) xs) = 
+              let Cons (Right y) ys = S.dropWhile isLeft xs
+              in Cons (x,y) $ product x y ys
+          warmup (Cons (Right y) ys) = 
+              let Cons (Left x) xs = S.dropWhile isRight ys
+              in Cons (x,y) $ product x y xs
+          product _ y (Cons (Left x') xs) = Cons (x',y) $ product x' y xs
+          product x _ (Cons (Right y') ys) = Cons (x,y') $ product x y' ys
+          isLeft x = case x of { Left _ -> True; _ -> False }
+          isRight x = case x of { Right _ -> True; _ -> False }
 
 -- |Stream a new pair every time both of the component 'Stream's have
 -- produced a new value. The composite 'Stream' will produce pairs at
 -- the rate of the slower component 'Stream' consisting of the most
 -- recent value from each 'Stream'.
-bothNew :: Stream a -> Stream b -> IO (Stream (IO (a,b)))
-bothNew s t = do mvx <- newEmptyTMVarIO
-                 mvy <- newEmptyTMVarIO
-                 c <- newChan
-                 let feedX (Cons x xs) = 
-                         do act <- atomically $ 
-                                   do _ <- tryTakeTMVar mvx
-                                      y <- tryTakeTMVar mvy
-                                      case y of
-                                        Nothing -> do putTMVar mvx x
-                                                      return $ return ()
-                                        Just y' -> return $ writeChan c (x,y')
-                            act 
-                            feedX xs
-                 let feedY (Cons y ys) =
-                         do act <- atomically $
-                                   do x <- tryTakeTMVar mvx
-                                      _ <- tryTakeTMVar mvy
-                                      case x of
-                                        Nothing -> do putTMVar mvy y
-                                                      return $ return ()
-                                        Just x' -> return $ writeChan c (x',y)
-                            act 
-                            feedY ys
-                 _ <- forkIO $ feedX s
-                 _ <- forkIO $ feedY t
-                 let merged = Cons (readChan c) merged
-                 return merged
+bothNew :: Stream a -> Stream b -> IO (Stream (a,b))
+bothNew xs ys = go Nothing Nothing <$> xs <|> ys
+    where go (Just x) _ (Cons (Right y) ys) = Cons (x,y) $ go Nothing Nothing ys
+          go _ (Just y) (Cons (Left x) xs) = Cons (x,y) $ go Nothing Nothing xs
+          go _ Nothing (Cons (Left x) xs) = go (Just x) Nothing xs
+          go Nothing _ (Cons (Right y) ys) = go Nothing (Just y) ys
 
 infixl 7 <|>
 -- |Merge two 'Stream's into one. Items from each component 'Stream'
--- will be added to the combined 'Stream' as they become available.
-(<|>) :: Stream a -> Stream a -> IO (Stream a)
-s <|> t = S.fromList <$> mergeIO (S.toList s) (S.toList t)
+-- will be tagged with an 'Either' constructor and added to the
+-- combined 'Stream' as they become available.
+(<|>) :: Stream a -> Stream b -> IO (Stream (Either a b))
+s <|> t = S.fromList <$> mergeIO (map Left (S.toList s)) (map Right (S.toList t))
+
+-- |Merge two 'Stream's into one. The items from each component
+-- 'Stream' will be added to the combined 'Stream' as they become
+-- available.
+merge :: Stream a -> Stream a -> IO (Stream a)
+merge s t = fmap extract <$> s <|> t
+    where extract (Left x) = x
+          extract (Right x) = x
 
 -- |Apply a function to each consecutive pair of elements from a
 -- 'Stream'.

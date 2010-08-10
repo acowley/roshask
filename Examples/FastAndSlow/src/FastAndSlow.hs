@@ -25,14 +25,11 @@ funnel = do fp <- streamIO fastProducer
             interleaved <- fp <|> sp
             consume interleaved
 
-discriminated :: Stream a -> Stream b -> IO (Stream (Either a b))
-discriminated xs ys = fmap Left xs <|> fmap Right ys
-
 -- Produce a Stream that interpolates consecutive elements of the
 -- first argument at the points given by the second.
 interpolate :: (a -> a -> [b] -> [c]) -> Stream a -> Stream b -> IO (Stream c)
 interpolate f xs clock = 
-    do fused <- discriminated xs clock
+    do fused <- xs <|> clock
        let Cons (Left p1) xs' = S.dropWhile (not . isLeft) fused
        return . concats $ go p1 xs'
     where go p1 xs = let (window, Cons (Left p2) xs') = S.break isLeft xs
@@ -56,8 +53,8 @@ testInterp = do slow <- streamIO slowNums :: IO (Stream Int)
 
 main = do fp <- streamIO fastProducer
           sp <- streamIO slowProducer
-          --fused <- bothNew fp sp >>= streamIO
-          fused <- everyNew fp sp >>= streamIO
+          --fused <- bothNew fp sp
+          fused <- everyNew fp sp
           consume fused
 
 statefulProducer = do r <- newIORef 0
