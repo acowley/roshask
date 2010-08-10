@@ -12,8 +12,8 @@ import System.FilePath (takeFileName)
 import Text.Printf (printf)
 import Msg.Types
 
-generateMsgType :: ByteString -> Msg -> ByteString
-generateMsgType pkgPath msg@(Msg name _ md5 fields) = 
+generateMsgType :: ByteString -> [ByteString] -> Msg -> ByteString
+generateMsgType pkgPath pkgMsgs msg@(Msg name _ md5 fields) = 
     B.concat [modLine, "\n", imports, dataLine, fieldSpecs, 
               " } deriving P.Show\n\n",
               genBinaryInstance msg, "\n\n", 
@@ -31,7 +31,7 @@ generateMsgType pkgPath msg@(Msg name _ md5 fields) =
                               "import Ros.BinaryIter\n",
                               "import Ros.RosBinary\n",
                               "import Msg.MsgInfo\n",
-                              genImports (map snd fields)]
+                              genImports pkgPath pkgMsgs (map snd fields)]
           dataLine = B.concat ["\ndata ", tName, " = ", tName, " { "]
           fieldIndent = B.replicate (B.length dataLine - 3) ' '
           lineSep = B.concat ["\n", fieldIndent, ", "]
@@ -49,19 +49,9 @@ genHasHeader m@(Msg name _ _ fields) =
                       "  getSequence = Header.seq . ", hn, "\n",
                       "  getFrame = Header.frame_id . ", hn, "\n",
                       "  getStamp = Header.stamp . " , hn, "\n",
-                      "  setSequence seq x = x { ", hn, 
-                      " = (", hn, " x) { Header.seq = seq } }\n\n"]
+                      "  setSequence seq x' = x' { ", hn, 
+                      " = (", hn, " x') { Header.seq = seq } }\n\n"]
     else ""
-{-
-genHasHeader :: Msg -> ByteString
-genHasHeader (Msg name _ _ ((hn, RUserType t):_)) 
-    | t == "Header" = B.concat["instance HasHeader ", pack name, 
-                               " where\n  getHeader = header\n",
-                               "  setSequence x seq = x { ", hn, 
-                               " = (", hn, " x) { Header.seq = seq } }\n\n"]
-    | otherwise = ""
-genHasHeader _ = ""
--}
 
 genHasHash :: Msg -> ByteString
 genHasHash (Msg sname lname md5 _) = 
@@ -73,16 +63,18 @@ genHasHash (Msg sname lname md5 _) =
 generateField :: (ByteString, MsgType) -> ByteString
 generateField (name, t) = B.concat [name, " :: ", ros2Hask t]
 
-genImports :: [MsgType] -> ByteString
-genImports fieldTypes = B.concat (concatMap (\i -> ["import ", i, "\n"])
-                                            (S.toList (allImports fieldTypes)))
-     where allImports = foldl' ((. typeDependency) . flip S.union) S.empty
+genImports :: ByteString -> [ByteString] -> [MsgType] -> ByteString
+genImports pkgPath pkgMsgs fieldTypes = 
+    B.concat $ concatMap (\i -> ["import ", i, "\n"])
+                         (S.toList (allImports fieldTypes))
+    where getDeps = typeDependency pkgPath pkgMsgs
+          allImports = foldl' ((. getDeps) . flip S.union) S.empty
 
 genBinaryInstance :: Msg -> ByteString
 genBinaryInstance m@(Msg name _ _ fields) = 
    B.concat ["instance RosBinary ", pack name, " where\n",
-             "  put x = do ", 
-             B.intercalate (B.append "\n" (pack (replicate 13 ' ')))
+             "  put x' = do ", 
+             B.intercalate (B.append "\n" (pack (replicate 14 ' ')))
                            (map putField fields),
              "\n  get = ", pack name, " <$> ",
              B.intercalate " <*> " (map getField fields),
@@ -92,7 +84,7 @@ putMsgHeader :: ByteString
 putMsgHeader = "\n  putMsg = putStampedMsg"
 
 putField :: (ByteString, MsgType) -> ByteString
-putField (name, t) = B.concat [serialize t, " (", name, " x)"]
+putField (name, t) = B.concat [serialize t, " (", name, " x')"]
 
 serialize :: MsgType -> ByteString
 serialize (RFixedArray _ t) = "putFixed"
@@ -110,34 +102,40 @@ vectorDeps = S.fromList [ "qualified Data.Vector.Storable as V" ]
 intImport = singleton "qualified Data.Int as Int"
 wordImport = singleton "qualified Data.Word as Word"
 
-typeDependency :: MsgType -> Set ByteString
-typeDependency RInt8             = intImport
-typeDependency RUInt8            = wordImport
-typeDependency RInt16            = intImport
-typeDependency RUInt16           = wordImport
-typeDependency RUInt32           = wordImport
-typeDependency RTime             = singleton "Ros.RosTypes"
-typeDependency RDuration         = singleton "Ros.RosTypes"
-typeDependency (RFixedArray _ t) = S.union vectorDeps $
-                                   typeDependency t
-typeDependency (RVarArray t)     = S.union vectorDeps $
-                                   typeDependency t
-typeDependency (RUserType ut)    = path2Module ut
-typeDependency _                 = S.empty
+typeDependency :: ByteString -> [ByteString] -> MsgType -> Set ByteString
+typeDependency _ _ RInt8             = intImport
+typeDependency _ _ RUInt8            = wordImport
+typeDependency _ _ RInt16            = intImport
+typeDependency _ _ RUInt16           = wordImport
+typeDependency _ _ RUInt32           = wordImport
+typeDependency _ _ RTime             = singleton "Ros.RosTypes"
+typeDependency _ _ RDuration         = singleton "Ros.RosTypes"
+typeDependency p m (RFixedArray _ t) = S.union vectorDeps $
+                                       typeDependency p m t
+typeDependency p m (RVarArray t)     = S.union vectorDeps $
+                                       typeDependency p m t
+typeDependency p m (RUserType ut)    = if elem ut m
+                                       then singleton $ 
+                                            B.concat ["qualified ", p, ut, 
+                                                      " as ", ut]
+                                       else path2Module ut
+typeDependency _ _ _                 = S.empty
 
--- Non built-in types are, by default, in the Ros.Std_msgs
--- namespace. If a package path is given, then it is converted to a
--- Haskell hierarchical module name and prefixed by "Ros.".
+-- Non built-in types are either in the current package or in the
+-- Ros.Std_msgs namespace. If a package path is given, then it is
+-- converted to a Haskell hierarchical module name and prefixed by
+-- "Ros.".
 path2Module :: ByteString -> Set ByteString
 path2Module "Header" = S.fromList ["qualified Ros.Roslib.Header as Header", 
                                    "Msg.HeaderSupport"]
 path2Module p = singleton $
                 if B.elem '/' p
                 then B.concat ["qualified Ros.",
-                               B.intercalate "." . map cap . B.split '/' $ p,
-                               " as ", p]
+                               B.intercalate "." . map cap $ parts,
+                               " as ", last parts]
                 else B.concat ["qualified Ros.Std_msgs.", p, " as ", p]
     where cap s = B.cons (toUpper (B.head s)) (B.tail s)
+          parts = B.split '/' p
 
 ros2Hask :: MsgType -> ByteString
 ros2Hask RBool             = "P.Bool"

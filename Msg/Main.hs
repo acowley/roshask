@@ -2,11 +2,12 @@ module Main (main) where
 import Control.Applicative
 import qualified Data.ByteString.Char8 as B
 import Data.Char (toUpper)
-import System.Directory (createDirectoryIfMissing, getCurrentDirectory)
+import System.Directory (createDirectoryIfMissing, getCurrentDirectory, 
+                         getDirectoryContents)
 import System.Environment (getArgs)
 import System.Exit (exitWith, ExitCode(..))
-import System.FilePath (replaceExtension, splitFileName, splitPath, 
-                        isRelative, (</>))
+import System.FilePath (replaceExtension, splitFileName, splitPath, isRelative,
+                        (</>), dropFileName, dropExtension, takeExtension)
 import Msg.Types
 import Msg.Parse
 import Msg.Gen
@@ -14,13 +15,17 @@ import Ros.Build.DepFinder (findPackageDeps, buildDepMsgs)
 import Ros.Build.Init (initPkg)
 
 generate :: FilePath -> IO ()
-generate fname = do r <- parseMsg fname
-                    case r of
-                      Left err -> do putStrLn $ "ERROR: " ++ err
-                                     exitWith (ExitFailure (-2))
-                      Right msg -> do fname' <- hsName
-                                      B.writeFile fname' 
-                                                  (generateMsgType pkgHier msg)
+generate fname = 
+    do r <- parseMsg fname
+       pkgMsgs <- map (cap . dropExtension) . 
+                  filter ((==".msg") . takeExtension) <$>
+                  getDirectoryContents (dropFileName fname)
+       case r of
+         Left err -> do putStrLn $ "ERROR: " ++ err
+                        exitWith (ExitFailure (-2))
+         Right msg -> do fname' <- hsName
+                         B.writeFile fname' $
+                           generateMsgType pkgHier (map B.pack pkgMsgs) msg
     where hsName = do createDirectoryIfMissing True d'
                       return $ d' </> f
           (d,f) = splitFileName $ replaceExtension fname ".hs"

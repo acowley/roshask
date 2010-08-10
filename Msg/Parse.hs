@@ -18,7 +18,7 @@ eatLine = manyTill anyChar (eitherP endOfLine endOfInput) *> skipSpace
 parseName = skipSpace *> identifier <* eatLine <* try comment
 
 identifier = B.cons <$> letter_ascii <*> takeWhile validChar
-    where validChar c = or (map ($ c) [isDigit, isAlpha_ascii, (== '_')])
+    where validChar c = or (map ($ c) [isDigit, isAlpha_ascii, (== '_'), (== '/')])
 
 parseInt = foldl' (\s x -> s*10 + digitToInt x) 0 <$> many1 digit
 
@@ -41,8 +41,23 @@ fixedArrayParser x = (\len name -> (name, RFixedArray len x)) <$>
 varArrayParser x = (, RVarArray x) <$> 
                    (typeString x *> string "[]" *> space *> parseName)
 
-userTypeParser = (\t name -> (name, RUserType t )) <$> 
-                 takeTill (== ' ') <*> (space *> parseName)
+
+userTypeParser :: Parser (ByteString, MsgType)
+userTypeParser = choice [userSimple, userVarArray, userFixedArray]
+
+userSimple :: Parser (ByteString, MsgType)
+userSimple = (\t name -> (name, RUserType t)) <$>
+             identifier <*> (space *> parseName)
+
+userVarArray :: Parser (ByteString, MsgType)
+userVarArray = (\t name -> (name, RVarArray (RUserType t))) <$>
+               identifier <*> (string "[]" *> space *> parseName)
+
+userFixedArray :: Parser (ByteString, MsgType)
+userFixedArray = (\t n name -> (name, RFixedArray n (RUserType t))) <$>
+                 identifier <*> 
+                 (char '[' *> parseInt <* char ']') <*> 
+                 (space *> parseName)
 
 fieldParsers = builtIns ++ [comment *> userTypeParser]
     where builtIns = concatMap (\f -> map ((comment *>) . f) simpleFieldTypes)
@@ -51,7 +66,7 @@ fieldParsers = builtIns ++ [comment *> userTypeParser]
 mkParser :: String -> String -> Parser Msg
 mkParser sname lname = Msg sname lname "" <$> many (choice fieldParsers)
 
-testMsg = "# Foo bar\n\n#   \nHeader header  # a header\nuint32 aNum # a number \n  # It's not important"
+testMsg = "# Foo bar\n\n#   \nHeader header  # a header\nuint32 aNum # a number \n  # It's not important\ngeometry_msgs/PoseStamped[] poses\n"
 
 test = feed (parse (mkParser "" "") testMsg) ""
 
