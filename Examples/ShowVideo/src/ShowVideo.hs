@@ -33,6 +33,6 @@ sdlInit = do _ <- SDL.init
 
 main = do showImage <- sdlInit
           runNode "ShowVideo" $
-            do source <- getParam' "video" "/video"
+            do source <- getParam' "~video" "/video"
                images <- subscribe source
                runHandler $ (traverse_ showImage images)
