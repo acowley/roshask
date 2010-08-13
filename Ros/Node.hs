@@ -192,9 +192,9 @@ runNode name (Node n) =
            nameMap' = concatMap resolve nameMap
            params' = concatMap resolve params
        when (not $ null nameMap')
-            (putStrLn $ "Got name remapping(s) "++show nameMap')
+            (putStrLn $ "Remapping name(s) "++show nameMap')
        when (not $ null params') 
-            (putStrLn $ "Got parameter binding(s) "++show params')
+            (putStrLn $ "Setting parameter(s) "++show params')
        case getConfig "ROS_IP" of
          Nothing -> case getConfig "ROS_HOSTNAME" of
                       Nothing -> return ()
