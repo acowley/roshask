@@ -10,6 +10,7 @@ import Control.Applicative ((<$>))
 import Control.Concurrent (newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (newTVarIO)
+import Control.Monad (when)
 import "monads-fd" Control.Monad.State (liftIO, get, put, execStateT)
 import "monads-fd" Control.Monad.Reader (ask, asks, runReaderT)
 import qualified Data.Map as M
@@ -172,7 +173,6 @@ runNode name (Node n) =
        sigStop <- newEmptyMVar
        env <- liftIO getEnvironment
        args <- liftIO getArgs
-       putStrLn $ "args = " ++ show args
        let getConfig' var def = maybe def id $ lookup var env
            getConfig = flip lookup env
            master = getConfig' "ROS_MASTER_URI" "http://localhost:11311"
@@ -191,8 +191,10 @@ runNode name (Node n) =
            resolve (n,v) = [(namespace ++ n,v), (n,v)]
            nameMap' = concatMap resolve nameMap
            params' = concatMap resolve params
-       putStrLn $ "Got remappings "++show nameMap'
-       putStrLn $ "Got parameter bindings "++show params'
+       when (not $ null nameMap')
+            (putStrLn $ "Got name remapping(s) "++show nameMap')
+       when (not $ null params') 
+            (putStrLn $ "Got parameter binding(s) "++show params')
        case getConfig "ROS_IP" of
          Nothing -> case getConfig "ROS_HOSTNAME" of
                       Nothing -> return ()
