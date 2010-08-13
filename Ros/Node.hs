@@ -181,7 +181,9 @@ runNode name (Node n) =
            (nameMap, params) = parseRemappings args
            name' = case lookup "__name" params of
                      Just x -> fromParam x
-                     Nothing -> name
+                     Nothing -> case name of
+                                  '/':_ -> name
+                                  _ -> namespace ++ name
            -- Name remappings apply to exact strings and resolved names.
            resolve p@(('/':_),_) = [p]
            resolve (('_':n),v) = [(namespace++name'++"/"++n, v)]
@@ -198,4 +200,4 @@ runNode name (Node n) =
          Just ip -> putMVar myURI $ "http://"++ip
        go . execStateT (runReaderT n (params', nameMap')) $
          NodeState name' namespace master myURI sigStop M.empty M.empty
-    where go ns = ns >>= RN.runNode name
+    where go ns = ns >>= RN.runNode
