@@ -1,0 +1,38 @@
+module ShowVideo (main) where
+import Control.Applicative
+import Control.Monad (forever, when)
+import Data.IORef (newIORef, readIORef, writeIORef)
+import qualified MySDL as SDL
+import SurfaceUtil
+import Ros.Node
+import Ros.Sensor_msgs.Image (Image, width, height, _data)
+import Data.Foldable (traverse_)
+
+setVideo :: Int -> Int -> IO SDL.Surface
+setVideo w h = SDL.setVideoMode w h 32 [SDL.HWSurface]
+
+sdlInit :: IO (Image -> IO ())
+sdlInit = do _ <- SDL.init
+             screen0 <- setVideo 640 480
+             res <- newIORef (640,480)
+             screen <- newIORef screen0
+             let showImage img = 
+                     do let w = fromIntegral $ width img
+                            h = fromIntegral $ height img
+                            p = _data img
+                        (w',h') <- readIORef res
+                        when (w /= w' || h /= h')
+                             (do writeIORef res (w,h)
+                                 setVideo w h >>= writeIORef screen)
+                        screen' <- readIORef screen --SDL.getVideoSurface
+                        image <- createGraySurfaceFrom [SDL.HWSurface] w h p
+                        SDL.blitSurface image Nothing screen' Nothing
+                        SDL.flip screen'
+                        return ()
+             return showImage
+
+main = do showImage <- sdlInit
+          runNode "ShowVideo" $
+            do source <- getParam' "video" "/video"
+               images <- subscribe source
+               runHandler $ (traverse_ showImage images)

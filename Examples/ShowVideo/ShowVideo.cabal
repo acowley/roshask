@@ -1,0 +1,23 @@
+Name:                ShowVideo
+Version:             0.0
+Synopsis:            I am code
+Cabal-version:       >=1.6
+Category:            Robotics
+Build-type:          Custom
+
+Executable ShowVideo
+  Build-Depends:  base >= 4.2 && < 5,
+                  vector >= 0.6.0.2 && < 0.7,
+                  roshask,
+                  MySDL
+  GHC-Options:    -Odph -no-hs-main
+  Main-Is:        SDLWrapper.hs
+  Hs-Source-Dirs: src
+  Frameworks:     SDL, SDL_image, Cocoa
+  Include-Dirs:   /Library/Frameworks/SDL.framework/Headers,
+                  /Library/Frameworks/SDL_image.framework/Headers
+  C-Sources:      src/c_main.c
+  Other-Modules:   SDLWrapper, ShowVideo
+  Extra-Libraries: SDLMain
+  Extra-Lib-Dirs:  lib
+  
