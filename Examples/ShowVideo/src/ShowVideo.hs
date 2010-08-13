@@ -13,9 +13,8 @@ setVideo w h = SDL.setVideoMode w h 32 [SDL.HWSurface]
 
 sdlInit :: IO (Image -> IO ())
 sdlInit = do _ <- SDL.init
-             screen0 <- setVideo 640 480
+             screen <- newIORef =<< setVideo 640 480
              res <- newIORef (640,480)
-             screen <- newIORef screen0
              let showImage img = 
                      do let w = fromIntegral $ width img
                             h = fromIntegral $ height img
@@ -24,10 +23,11 @@ sdlInit = do _ <- SDL.init
                         when (w /= w' || h /= h')
                              (do writeIORef res (w,h)
                                  setVideo w h >>= writeIORef screen)
-                        screen' <- readIORef screen --SDL.getVideoSurface
+                        screen' <- readIORef screen
                         image <- createGraySurfaceFrom [SDL.HWSurface] w h p
                         SDL.blitSurface image Nothing screen' Nothing
                         SDL.flip screen'
+                        _ <- SDL.pollEvent
                         return ()
              return showImage
 
