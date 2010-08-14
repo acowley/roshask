@@ -172,8 +172,8 @@ runSlave n = do quitNow <- newQSem 0
                     myPort = ":" ++ show port
                 myURIEmpty <- isEmptyMVar myUri
                 if myURIEmpty 
-                  then putMVar myUri ("http://"++myIP++myPort)
-                  else modifyMVar_ myUri (return . (++myPort))
+                  then putMVar myUri $! "http://"++myIP++myPort
+                  else modifyMVar_ myUri ((return $!) . (++myPort))
                 t <- forkIO $ simpleServe port (rpc (slaveRPC n quitNow))
                 let wait = do waitQSem quitNow
                               -- Wait a second for the response to flush

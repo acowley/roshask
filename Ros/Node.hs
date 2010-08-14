@@ -3,7 +3,8 @@
 -- |The primary entrypoint to the ROS client library portion of
 -- roshask. This module defines the actions used to configure a ROS
 -- Node.
-module Ros.Node (Node, runNode, advertise, advertiseIO, subscribe, streamIO,
+module Ros.Node (Node, runNode, advertise, advertiseIO, advertiseBufferedIO, 
+                 advertiseBuffered, subscribe, streamIO,
                  getShutdownAction, runHandler, getParam, getParam', liftIO,
                  module Ros.RosTypes) where
 import Control.Applicative ((<$>))
@@ -24,7 +25,7 @@ import Ros.NodeType
 import qualified Ros.ParameterServerAPI as P
 import Ros.RosBinary (RosBinary)
 import Ros.RosTypes
-import Ros.RosTcp (subStream, runServer)
+import Ros.RosTcp (subStream, runServer, runServerIO)
 import qualified Ros.RunNode as RN
 import Ros.TopicStats (recvMessageStat, sendMessageStat)
 import Ros.Util.ArgRemapping
@@ -67,6 +68,15 @@ mkPub s bufferSize =
        let trep = msgTypeName (undefined::a)
        return $ Publication known trep port cleanup stats
 
+mkPubIO :: forall a. (RosBinary a, MsgInfo a) =>
+           Stream (IO a) -> Int -> IO Publication
+mkPubIO s bufferSize = 
+    do stats <- newTVarIO M.empty
+       (cleanup, port) <- runServerIO s (sendMessageStat stats) bufferSize
+       known <- newTVarIO S.empty
+       let trep = msgTypeName (undefined::a)
+       return $ Publication known trep port cleanup stats
+
 -- |Subscribe to the given Topic. Returns the @Stream@ of values
 -- received on over the Topic.
 subscribe :: (RosBinary a, MsgInfo a) => TopicName -> Node (Stream a)
@@ -104,9 +114,14 @@ advertise = advertiseBuffered 1
 
 -- |Convert a 'Stream' of 'IO' actions to a 'Stream' of pure values.
 streamIO :: Stream (IO a) -> IO (Stream a)
+{-
 streamIO (Cons x xs) = unsafeInterleaveIO $
                        do x' <- x
                           xs' <- streamIO xs
+                          return $ Cons x' xs'
+-}
+streamIO (Cons x xs) = do x' <- x
+                          xs' <- unsafeInterleaveIO $ streamIO xs
                           return $ Cons x' xs'
 
 -- |Advertise a Topic publishing a 'Stream' of 'IO' values.
@@ -119,7 +134,15 @@ advertiseIO = advertiseBufferedIO 1
 advertiseBufferedIO :: (RosBinary a, MsgInfo a) =>
                        Int -> TopicName -> Stream (IO a) -> Node ()
 advertiseBufferedIO bufferSize name stream = 
-    advertiseBuffered bufferSize name =<< liftIO (streamIO stream)
+    do n <- get
+       name' <- canonicalizeName =<< remapName name
+       let pubs = publications n
+       if M.member name' pubs
+          then error $ "Already advertised "++name'
+          else do pub <- liftIO $ mkPubIO stream bufferSize
+                  put n { publications = M.insert name' pub pubs }
+                         
+--    advertiseBuffered bufferSize name =<< liftIO (streamIO stream)
 
 -- |Get an action that will shutdown this Node.
 getShutdownAction :: Node (IO ())
@@ -198,8 +221,8 @@ runNode name (Node n) =
        case getConfig "ROS_IP" of
          Nothing -> case getConfig "ROS_HOSTNAME" of
                       Nothing -> return ()
-                      Just n -> putMVar myURI $ "http://"++n
-         Just ip -> putMVar myURI $ "http://"++ip
-       go . execStateT (runReaderT n (params', nameMap')) $
+                      Just n -> putMVar myURI $! "http://"++n
+         Just ip -> putMVar myURI $! "http://"++ip
+       go name' . execStateT (runReaderT n (params', nameMap')) $
          NodeState name' namespace master myURI sigStop M.empty M.empty
-    where go ns = ns >>= RN.runNode
+    where go name' ns = ns >>= RN.runNode name'

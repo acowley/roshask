@@ -39,16 +39,16 @@ registerNode name n =
 -- |Run a ROS Node with the given name. Returns when the Node has
 -- shutdown either by receiving an interrupt signal (e.g. Ctrl-C) or
 -- because the master told it to stop.
-runNode :: RosSlave s => s -> IO ()
-runNode s = do (wait, _port) <- runSlave s
-               registerNode (getNodeName s) s
-               putStrLn "Spinning"
-               allDone <- newQSem 0
-               let shutdown = do putStrLn "Shutting down"
-                                 cleanupNode s `catch` \_ -> return ()
-                                 signalQSem allDone
-               setShutdownAction s shutdown
-               _ <- installHandler sigINT (CatchOnce shutdown) Nothing
-               t <- forkIO $ wait >> signalQSem allDone
-               waitQSem allDone
-               killThread t `catch` \_ -> return ()
+runNode :: RosSlave s => String -> s -> IO ()
+runNode name s = do (wait, _port) <- runSlave s
+                    registerNode name s
+                    putStrLn "Spinning"
+                    allDone <- newQSem 0
+                    let shutdown = do putStrLn "Shutting down"
+                                      cleanupNode s `catch` \_ -> return ()
+                                      signalQSem allDone
+                    setShutdownAction s shutdown
+                    _ <- installHandler sigINT (CatchOnce shutdown) Nothing
+                    t <- forkIO $ wait >> signalQSem allDone
+                    waitQSem allDone
+                    killThread t `catch` \_ -> return ()

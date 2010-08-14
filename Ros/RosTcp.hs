@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
-module Ros.RosTcp (subStream, runServer) where
+module Ros.RosTcp (subStream, runServer, runServerIO) where
 import Control.Applicative ((<$>))
 import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.STM (atomically)
@@ -17,6 +17,7 @@ import qualified Network.Socket as Sock
 import Network.Socket.ByteString
 --import System.IO (IOMode(ReadMode), hSetBuffering, BufferMode(..))
 import System.IO (IOMode(ReadMode))
+import System.IO.Unsafe
 import Text.URI (parseURI, uriRegName)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -24,6 +25,7 @@ import Ros.BinaryIter (streamIn)
 import Ros.RosTypes
 import Ros.RosBinary
 import Ros.ConnectionHeader
+import qualified Ros.Stream as S
 import Msg.MsgInfo
 import Ros.SlaveAPI (requestTopicClient)
 
@@ -183,6 +185,34 @@ runServer stream _updateStats bufferSize =
       acceptThread <- forkIO $ 
                       acceptClients sock clients negotiate mkBuffer
       pubThread <- forkIO $ pubStream stream clients
+      let cleanup = atomically (readTVar clients) >>= 
+                    sequence_ . map fst >> 
+                    shutdown sock ShutdownBoth >>
+                    killThread acceptThread >>
+                    killThread pubThread
+      return (cleanup, port)
+
+runServerIO :: forall a. (RosBinary a, MsgInfo a) => 
+             Stream (IO a) -> (URI -> Int -> IO ()) -> Int -> IO (IO (), Int)
+runServerIO stream _updateStats bufferSize = 
+    withSocketsDo $ do
+      sock <- socket AF_INET Sock.Stream defaultProtocol
+      bindSocket sock (SockAddrInet aNY_PORT iNADDR_ANY)
+      port <- fromInteger . toInteger <$> socketPort sock
+      listen sock 5
+      clients <- newTVarIO []
+      let ttype = msgTypeName (undefined::a)
+          md5 = sourceMD5 (undefined::a)
+          negotiate = negotiatePub ttype md5
+          mkBuffer = newRingChan bufferSize
+      acceptThread <- forkIO $ 
+                      acceptClients sock clients negotiate mkBuffer
+      pubThread <- forkIO $ let popIO s = do x <- S.head s
+                                             xs <- unsafeInterleaveIO $ 
+                                                   popIO (S.tail s)
+                                             return $ Cons x xs
+                            in do s' <- popIO stream
+                                  pubStream s' clients
       let cleanup = atomically (readTVar clients) >>= 
                     sequence_ . map fst >> 
                     shutdown sock ShutdownBoth >>
