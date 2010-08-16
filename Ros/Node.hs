@@ -61,20 +61,18 @@ mkSub tname = do c <- newBoundedChan recvBufferSize
 
 mkPub :: forall a. (RosBinary a, MsgInfo a) => 
          Stream a -> Int -> IO Publication
-mkPub s bufferSize = 
-    do stats <- newTVarIO M.empty
-       (cleanup, port) <- runServer s (sendMessageStat stats) bufferSize
-       known <- newTVarIO S.empty
-       let trep = msgTypeName (undefined::a)
-       return $ Publication known trep port cleanup stats
+mkPub = mkPubAux (msgTypeName (undefined::a)) . runServer
 
 mkPubIO :: forall a. (RosBinary a, MsgInfo a) =>
            Stream (IO a) -> Int -> IO Publication
-mkPubIO s bufferSize = 
+mkPubIO = mkPubAux (msgTypeName (undefined::a)) . runServerIO
+
+mkPubAux :: String -> ((URI -> Int -> IO ()) -> Int -> IO (IO (), Int)) ->
+            Int -> IO Publication
+mkPubAux trep runServer' bufferSize = 
     do stats <- newTVarIO M.empty
-       (cleanup, port) <- runServerIO s (sendMessageStat stats) bufferSize
+       (cleanup, port) <- runServer' (sendMessageStat stats) bufferSize
        known <- newTVarIO S.empty
-       let trep = msgTypeName (undefined::a)
        return $ Publication known trep port cleanup stats
 
 -- |Subscribe to the given Topic. Returns the @Stream@ of values
@@ -94,19 +92,21 @@ subscribe name = do n <- get
 runHandler :: IO () -> Node ThreadId
 runHandler = liftIO . forkIO
 
+advertiseAux :: (Int -> IO Publication) -> Int -> TopicName -> Node ()
+advertiseAux mkPub' bufferSize name = 
+    do n <- get
+       name' <- remapName =<< canonicalizeName name
+       let pubs = publications n
+       if M.member name' pubs
+         then error $ "Already advertised " ++ name'
+         else do pub <- liftIO $ mkPub' bufferSize
+                 put n { publications = M.insert name' pub pubs }
+
 -- |Advertise a Topic publishing a 'Stream' of pure values with a
 -- per-client transmit buffer of the specified size.
 advertiseBuffered :: (RosBinary a, MsgInfo a) => 
                      Int -> TopicName -> Stream a -> Node ()
-advertiseBuffered bufferSize name stream = 
-    do n <- get
-       name' <- canonicalizeName =<< remapName name
-       let pubs = publications n
-       if M.member name' pubs 
-         then error $ "Already advertised "++name'
-         else do pub <- liftIO $ mkPub stream bufferSize
-                 put n { publications = M.insert name' pub pubs }
-
+advertiseBuffered bufferSize name s = advertiseAux (mkPub s) bufferSize name
 
 -- |Advertise a Topic publishing a 'Stream' of pure values.
 advertise :: (RosBinary a, MsgInfo a) => TopicName -> Stream a -> Node ()
@@ -114,14 +114,9 @@ advertise = advertiseBuffered 1
 
 -- |Convert a 'Stream' of 'IO' actions to a 'Stream' of pure values.
 streamIO :: Stream (IO a) -> IO (Stream a)
-{-
 streamIO (Cons x xs) = unsafeInterleaveIO $
                        do x' <- x
                           xs' <- streamIO xs
-                          return $ Cons x' xs'
--}
-streamIO (Cons x xs) = do x' <- x
-                          xs' <- unsafeInterleaveIO $ streamIO xs
                           return $ Cons x' xs'
 
 -- |Advertise a Topic publishing a 'Stream' of 'IO' values.
@@ -133,14 +128,7 @@ advertiseIO = advertiseBufferedIO 1
 -- per-client transmit buffer of the specified size.
 advertiseBufferedIO :: (RosBinary a, MsgInfo a) =>
                        Int -> TopicName -> Stream (IO a) -> Node ()
-advertiseBufferedIO bufferSize name stream = 
-    do n <- get
-       name' <- canonicalizeName =<< remapName name
-       let pubs = publications n
-       if M.member name' pubs
-          then error $ "Already advertised "++name'
-          else do pub <- liftIO $ mkPubIO stream bufferSize
-                  put n { publications = M.insert name' pub pubs }
+advertiseBufferedIO bufferSize name s = advertiseAux (mkPubIO s) bufferSize name
                          
 --    advertiseBuffered bufferSize name =<< liftIO (streamIO stream)
 
@@ -158,16 +146,14 @@ canonicalizeName :: String -> Node String
 canonicalizeName n@('/':_) = return n
 canonicalizeName ('~':n) = do state <- get
                               let node = nodeName state
-                                  ns = namespace state
-                              return $ ns ++ node ++ "/" ++ n
+                              return $ node ++ "/" ++ n
 canonicalizeName n = do (++n) . namespace <$> get
 
 -- |Get a parameter value from the Parameter Server.
 getServerParam :: XmlRpcType a => String -> Node (Maybe a)
 getServerParam var = do state <- get
                         let masterUri = master state
-                            ns = namespace state
-                            myName = ns ++ nodeName state
+                            myName = nodeName state
                         -- Call hasParam first because getParam only returns 
                         -- a partial result (just the return code) in failure.
                         hasParam <- liftIO $ P.hasParam masterUri myName var
@@ -177,7 +163,7 @@ getServerParam var = do state <- get
 
 -- |Get the value associated with the given parameter name.
 getParam :: (XmlRpcType a, FromParam a) => String -> Node (Maybe a)
-getParam var = do var' <- canonicalizeName =<< remapName var
+getParam var = do var' <- remapName =<< canonicalizeName var
                   params <- fst <$> ask
                   case lookup var' params of
                     Just val -> return . Just $ fromParam val
@@ -209,8 +195,8 @@ runNode name (Node n) =
                                   _ -> namespace ++ name
            -- Name remappings apply to exact strings and resolved names.
            resolve p@(('/':_),_) = [p]
-           resolve (('_':n),v) = [(namespace++name'++"/"++n, v)]
-           resolve (('~':n),v) = [(namespace++name'++"/"++ n, v)] --, ('_':n,v)]
+           resolve (('_':n),v) = [(name'++"/"++n, v)]
+           resolve (('~':n),v) = [(name'++"/"++ n, v)] --, ('_':n,v)]
            resolve (n,v) = [(namespace ++ n,v), (n,v)]
            nameMap' = concatMap resolve nameMap
            params' = concatMap resolve params
