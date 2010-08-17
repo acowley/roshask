@@ -106,7 +106,7 @@ acceptClients sock clients negotiate mkBuffer = forever acceptClient
 pubStream :: RosBinary a => 
              Stream a -> TVar [(b, RingChan ByteString)] -> IO ()
 pubStream s clients = go 0 s
-    where go !n (Cons !x xs) = let bytes = runPut (putMsg n x)
+    where go !n (Cons !x xs) = let bytes = runPut $ putMsg n x
                                in do cs <- readTVarIO clients
                                      mapM_ (flip writeChan bytes . snd) cs
                                      go (n+1) xs
@@ -135,6 +135,8 @@ negotiateSub sock tname ttype md5 =
          Nothing -> error "Server did not include MD5 sum in its response."
        setSocketOption sock KeepAlive 1
 
+recvBufferSize = 3
+
 -- |Connect to a publisher and return the stream of data it is
 -- publishing.
 subStream :: forall a. (RosBinary a, MsgInfo a) => 
@@ -156,7 +158,7 @@ subStream target tname _updateStats =
        h <- socketToHandle sock ReadMode
        --hSetBuffering h NoBuffering
        putStrLn $ "Streaming "++tname++" from "++target
-       streamIn h
+       streamIn recvBufferSize h
     where host = case parseURI target of
                    Just u -> case uriRegName u of
                                Just host -> host

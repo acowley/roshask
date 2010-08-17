@@ -5,7 +5,7 @@
 -- code for ROS .msg types.
 module Ros.BinaryIter (streamIn) where
 import Control.Applicative
-import Control.Concurrent (myThreadId, killThread)
+import Control.Concurrent (myThreadId, killThread, forkIO)
 import Data.Binary.Get
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
@@ -14,6 +14,8 @@ import System.IO.Unsafe (unsafeInterleaveIO)
 import Unsafe.Coerce (unsafeCoerce)
 import Ros.RosTypes
 import Ros.RosBinary (RosBinary(get))
+import Ros.Stream (fromList)
+import Ros.Util.RingChan
 
 -- Get the specified number of bytes from a 'Handle'. Returns a
 -- wrapped-up 'Nothing' if the client shutdown (indicated by receiving
@@ -43,17 +45,33 @@ instance Functor IOMaybe where
                               Nothing -> return Nothing
 
 -- |The function that does the work of streaming members of the
--- 'RosBinary' class in from a 'Handle'.
-streamIn :: RosBinary a => Handle -> IO (Stream a)
-streamIn h = go 
-    where go = do item <- unIOM $
-                          do len <- runGet getInt <$> hGetAll h 4
-                             runGet get <$> hGetAll h len
-                  case item of
-                    Nothing -> putStrLn "Publisher stopped" >>
-                               myThreadId >>= killThread >>
-                               return undefined
-                    Just item' -> Cons item' <$> unsafeInterleaveIO go
+-- 'RosBinary' class in from a 'Handle'. The first parameter specifies
+-- the maximum number of items that will be buffered.
+streamIn :: RosBinary a => Int -> Handle -> IO (Stream a)
+streamIn sz h = do c <- newRingChan sz
+                   parent <- myThreadId
+                   forkIO $ go c parent
+                   items <- getChanContents c
+                   return $ fromList items
+    where go c p = let aux = 
+                           do item <- unIOM $
+                                      do len <- runGet getInt <$> hGetAll h 4
+                                         runGet get <$> hGetAll h len
+                              case item of
+                                Nothing -> putStrLn "Publisher stopped" >>
+                                           myThreadId >>= killThread >>
+                                           killThread p >> return undefined
+                                Just item' -> writeChan c item' >> aux
+                   in aux
+-- streamIn sz h = go 
+--     where go = do item <- unIOM $
+--                           do len <- runGet getInt <$> hGetAll h 4
+--                              runGet get <$> hGetAll h len
+--                   case item of
+--                     Nothing -> putStrLn "Publisher stopped" >>
+--                                myThreadId >>= killThread >>
+--                                return undefined
+--                     Just item' -> Cons item' <$> unsafeInterleaveIO go
 
 getInt :: Get Int
 getInt = unsafeCoerce <$> getWord32host
