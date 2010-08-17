@@ -38,11 +38,9 @@ sdlInit = do _ <- SDL.init
                         return ()
              return showImage
 
-myTraverse :: (Image -> IO ()) -> Stream a -> IO ()
-myTraverse f (Cons x xs) = (f $! x) >> myTraverse f xs
-
 main = do showImage <- sdlInit
           runNode "ShowVideo" $
             do source <- getParam' "~video" "/video"
                images <- subscribe source
-               runHandler $ myTraverse showImage images --(traverse_ showImage images)
+               runHandler $ traverse_ showImage images
+               
