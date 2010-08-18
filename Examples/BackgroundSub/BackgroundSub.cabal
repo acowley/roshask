@@ -8,7 +8,6 @@ Build-type:          Custom
 Executable BackSub
   Build-Depends:  base >= 4.2 && < 5,
                   vector,
-                  Stream,
                   HOpenCV,
                   roshask
   GHC-Options:    -Odph -threaded -ddump-simpl-stats

@@ -25,7 +25,7 @@ add :: IntImage -> IntImage -> IntImage
 add (IntImage _ _ i1) (IntImage w h i2) = IntImage w h $ V.zipWith (+) i1 i2
 
 iscale c (IntImage w h pix) = IntImage w h $ V.map (*c) pix
-shift x (IntImage w h pix) = IntImage w h (V.map (`div` x) pix)
+shift x (IntImage w h pix) = IntImage w h (V.map (`quot` x) pix)
 
 despeckle w h = H.pixels . H.dilate 8 . H.erode 8 . H.fromGrayPixels w h
 
@@ -35,7 +35,7 @@ maskMotion (IntImage _ _ i1) (IntImage w h i2) =
     where mask = despeckle w h $ V.zipWith threshold diffs i2
           applyMask m pix = if m > 0 then pix else 0
           diffs = V.map abs $ V.zipWith (-) i1 i2
-          threshold diff avg = if diff > max 1 (avg `div` 32) then 255 else 0
+          threshold diff avg = if diff > max 1 (avg `quot` 32) then 255 else 0
 
 main = runNode "backsub" $ do
        raw <- fmap toIntPixels <$> subscribe "cam"
