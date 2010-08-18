@@ -16,14 +16,10 @@ sdlInit :: IO (Image -> IO ())
 sdlInit = do _ <- SDL.init
              screen <- newIORef =<< setVideo 640 480
              res <- newIORef (640,480)
-             frameCount <- newIORef 0
              let showImage img = 
                      do let w = fromIntegral $ width img
                             h = fromIntegral $ height img
                             p = _data img
-                        n <- readIORef frameCount
-                        writeIORef frameCount $! n+1
-                        putStrLn $ "Frame "++show n
                         (w',h') <- readIORef res
                         when (w /= w' || h /= h')
                              (do writeIORef res (w,h)
