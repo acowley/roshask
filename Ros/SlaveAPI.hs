@@ -112,15 +112,17 @@ pubUpdate :: RosSlave a => a -> CallerID -> TopicName -> [URI] -> RpcResult Int
 pubUpdate n _ topic publishers = do publisherUpdate n topic publishers
                                     return (1, "", 1)
 
-myName :: IO String
-myName = init <$> readProcess "hostname" [] ""
+-- Extract just the hostname or IP part of a Node's URI.
+myName :: RosSlave a => a -> IO String
+myName n = extractName `fmap` readMVar (getNodeURI n)
+    where extractName uri = takeWhile (/=':') $ drop 7 uri
 
 requestTopic :: RosSlave a => a -> CallerID -> TopicName -> [[Value]] -> 
                 RpcResult (String,String,Int)
 requestTopic n _ topic _protocols = 
     case getTopicPortTCP n topic of
       Just p -> do putStrLn $ topic++" requested "++show p
-                   host <- myName
+                   host <- myName n
                    return (1, "", ("TCPROS",host,p))
       Nothing -> return (0, "Unknown topic", ("TCPROS", "", 0))
 
@@ -167,12 +169,12 @@ findFreePort = do s <- socket AF_INET Net.Stream defaultProtocol
 runSlave :: RosSlave a => a -> IO (IO (), Int)
 runSlave n = do quitNow <- newQSem 0
                 port <- findFreePort
-                myIP <- init <$> readProcess "hostname" [] ""
                 let myUri = getNodeURI n
                     myPort = ":" ++ show port
                 myURIEmpty <- isEmptyMVar myUri
                 if myURIEmpty 
-                  then putMVar myUri $! "http://"++myIP++myPort
+                  then do myIP <- init <$> readProcess "hostname" [] ""
+                          putMVar myUri $! "http://"++myIP++myPort
                   else modifyMVar_ myUri ((return $!) . (++myPort))
                 t <- forkIO $ simpleServe port (rpc (slaveRPC n quitNow))
                 let wait = do waitQSem quitNow
