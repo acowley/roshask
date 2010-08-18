@@ -164,27 +164,29 @@ subStream target tname _updateStats =
                                                   "from "++target
                    Nothing -> error $ "Couldn't parse URI "++target
 
--- |The server starts a thread that peels elements off the stream as
--- they become available and sends them to all connected
--- clients. Returns an action for cleanup up resources allocated by
--- this publication server along with the port the server is listening
--- on.
-runServer :: forall a. (RosBinary a, MsgInfo a) => 
-             Stream a -> (URI -> Int -> IO ()) -> Int -> IO (IO (), Int)
-runServer stream _updateStats bufferSize = 
+-- Helper to run the publisher's side of a topic negotiation with a
+-- new client.
+mkPubNegotiator :: MsgInfo a => a -> Socket -> IO ()
+mkPubNegotiator x = negotiatePub (msgTypeName x) (sourceMD5 x)
+
+-- Run a publication server given a function that returns a
+-- negotiation action given a client 'Socket', a function that returns
+-- a publication action given a client list, a statistics updater, and
+-- the size of the send buffer.
+runServerAux :: (Socket -> IO ()) -> 
+                (TVar [(IO (), RingChan ByteString)] -> IO ()) -> 
+                (URI -> Int -> IO ()) -> Int -> IO (IO (), Int)
+runServerAux negotiate pubAction _updateStats bufferSize = 
     withSocketsDo $ do
       sock <- socket AF_INET Sock.Stream defaultProtocol
       bindSocket sock (SockAddrInet aNY_PORT iNADDR_ANY)
       port <- fromInteger . toInteger <$> socketPort sock
       listen sock 5
       clients <- newTVarIO []
-      let ttype = msgTypeName (undefined::a)
-          md5 = sourceMD5 (undefined::a)
-          negotiate = negotiatePub ttype md5
-          mkBuffer = newRingChan bufferSize
+      let mkBuffer = newRingChan bufferSize
       acceptThread <- forkIO $ 
                       acceptClients sock clients negotiate mkBuffer
-      pubThread <- forkIO $ pubStream stream clients
+      pubThread <- forkIO $ pubAction clients
       let cleanup = atomically (readTVar clients) >>= 
                     sequence_ . map fst >> 
                     shutdown sock ShutdownBoth >>
@@ -192,30 +194,26 @@ runServer stream _updateStats bufferSize =
                     killThread pubThread
       return (cleanup, port)
 
+-- |The server starts a thread that peels elements off the stream as
+-- they become available and sends them to all connected
+-- clients. Returns an action for cleaning up resources allocated by
+-- this publication server along with the port the server is listening
+-- on.
+runServer :: forall a. (RosBinary a, MsgInfo a) => 
+             Stream a -> (URI -> Int -> IO ()) -> Int -> IO (IO (), Int)
+runServer stream = runServerAux (mkPubNegotiator (undefined::a)) 
+                                (pubStream stream)
+
+-- |The server starts a thread that peels IO actions off the stream as
+-- they become available, runs them, and sends them to all connected
+-- clients. Returns an action for cleaning up resources allocated by
+-- this publication server along with the port the server is
+-- listening on.
 runServerIO :: forall a. (RosBinary a, MsgInfo a) => 
-             Stream (IO a) -> (URI -> Int -> IO ()) -> Int -> IO (IO (), Int)
-runServerIO stream _updateStats bufferSize = 
-    withSocketsDo $ do
-      sock <- socket AF_INET Sock.Stream defaultProtocol
-      bindSocket sock (SockAddrInet aNY_PORT iNADDR_ANY)
-      port <- fromInteger . toInteger <$> socketPort sock
-      listen sock 5
-      clients <- newTVarIO []
-      let ttype = msgTypeName (undefined::a)
-          md5 = sourceMD5 (undefined::a)
-          negotiate = negotiatePub ttype md5
-          mkBuffer = newRingChan bufferSize
-      acceptThread <- forkIO $ 
-                      acceptClients sock clients negotiate mkBuffer
-      pubThread <- forkIO $ let popIO s = do x <- S.head s
-                                             xs <- unsafeInterleaveIO $ 
-                                                   popIO (S.tail s)
-                                             return $ Cons x xs
-                            in do s' <- popIO stream
-                                  pubStream s' clients
-      let cleanup = atomically (readTVar clients) >>= 
-                    sequence_ . map fst >> 
-                    shutdown sock ShutdownBoth >>
-                    killThread acceptThread >>
-                    killThread pubThread
-      return (cleanup, port)
+               Stream (IO a) -> (URI -> Int -> IO ()) -> Int -> IO (IO (), Int)
+runServerIO stream = runServerAux (mkPubNegotiator (undefined::a)) pubIO
+    where pubIO clients = 
+              let popIO s = do x <- S.head s
+                               xs <- unsafeInterleaveIO $ popIO (S.tail s)
+                               return $ Cons x xs
+              in popIO stream >>= flip pubStream clients
