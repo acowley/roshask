@@ -135,8 +135,6 @@ negotiateSub sock tname ttype md5 =
          Nothing -> error "Server did not include MD5 sum in its response."
        setSocketOption sock KeepAlive 1
 
-recvBufferSize = 3
-
 -- |Connect to a publisher and return the stream of data it is
 -- publishing.
 subStream :: forall a. (RosBinary a, MsgInfo a) => 
@@ -158,7 +156,7 @@ subStream target tname _updateStats =
        h <- socketToHandle sock ReadMode
        --hSetBuffering h NoBuffering
        putStrLn $ "Streaming "++tname++" from "++target
-       streamIn recvBufferSize h
+       streamIn h
     where host = case parseURI target of
                    Just u -> case uriRegName u of
                                Just host -> host
