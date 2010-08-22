@@ -5,6 +5,7 @@ import Control.Concurrent
 import qualified Data.Foldable as F
 import Ros.Stream (Stream(..))
 import qualified Ros.Stream as S
+import System.IO.Unsafe (unsafeInterleaveIO)
 
 -- |Turn a stream of values into a stream of pairs of consecutive
 -- values.
@@ -145,3 +146,23 @@ gate = curry $ fmap fst . uncurry lockstep
 -- element from each list in sequence.
 concats :: F.Foldable f => Stream (f a) -> Stream a
 concats (Cons x xs) = F.foldr Cons (concats xs) x
+
+-- |Flatten a 'Stream' of 'F.Foldable' values such that old values are
+-- discarded as soon as the original 'Stream' produces a new
+-- 'F.Foldable'.
+interruptible :: F.Foldable t => Stream (t a) -> IO (Stream a)
+interruptible s = 
+    do feeder <- newEmptyMVar         -- Active feeder thread
+       latestItem <- newEmptyMVar     -- Next available item
+       let feedItems ys = do ft <- tryTakeMVar feeder
+                             maybe (return ()) killThread ft
+                             t <- forkIO $ F.traverse_ (putMVar latestItem) ys
+                             putMVar feeder t 
+           watchForItems s = let !nxt = S.head s
+                             in feedItems nxt >> 
+                                watchForItems (S.tail s)
+           getAll = do x <- unsafeInterleaveIO $ takeMVar latestItem
+                       xs <- unsafeInterleaveIO getAll
+                       return $ Cons x xs
+       _ <- forkIO $ watchForItems s
+       getAll
