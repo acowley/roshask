@@ -18,6 +18,13 @@ consecutive s = (,) <$> s <*> S.tail s
 lockstep :: Stream a -> Stream b -> Stream (a,b)
 lockstep s1 s2 = (,) <$> s1 <*> s2
 
+-- |Apply the given function to an item from each stream in
+-- lockstep. This means that the function advances down the two
+-- streams without dropping any elements at the rate of the slower
+-- input 'Stream'.
+inStep :: (a -> b -> c) -> Stream a -> Stream b -> Stream c
+inStep f s1 s2 = fmap (uncurry f) $ lockstep s1 s2
+
 -- |Stream a new pair every time either of the component 'Stream's
 -- produces a new value. The value of the other element of the pair
 -- will be the newest available value. The resulting 'Stream' will
