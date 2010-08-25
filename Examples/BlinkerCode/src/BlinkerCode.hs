@@ -9,22 +9,25 @@ import AI.CV.OpenCV.HighCV hiding (width, height)
 import AI.CV.OpenCV.Threshold
 import AI.CV.OpenCV.ArrayOps
 import Ros.Sensor_msgs.Image 
-import BlobExtraction (findMultiBlobs)
+import BlobExtraction
 
+findMultiBlobs = undefined
 findBlinks = fmap (thresholdBinary 32 1) . finiteDifference absDiff
 shiftCode curr prev = cvScaleAdd (cvAndS 127 prev) 2 curr
-findBlinkers = findMultiBlobs
-
-imgToCV :: Image -> HIplImage FreshImage MonoChromatic Word8
-imgToCV img = fromPixels (width img) (height img) (_data img)
+findLEDs = findMultiBlobs
 
 evensOdds :: Stream a -> (Stream a, Stream a)
-evensOdds s = (fmap everyOther s, fmap everyOther (S.tail s))
-    where everyOther Cons x xs = Cons x (S.tail xs)
+evensOdds s = (everyOther s, everyOther (S.tail s))
+    where everyOther (Cons x xs) = Cons x (S.tail xs)
+
+both f (x,y) = (f x, f y)
+imgToCV img = fromPixels (width img) (height img) (_data img)
 
 main = runNode "BlinkerCodes" $
-       do images <- fmap imgToCV <$> subscribe "camera"
+       do (evens,odds) <- both findBlinks . evensOdds . fmap imgToCV <$> 
+                          subscribe "camera"
           let blackImage = fromGrayPixels 640 480 (V.replicate (640*480) 0) 
-              blinks = findBlinks images
-              codes = inStep shiftCode blinks (Cons blackImage blinks)
-          advertise "blinkers" $ fmap findBlinkers codes
+              codes1 = inStep shiftCode evens (Cons blackImage evens)
+              codes2 = inStep shiftCode odds (Cons blackImage odds)
+          leds <- liftIO $ merge (fmap findLEDs codes1) (fmap findLEDs codes2)
+          advertise "blinkers" leds
