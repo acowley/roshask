@@ -1,0 +1,14 @@
+Name:                BlinkerCode
+Version:             0.0
+Synopsis:            I am code
+Cabal-version:       >=1.6
+Category:            Robotics
+Build-type:          Custom
+
+Executable BlinkerCode
+  Build-Depends:  base >= 4.2 && < 5,
+                  vector >= 0.6.0.2 && < 0.7,
+                  roshask
+  GHC-Options:    -Odph -main-is BlinkerCode
+  Main-Is:        BlinkerCode.hs
+  Hs-Source-Dirs: src
