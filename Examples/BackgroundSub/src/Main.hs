@@ -35,6 +35,7 @@ maskMotion (IntImage _ _ i1) (IntImage w h i2) =
     where mask = despeckle w h $ V.zipWith threshold diffs i2
           applyMask m pix = if m > 0 then pix else 0
           diffs = V.map abs $ V.zipWith (-) i1 i2
+          threshold :: Int -> Int -> Word8
           threshold diff avg = if diff > max 1 (avg `quot` 32) then 255 else 0
 
 main = runNode "backsub" $ do
