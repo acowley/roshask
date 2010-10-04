@@ -73,9 +73,12 @@ genImports pkgPath pkgMsgs fieldTypes =
 genBinaryInstance :: Msg -> ByteString
 genBinaryInstance m@(Msg name _ _ fields) = 
    B.concat ["instance RosBinary ", pack name, " where\n",
-             "  put x' = do ", 
-             B.intercalate (B.append "\n" (pack (replicate 14 ' ')))
-                           (map putField fields),
+             "  put = ", 
+             B.intercalate " *> " $ 
+              map (\(f,t) -> B.concat [serialize t, " . ", f]) fields,
+             -- "  put x' = do ", 
+             -- B.intercalate (B.append "\n" (pack (replicate 14 ' ')))
+             --               (map putField fields),
              "\n  get = ", pack name, " <$> ",
              B.intercalate " <*> " (map getField fields),
              if hasHeader m then putMsgHeader else ""]
