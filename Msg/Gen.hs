@@ -10,6 +10,7 @@ import qualified Data.Set as S
 import Data.List (intercalate, foldl')
 import System.FilePath (takeFileName)
 import Text.Printf (printf)
+import Msg.Analysis
 import Msg.Types
 
 generateMsgType :: ByteString -> [ByteString] -> Msg -> ByteString
@@ -17,7 +18,6 @@ generateMsgType pkgPath pkgMsgs msg@(Msg name _ md5 fields) =
     B.concat [modLine, "\n", imports, dataLine, fieldSpecs, 
               " } deriving P.Show\n\n",
               genBinaryInstance msg, "\n\n", 
-              --genBinaryIterInstance msg, "\n\n",
               genHasHeader msg,
               genHasHash msg]
     where tName = pack $ toUpper (head name) : tail name
@@ -76,9 +76,6 @@ genBinaryInstance m@(Msg name _ _ fields) =
              "  put = ", 
              B.intercalate " *> " $ 
               map (\(f,t) -> B.concat [serialize t, " . ", f]) fields,
-             -- "  put x' = do ", 
-             -- B.intercalate (B.append "\n" (pack (replicate 14 ' ')))
-             --               (map putField fields),
              "\n  get = ", pack name, " <$> ",
              B.intercalate " <*> " (map getField fields),
              if hasHeader m then putMsgHeader else ""]
@@ -128,7 +125,7 @@ typeDependency p m (RUserType ut)    = if elem ut m
                                        else path2Module ut
 typeDependency _ _ _                 = S.empty
 
--- Non built-in types are either in the current package or in the
+-- Non built-in types are either in the specified package or in the
 -- Ros.Std_msgs namespace. If a package path is given, then it is
 -- converted to a Haskell hierarchical module name and prefixed by
 -- "Ros.".
@@ -167,13 +164,3 @@ ros2Hask (RVarArray t)     = case t of
                                _ -> B.append "V.Vector " (ros2Hask t)
 ros2Hask (RUserType t)     = qualify . pack . takeFileName . unpack $ t
     where qualify b = B.concat [b, ".", b]
-
-genBinaryIterInstance :: Msg -> ByteString
-genBinaryIterInstance (Msg name _ _ fields) = 
-    B.concat ["instance BinaryIter ", pack name, " where\n",
-              "  consume = case ", pack name, " <$> ", 
-              B.intercalate " <*> " (replicate (length fields) "consume'"),
-              " of\n",
-              "              Emit v r1 -> \\r2 -> Emit v (r1 `mappend` r2)\n",
-              "              More k -> k"]
-                

@@ -1,6 +1,6 @@
 -- Use a package's manifest.xml file to find paths to the packages on
 -- which this package is dependent.
-module Ros.Build.DepFinder (findPackageDeps, buildDepMsgs) where
+module Ros.Build.DepFinder (findPackageDeps, buildDepMsgs, findMessage) where
 import Control.Applicative ((<$>))
 import Control.Monad (when, filterM, (>=>))
 import Data.Maybe (mapMaybe, isNothing, fromJust)
@@ -8,7 +8,8 @@ import Data.List (find, findIndex)
 import System.Directory (doesFileExist, doesDirectoryExist, 
                          getDirectoryContents)
 import System.Environment (getEnvironment)
-import System.FilePath ((</>), splitSearchPath, takeExtension)
+import System.FilePath ((</>), splitSearchPath, takeExtension, 
+                        dropExtension, takeFileName)
 import System.Process (runCommand)
 import Text.XML.Light
 
@@ -25,7 +26,7 @@ findPackagePath search pkg = go search
 -- Get the packages listed as dependencies in an XML manifest.  NOTE:
 -- In version 1.3.7, the xml package gained the ability to work with
 -- ByteStrings via the XmlSource typeclass. Consider that upgrade if
--- performance is a consideration.
+-- performance is causing trouble.
 getPackages :: String -> Maybe [Package]
 getPackages = (map attrVal . 
                mapMaybe (find ((==pkg).attrKey) . elAttribs) . 
@@ -95,3 +96,25 @@ buildDepMsgs :: [FilePath] -> IO ()
 buildDepMsgs = mapM_ (findMessages >=> 
                       mapM_ (cmd . ("roshask gen "++)))
     where cmd = runCommand >=> \_ -> return ()
+
+-- |Find the path to the message definition (.msg) file for a message
+-- type with the given name. The first argument is a home package used
+-- to resolve unqualified message names. The second argument is the
+-- name of the message type either in the form "pkgName/typeName" or
+-- "typeName". The specified package will be searched for using the
+-- search paths indicated in the current environment (ROS_PACKAGE_PATH
+-- and ROS_ROOT).
+findMessage :: String -> String -> IO (Maybe FilePath)
+findMessage homePkg msgName = 
+    do searchPaths <- getRosPaths
+       -- Add an implicit dependency on the "roslib" package.
+       let pkgs = [ msgPkg, "roslib" ]
+       pkgPaths <- mapM (findPackagePath searchPaths) pkgs
+       case findIndex isNothing pkgPaths of
+         Just i -> error $ "Couldn't find path to package " ++ (pkgs !! i)
+         Nothing -> find isMsg . concat <$> 
+                    mapM (findMessages . fromJust) pkgPaths
+    where (msgPkg, msgType) = case span (/= '/') msgName of
+                                (msgType, []) -> (homePkg, msgType)
+                                (msgPkg, msgType) -> (msgPkg, tail msgType)
+          isMsg = (== msgType) . dropExtension . takeFileName

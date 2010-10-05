@@ -71,6 +71,7 @@ Executable roshask
 
   GHC-Options:    -Odph
   Main-Is:        Msg/Main.hs
+  Other-modules:  Msg.Parse Msg.Gen Msg.Analysis
   Hs-Source-Dirs: .
 
 
