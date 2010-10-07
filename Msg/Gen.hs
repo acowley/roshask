@@ -34,9 +34,6 @@ generateMsgType pkgPath pkgMsgs msg@(Msg name longName md5 fields) =
           imports = B.concat ["import qualified Prelude as P\n",
                               "import Prelude ((.), (+))\n",
                               "import Control.Applicative\n",
-                              "import Data.Monoid\n",
-                              "import Data.Typeable\n",
-                              "import Ros.BinaryIter\n",
                               "import Ros.RosBinary\n",
                               "import Msg.MsgInfo\n",
                               genImports pkgPath pkgMsgs (map snd fields)]
