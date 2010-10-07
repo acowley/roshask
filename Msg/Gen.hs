@@ -96,7 +96,7 @@ genStorableInstance m@(Msg name _ _ fields) = isMsgFlat m >>= return . aux
                              "  sizeOf _ = ", totalSize m,"\n",
                              "  alignment _ = alignment nullPtr\n",
                              "  peek = SM.runStorable (", pack name, " <$> ",
-                               B.intercalate " *> " peekFields, ")\n",
+                               B.intercalate " <*> " peekFields, ")\n",
                              "  poke ptr' obj' = SM.runStorable store' ptr'\n",
                              "    where store' = ",
                                B.intercalate " *> " pokeFields,"\n\n"]
