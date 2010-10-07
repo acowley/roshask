@@ -1,0 +1,17 @@
+<package>
+  <description brief="Example5">
+
+     Example5
+
+  </description>
+  <author>Anthony Cowley</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/Example5</url>
+  <depend package="std_msgs"/>
+  <depend package="geometry_msgs"/>
+  <depend package="sensor_msgs"/>
+
+</package>
+
+
