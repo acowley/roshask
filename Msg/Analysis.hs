@@ -13,6 +13,7 @@ allM p (x:xs) = p x >>= aux
 isMsgFlat :: Msg -> IO Bool
 isMsgFlat (Msg _ msgName _ fields) = allM flat $ map snd fields
     where flat (RVarArray _) = return False
+          flat RString       = return False
           flat (RUserType n) = either error isMsgFlat =<< 
                                maybe (err n) parseMsg =<< 
                                findMessage homePkg (unpack n)

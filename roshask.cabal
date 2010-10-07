@@ -23,7 +23,7 @@ Library
   Exposed-modules:     Ros.RosTypes Ros.Node Ros.BinaryIter Ros.RosBinary 
                        Msg.MsgInfo Ros.Build.DepFinder Ros.Build.SetupUtil 
                        Msg.HeaderSupport Ros.StreamCombinators Ros.Stream
-                       Ros.Rate
+                       Ros.Rate Ros.Util.StorableMonad
   
   -- Packages needed in order to build this package.
   Build-depends:       base >= 4 && < 6,

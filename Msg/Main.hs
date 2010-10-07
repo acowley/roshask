@@ -24,8 +24,9 @@ generate fname =
          Left err -> do putStrLn $ "ERROR: " ++ err
                         exitWith (ExitFailure (-2))
          Right msg -> do fname' <- hsName
-                         B.writeFile fname' $
-                           generateMsgType pkgHier (map B.pack pkgMsgs) msg
+                         let pkgMsgs' = map B.pack pkgMsgs
+                         msgType <- generateMsgType pkgHier pkgMsgs' msg
+                         B.writeFile fname' msgType
     where hsName = do createDirectoryIfMissing True d'
                       return $ d' </> f
           (d,f) = splitFileName $ replaceExtension fname ".hs"

@@ -41,7 +41,6 @@ fixedArrayParser x = (\len name -> (name, RFixedArray len x)) <$>
 varArrayParser x = (, RVarArray x) <$> 
                    (typeString x *> string "[]" *> space *> parseName)
 
-
 userTypeParser :: Parser (ByteString, MsgType)
 userTypeParser = choice [userSimple, userVarArray, userFixedArray]
 
@@ -59,7 +58,26 @@ userFixedArray = (\t n name -> (name, RFixedArray n (RUserType t))) <$>
                  (char '[' *> parseInt <* char ']') <*> 
                  (space *> parseName)
 
-fieldParsers = builtIns ++ [comment *> userTypeParser]
+-- Parsers for deprecated "byte" and "char" types. These have been
+-- replaced by uint8 and int8, respectively.
+deprecated :: [Parser (ByteString, MsgType)]
+deprecated = map (comment *>) . concatMap (\x -> map ($ x) builders) $ 
+             [("byte", RUInt8), ("char", RInt8)]
+    where builders = map uncurry [depField, depFixedArray, depVarArray]
+
+depField :: ByteString -> MsgType -> Parser (ByteString, MsgType)
+depField s x = (, x) <$> (string s *> space *> parseName)
+
+depFixedArray :: ByteString -> MsgType -> Parser (ByteString, MsgType)
+depFixedArray s x = (\len name -> (name, RFixedArray len x)) <$>
+                    (string s *> char '[' *> parseInt <* char ']') <*>
+                    (space *> parseName)
+
+depVarArray :: ByteString -> MsgType -> Parser (ByteString, MsgType)
+depVarArray s x = (, RVarArray x) <$> 
+                  (string s *> string "[]" *>space *> parseName)
+
+fieldParsers = deprecated ++ builtIns ++ [comment *> userTypeParser]
     where builtIns = concatMap (\f -> map ((comment *>) . f) simpleFieldTypes)
                                [simpleParser, fixedArrayParser, varArrayParser]
 
