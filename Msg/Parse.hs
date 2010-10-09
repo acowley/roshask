@@ -8,6 +8,7 @@ import Data.ByteString.Char8 (pack, unpack)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.ByteString.Lazy.Char8 as BL
 import Data.Char (toLower, digitToInt)
+import Data.Either (partitionEithers)
 import Data.List (foldl')
 import System.Environment (getEnvironment)
 import System.FilePath (dropExtension, takeFileName, splitDirectories, (</>))
@@ -75,31 +76,61 @@ depFixedArray s x = (\len name -> (name, RFixedArray len x)) <$>
 
 depVarArray :: ByteString -> MsgType -> Parser (ByteString, MsgType)
 depVarArray s x = (, RVarArray x) <$> 
-                  (string s *> string "[]" *>space *> parseName)
+                  (string s *> string "[]" *> space *> parseName)
 
-fieldParsers = deprecated ++ builtIns ++ [comment *> userTypeParser]
-    where builtIns = concatMap (\f -> map ((comment *>) . f) simpleFieldTypes)
+-- Parse constants defined in the message
+constParser :: ByteString -> MsgType -> Parser (ByteString, MsgType, ByteString)
+constParser s x = (,x,) <$> 
+                  (string s *> space *> identifier) <*> 
+                  (skipSpace *> char '=' *> skipSpace *> restOfLine <* skipSpace)
+    where restOfLine :: Parser ByteString
+          restOfLine = pack <$> manyTill anyChar (eitherP endOfLine endOfInput)
+
+constParsers = map (uncurry constParser) $
+               [("byte", RUInt8), ("char", RInt8)] ++
+               zip typeNames simpleFieldTypes
+    where typeNames = map (pack . map toLower . tail . show) simpleFieldTypes
+
+-- String constants are parsed somewhat differently from numeric
+-- constants. For numerical constants, we drop comments and trailing
+-- spaces. For strings, we take the whole line (so comments aren't
+-- stripped).
+sanitizeConstants (name, RString, val) = 
+    (name, RString, B.concat ["\"",val,"\""])
+sanitizeConstants (name, t, val) = 
+    (name, t, B.takeWhile (\c -> c /= '#' && not (isSpace c)) val)
+
+fieldParsers = map (comment *>) $
+               map (Right . sanitizeConstants <$>) constParsers ++ 
+               map (Left <$>) (deprecated ++ builtIns ++ [userTypeParser])
+    where builtIns = concatMap (flip map simpleFieldTypes)
                                [simpleParser, fixedArrayParser, varArrayParser]
+-- fieldParsers = deprecated ++ builtIns ++ [comment *> userTypeParser]
+--     where builtIns = concatMap (\f -> map ((comment *>) . f) simpleFieldTypes)
+--                                [simpleParser, fixedArrayParser, varArrayParser]
 
 mkParser :: String -> String -> Parser Msg
-mkParser sname lname = Msg sname lname "" <$> many (choice fieldParsers)
+mkParser sname lname = uncurry (Msg sname lname "") . partitionEithers <$> 
+                       many (choice fieldParsers)
 
-testMsg = "# Foo bar\n\n#   \nHeader header  # a header\nuint32 aNum # a number \n  # It's not important\ngeometry_msgs/PoseStamped[] poses\n"
+testMsg = "# Foo bar\n\n#   \nHeader header  # a header\nuint32 aNum # a number \n  # It's not important\ngeometry_msgs/PoseStamped[] poses\nbyte DEBUG=1 #debug level\n"
 
 test = feed (parse (mkParser "" "") testMsg) ""
 
 -- Ensure that field names do not coincide with Haskell reserved words.
 sanitize :: Msg -> Msg
-sanitize (Msg sname lname md5 fields) = Msg sname lname md5 $
-                                        map sanitizeField fields
-    where sanitizeField ("data", t)   = ("_data", t)
-          sanitizeField ("type", t)   = ("_type", t)
-          sanitizeField ("class", t)  = ("_class", t)
-          sanitizeField ("module", t) = ("_module", t)
-          sanitizeField x             = x
+sanitize msg = msg { fields = map (first sanitizeField) (fields msg)
+                   , constants = map (fiirst sanitizeField) (constants msg) }
+    where sanitizeField "data"   = "_data"
+          sanitizeField "type"   = "_type"
+          sanitizeField "class"  = "_class"
+          sanitizeField "module" = "_module"
+          sanitizeField x        = B.cons (toLower (B.head x)) (B.tail x)
+          first f (x, y) = (f x, y)
+          fiirst f (x, y, z) = (f x, y, z)
 
 addHash :: String -> Msg -> Msg
-addHash hash (Msg sname lname _ fields) = Msg sname lname hash fields
+addHash hash msg = msg { md5sum = hash}
 
 genName :: FilePath -> String
 genName f = let parts = splitDirectories f

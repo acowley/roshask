@@ -13,4 +13,9 @@ data MsgType = RBool | RInt8 | RUInt8 | RInt16 | RUInt16
 
 -- |A message has a short name, a long name, an md5 sum, and a list of
 -- named, typed fields.
-data Msg = Msg String String String [(ByteString, MsgType)] deriving Show
+data Msg = Msg { shortName :: String
+               , longName  :: String
+               , md5sum    :: String
+               , fields    :: [(ByteString, MsgType)]
+               , constants :: [(ByteString, MsgType, ByteString)] }
+           deriving Show

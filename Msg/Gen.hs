@@ -2,32 +2,39 @@
 -- supports arrays of built-in types.
 {-# LANGUAGE OverloadedStrings #-}
 module Msg.Gen (generateMsgType) where
+import Control.Applicative ((<$>), (<*>))
+import Control.Monad ((>=>))
 import Data.ByteString.Char8 (pack, unpack, ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Char (toUpper)
+import Data.Maybe (fromJust)
 import Data.Set (Set, singleton)
 import qualified Data.Set as S
 import Data.List (intercalate, foldl')
-import System.FilePath (takeFileName)
 import Text.Printf (printf)
 import Ros.Build.DepFinder (findMessage)
-import Msg.Analysis (isMsgFlat)
+import Msg.Analysis (MsgInfo, SerialInfo(..), analyzeMsg, isFlat, getTypeInfo)
 import Msg.Parse (parseMsg)
 import Msg.Types
 
 generateMsgType :: ByteString -> [ByteString] -> Msg -> IO ByteString
-generateMsgType pkgPath pkgMsgs msg@(Msg name longName md5 fields) =
-  do fieldDecls <- mapM (generateField homePkg) fields
-     let fieldSpecs = B.intercalate lineSep fieldDecls
-     (storableImport, storableInstance) <- genStorableInstance msg
+generateMsgType pkgPath pkgMsgs msg@(Msg name longName md5 fields _) =
+  do (fDecls, binInst, st, cons) <- analyzeMsg msg $ 
+                                    (,,,) <$> mapM generateField fields
+                                          <*> genBinaryInstance msg
+                                          <*> genStorableInstance msg
+                                          <*> genConstants msg
+     let fieldSpecs = B.intercalate lineSep fDecls
+         (storableImport, storableInstance) = st
      return $ B.concat [ modLine, "\n"
                        , imports
                        , storableImport
                        , dataLine, fieldSpecs, " } deriving P.Show\n\n"
-                       , genBinaryInstance msg, "\n\n"
+                       , binInst, "\n\n"
                        , storableInstance
                        , genHasHeader msg
-                       , genHasHash msg ]
+                       , genHasHash msg
+                       , cons ]
     where tName = pack $ toUpper (head name) : tail name
           modLine = B.concat ["{-# LANGUAGE OverloadedStrings #-}\n",
                               "module ", pkgPath, tName, " where"]
@@ -43,11 +50,12 @@ generateMsgType pkgPath pkgMsgs msg@(Msg name longName md5 fields) =
           homePkg = takeWhile (/= '/') longName
 
 hasHeader :: Msg -> Bool
-hasHeader (Msg _ _ _ ((_, RUserType "Header"):_)) = True
-hasHeader _                                       = False
+hasHeader msg = case fields msg of
+                  ((_, RUserType "Header"):_) -> True
+                  _ -> False
 
 genHasHeader :: Msg -> ByteString
-genHasHeader m@(Msg name _ _ fields) = 
+genHasHeader m@(Msg name _ _ fields _) = 
     if hasHeader m
     then let hn = fst (head fields) -- The header field name
          in B.concat ["instance HasHeader ", pack name, " where\n",
@@ -59,15 +67,15 @@ genHasHeader m@(Msg name _ _ fields) =
     else ""
 
 genHasHash :: Msg -> ByteString
-genHasHash (Msg sname lname md5 _) = 
+genHasHash (Msg sname lname md5 _ _) = 
     B.concat ["instance MsgInfo ", pack sname,
               " where\n  sourceMD5 _ = \"", pack md5,
               "\"\n  msgTypeName _ = \"", pack lname,
               "\"\n"]
 
-generateField :: String -> (ByteString, MsgType) -> IO ByteString
-generateField homePkg (name, t) = do t' <- ros2Hask homePkg t
-                                     return $ B.concat [name, " :: ", t']
+generateField :: (ByteString, MsgType) -> MsgInfo ByteString
+generateField (name, t) = do t' <- hType <$> getTypeInfo t
+                             return $ B.concat [name, " :: ", t']
 
 genImports :: ByteString -> [ByteString] -> [MsgType] -> ByteString
 genImports pkgPath pkgMsgs fieldTypes = 
@@ -76,59 +84,51 @@ genImports pkgPath pkgMsgs fieldTypes =
     where getDeps = typeDependency pkgPath pkgMsgs
           allImports = foldl' ((. getDeps) . flip S.union) S.empty
 
-genBinaryInstance :: Msg -> ByteString
-genBinaryInstance m@(Msg name _ _ fields) = 
-   B.concat ["instance RosBinary ", pack name, " where\n",
-             "  put obj' = ", 
-             B.intercalate " *> " $ 
-              map (\(f,t) -> B.concat [serialize t, " (", f, " obj')"]) fields,
-             "\n  get = ", pack name, " <$> ",
-             B.intercalate " <*> " (map getField fields),
-             if hasHeader m then putMsgHeader else ""]
+genBinaryInstance :: Msg -> MsgInfo ByteString
+genBinaryInstance m@(Msg name _ _ fields _) = 
+    do puts <- mapM (\(f,t) -> serialize t >>= return . buildPut f) fields
+       gets <- mapM (deserialize . snd) fields
+       return $ B.concat ["instance RosBinary ", pack name, " where\n",
+                          "  put obj' = ", B.intercalate " *> " puts,"\n",
+                          "  get = ", pack name, " <$> ", 
+                          B.intercalate " <*> " gets,
+                          if hasHeader m then putMsgHeader else ""]
+    where buildPut f ser = B.concat [ser, " (", f, " obj')"]
 
-genStorableInstance :: Msg -> IO (ByteString, ByteString)
-genStorableInstance m@(Msg name _ _ fields) = isMsgFlat m >>= return . aux
-    where aux False = ("", "")
-          aux True = (smImp, stInst)
-          peekFields = map (const "SM.peek") fields
-          pokeFields = map (\(n,_) -> B.concat ["SM.poke (", n, " obj')"]) fields
-          stInst = B.concat ["instance Storable ", pack name, " where\n",
-                             "  sizeOf _ = ", totalSize m,"\n",
-                             "  alignment _ = alignment nullPtr\n",
-                             "  peek = SM.runStorable (", pack name, " <$> ",
-                               B.intercalate " <*> " peekFields, ")\n",
-                             "  poke ptr' obj' = SM.runStorable store' ptr'\n",
-                             "    where store' = ",
-                               B.intercalate " *> " pokeFields,"\n\n"]
+genStorableInstance :: Msg -> MsgInfo (ByteString, ByteString)
+genStorableInstance msg = isFlat >>= aux
+    where aux False = return ("", "")
+          aux True = do sz <- totalSize msg
+                        return (smImp, stInst sz)
+          peekFields = map (const "SM.peek") (fields msg)
+          pokeFields = map (\(n,_) -> B.concat ["SM.poke (", n, " obj')"]) 
+                           (fields msg)
+          name = pack (shortName msg)
+          stInst sz = B.concat ["instance Storable ", name, " where\n",
+                                "  sizeOf _ = ", sz,"\n",
+                                "  alignment _ = 8\n",
+                                "  peek = SM.runStorable (", name, " <$> ",
+                                B.intercalate " <*> " peekFields, ")\n",
+                                "  poke ptr' obj' = ",
+                                "SM.runStorable store' ptr'\n",
+                                "    where store' = ",
+                                B.intercalate " *> " pokeFields,"\n\n"]
           smImp = B.concat [ "import Foreign.Storable (Storable(..))\n"
-                           , "import qualified Ros.Util.StorableMonad as SM\n"
-                           , "import Foreign.Ptr (nullPtr)\n" ]
+                           , "import qualified Ros.Util.StorableMonad as SM\n" ]
 
-totalSize :: Msg -> ByteString
-totalSize (Msg _ _ _ fields) = B.intercalate sep $ map aux fields
-    where aux (_,t) = B.concat ["sizeOf (P.undefined::", mkFlatType t, ")"]
+totalSize :: Msg -> MsgInfo ByteString
+totalSize msg = B.intercalate sep <$> mapM (aux . snd) (fields msg)
+    where aux = getTypeInfo >=> return . fromJust . size
           sep = B.append " +\n" $ B.replicate 13 ' '
 
 putMsgHeader :: ByteString
 putMsgHeader = "\n  putMsg = putStampedMsg"
 
-putField :: (ByteString, MsgType) -> ByteString
-putField (name, t) = B.concat [serialize t, " (", name, " x')"]
+serialize :: MsgType -> MsgInfo ByteString
+serialize = getTypeInfo >=> return . putField
 
-serialize :: MsgType -> ByteString
-serialize (RFixedArray _ (RUserType _)) = "putFixedList"
-serialize (RFixedArray _ t) = "putFixed"
-serialize (RVarArray (RUserType _)) = "putList"
-serialize _ = "put"
-
-getField :: (ByteString, MsgType) -> ByteString
-getField = deserialize . snd
-
-deserialize :: MsgType -> ByteString
-deserialize (RFixedArray n (RUserType _)) = B.append "getFixedList " (pack (show n))
-deserialize (RFixedArray n t) = B.append "getFixed " (pack (show n))
-deserialize (RVarArray (RUserType _)) = "getList"
-deserialize _ = "get"
+deserialize :: MsgType -> MsgInfo ByteString
+deserialize = getTypeInfo >=> return . getField
 
 vectorDeps = S.fromList [ "qualified Data.Vector.Storable as V" ]
 
@@ -170,51 +170,9 @@ path2Module p = singleton $
     where cap s = B.cons (toUpper (B.head s)) (B.tail s)
           parts = B.split '/' p
 
--- Given a home package name and a ROS 'MsgType', generate a Haskell
--- type name.
-ros2Hask :: String -> MsgType -> IO ByteString
-ros2Hask pkg (RFixedArray _ t) = mkArrayType pkg t
-ros2Hask pkg (RVarArray t)     = mkArrayType pkg t
-ros2Hask pkg RString           = return "P.String"
-ros2Hask _   t                 = return $ mkFlatType t
-
--- Generate the name of the Haskell type that corresponds to a flat
--- (i.e. non-array) ROS type.
-mkFlatType :: MsgType -> ByteString
-mkFlatType RBool         = "P.Bool"
-mkFlatType RInt8         = "Int.Int8"
-mkFlatType RUInt8        = "Word.Word8"
-mkFlatType RInt16        = "Int.Int16"
-mkFlatType RUInt16       = "Word.Word16"
-mkFlatType RInt32        = "P.Int"
-mkFlatType RUInt32       = "Word.Word32"
-mkFlatType RInt64        = "Int.Int64"
-mkFlatType RUInt64       = "Word.Word64"
-mkFlatType RFloat32      = "P.Float"
-mkFlatType RFloat64      = "P.Double"
-mkFlatType RTime         = "ROSTime"
-mkFlatType RDuration     = "ROSDuration"
-mkFlatType (RUserType t) = qualify . pack . takeFileName . unpack $ t
-    where qualify b = B.concat [b, ".", b]
-mkFlatType t             = error $ show t ++ " is not a flat type"
-
--- Make an array type declaration. If the element type of the
--- collection is flat (i.e. does not itself have a field of type
--- 'RVarArray'), then it will have a 'Storable' instance and can be
--- stored in a 'Vector'.
-mkArrayType :: String -> MsgType -> IO ByteString
-mkArrayType pkg ut@(RUserType t) = 
-    findMessage pkg (unpack t) >>= 
-    maybe (error $ "Couldn't find definition for " ++ show t) parseMsg >>= 
-    either error isMsgFlat >>= 
-    toArr
-    where toArr True  = return . B.append "V.Vector " . mkFlatType $ ut
-          toArr False = return $ B.concat ["[", mkFlatType ut, "]"]
-mkArrayType pkg (RFixedArray _ t) = 
-    do t'<- ros2Hask pkg t
-       return $ B.concat ["[", t', "]"]
-mkArrayType pkg (RVarArray t) =
-    do t' <- ros2Hask pkg t
-       return $ B.concat ["[", t', "]"]
-mkArrayType pkg RString = return "[P.String]"
-mkArrayType _ t       = return . B.append "V.Vector " $ mkFlatType t
+genConstants :: Msg -> MsgInfo ByteString
+genConstants = fmap B.concat . mapM buildLine . constants
+    where buildLine (name, rosType, val) = 
+              do t <- hType <$> getTypeInfo rosType
+                 return $ B.concat ["\n",name, " :: ", t, "\n", 
+                                    name, " = ", val, "\n"]

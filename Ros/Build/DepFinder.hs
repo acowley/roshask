@@ -10,7 +10,7 @@ import System.Directory (doesFileExist, doesDirectoryExist,
 import System.Environment (getEnvironment)
 import System.FilePath ((</>), splitSearchPath, takeExtension, 
                         dropExtension, takeFileName)
-import System.Process (runCommand)
+import System.Process (runCommand, waitForProcess)
 import Text.XML.Light
 
 type Package = String
@@ -95,7 +95,7 @@ findMessages path = aux =<< doesDirectoryExist msgPath
 buildDepMsgs :: [FilePath] -> IO ()
 buildDepMsgs = mapM_ (findMessages >=> 
                       mapM_ (cmd . ("roshask gen "++)))
-    where cmd = runCommand >=> \_ -> return ()
+    where cmd x = putStrLn x >> runCommand x >>= waitForProcess >> return ()
 
 -- |Find the path to the message definition (.msg) file for a message
 -- type with the given name. The first argument is a home package used
