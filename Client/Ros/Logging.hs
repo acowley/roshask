@@ -1,4 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
+-- |Support for publishing log messages at various severity
+-- levels. The log messages are annotated with the filename and line
+-- number where they are generated.
 module Ros.Logging (Log(..), 
                     logDebug, logWarn, logInfo, logError, logFatal) where
 import Data.Word (Word8)
