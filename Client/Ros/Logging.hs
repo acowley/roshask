@@ -30,3 +30,4 @@ logWarn  = mkLogMsg wARN
 logInfo  = mkLogMsg iNFO
 logError = mkLogMsg eRROR
 logFatal = mkLogMsg fATAL
+
