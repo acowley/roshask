@@ -129,8 +129,6 @@ advertiseIO = advertiseBufferedIO 1
 advertiseBufferedIO :: (RosBinary a, MsgInfo a) =>
                        Int -> TopicName -> Stream (IO a) -> Node ()
 advertiseBufferedIO bufferSize name s = advertiseAux (mkPubIO s) bufferSize name
-                         
---    advertiseBuffered bufferSize name =<< liftIO (streamIO stream)
 
 -- |Get an action that will shutdown this Node.
 getShutdownAction :: Node (IO ())
