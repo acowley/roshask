@@ -66,7 +66,7 @@ Executable roshask
                   bytestring,
                   containers == 0.3.*,
                   monads-fd == 0.1.*,
-                  vector >= 0.6 && < 0.7,
+                  vector == 0.7.*,
                   binary,
                   filepath > 1.1 && < 1.2,
                   attoparsec > 0.8 && < 0.9,

@@ -7,7 +7,7 @@ Build-type:          Custom
 
 Executable ShowVideo
   Build-Depends:  base >= 4.2 && < 5,
-                  vector >= 0.6.0.2 && < 0.7,
+                  vector == 0.7.*,
                   roshask,
                   MySDL
   GHC-Options:    -Odph -no-hs-main
