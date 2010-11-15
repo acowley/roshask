@@ -79,4 +79,6 @@ Executable roshask
   Other-modules:  Ros.Core.Msg.Parse Ros.Core.Msg.Gen Ros.Core.Msg.Analysis 
                   Ros.Core.Msg.ResolutionTypes
                   Ros.Core.Build.Init Ros.Core.Build.SetupUtil
+                  Ros.Core.Msg.BinaryInstance Ros.Core.Msg.StorableInstance
+                  Ros.Core.Msg.FieldImports
   Hs-Source-Dirs: .

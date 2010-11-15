@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 -- |ROS message types.
 module Ros.Core.Msg.Types where
 import Data.ByteString (ByteString)
@@ -23,3 +24,8 @@ data Msg = Msg { shortName :: String
 instance Show Msg where
     show (Msg sn ln _ f c) = intercalate " " 
                              ["Msg", show sn, show ln, show f, show c]
+
+hasHeader :: Msg -> Bool
+hasHeader msg = case fields msg of
+                  ((_, RUserType "Header"):_) -> True
+                  _ -> False
