@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- |ROS message types.
 module Ros.Core.Msg.Types where
-import Data.ByteString (ByteString)
+import Data.ByteString.Char8 (ByteString)
 import Data.List (intercalate)
 
 -- |A variant type describing the types that may be included in a ROS

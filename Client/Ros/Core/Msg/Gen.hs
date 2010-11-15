@@ -5,12 +5,13 @@ import Control.Applicative ((<$>), (<*>))
 import Data.ByteString.Char8 (pack, ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Char (toUpper)
-import Ros.Core.Msg.Analysis (MsgInfo, SerialInfo(..), withMsg, isFlat, 
+import Ros.Core.Msg.Analysis (MsgInfo, SerialInfo(..), withMsg, 
                               getTypeInfo, liftIO)
 import Ros.Core.Msg.Types
 import Ros.Core.Msg.BinaryInstance
 import Ros.Core.Msg.FieldImports
 import Ros.Core.Msg.StorableInstance
+import Ros.Core.Msg.NFDataInstance
 
 generateMsgType :: ByteString -> [ByteString] -> Msg -> MsgInfo ByteString
 generateMsgType pkgPath pkgMsgs msg@(Msg name _ _ fields _) =
@@ -28,6 +29,7 @@ generateMsgType pkgPath pkgMsgs msg@(Msg name _ _ fields _) =
                        , dataLine, fieldSpecs, " } deriving P.Show\n\n"
                        , binInst, "\n\n"
                        , storableInstance
+                       , genNFDataInstance msg
                        , genHasHeader msg
                        , msgHash
                        , cons ]
@@ -39,7 +41,8 @@ generateMsgType pkgPath pkgMsgs msg@(Msg name _ _ fields _) =
                               "import Control.Applicative\n",
                               "import Ros.Core.RosBinary\n",
                               "import Ros.Core.Msg.MsgInfo\n",
-                              genImports pkgPath pkgMsgs (map snd fields)]
+                              genImports pkgPath pkgMsgs (map snd fields),
+                              nfImport]
           dataLine = B.concat ["\ndata ", tName, " = ", tName, " { "]
           fieldIndent = B.replicate (B.length dataLine - 3) ' '
           lineSep = B.concat ["\n", fieldIndent, ", "]
