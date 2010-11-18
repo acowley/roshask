@@ -11,6 +11,7 @@ import Control.Applicative ((<$>))
 import Control.Concurrent (newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (newTVarIO)
+import Control.DeepSeq (NFData, deepseq)
 import Control.Monad (when)
 import "monads-fd" Control.Monad.State (liftIO, get, put, execStateT)
 import "monads-fd" Control.Monad.Reader (ask, asks, runReaderT)
@@ -113,11 +114,11 @@ advertise :: (RosBinary a, MsgInfo a) => TopicName -> Stream a -> Node ()
 advertise = advertiseBuffered 1
 
 -- |Convert a 'Stream' of 'IO' actions to a 'Stream' of pure values.
-streamIO :: Stream (IO a) -> IO (Stream a)
+streamIO :: NFData a => Stream (IO a) -> IO (Stream a)
 streamIO (Cons x xs) = unsafeInterleaveIO $
                        do x' <- x
                           xs' <- streamIO xs
-                          return $ Cons x' xs'
+                          return . deepseq x' $ Cons x' xs'
 
 -- |Advertise a Topic publishing a 'Stream' of 'IO' values.
 advertiseIO :: (RosBinary a, MsgInfo a) => 
