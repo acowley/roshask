@@ -11,31 +11,45 @@ import System.FilePath (replaceExtension, splitFileName, splitPath, isRelative,
 import Ros.Core.Msg.Analysis (runAnalysis)
 import Ros.Core.Msg.Parse
 import Ros.Core.Msg.Gen
+import Ros.Core.Msg.MD5
 import Ros.Core.Msg.PkgBuilder (buildPkgMsgs)
 import Ros.Core.Build.DepFinder (findPackageDeps)
 import Ros.Core.Build.Init (initPkg)
 
-generate :: FilePath -> IO ()
+-- Ensure that the first character in a String is capitalized.
+cap :: String -> String
+cap s = toUpper (head s) : tail s
+
+-- Get a list of all messages defined in a directory.
+pkgMessages :: FilePath -> IO [FilePath]
+pkgMessages = fmap (map (cap . dropExtension) .
+                    filter ((== ".msg") . takeExtension)) .
+              getDirectoryContents
+
+generateAndSave :: FilePath -> IO ()
+generateAndSave fname = do msgType <- fst <$> generate fname
+                           fname' <- hsName
+                           B.writeFile fname' msgType
+  where hsName = do createDirectoryIfMissing True d'
+                    return $ d' </> f
+        (d,f) = splitFileName $ replaceExtension fname ".hs"
+        pkgName = cap . last . init . splitPath $ d
+        d' = d </> "haskell" </> "Ros" </> pkgName
+
+generate :: FilePath -> IO (B.ByteString, String)
 generate fname = 
     do r <- parseMsg fname
-       pkgMsgs <- map (cap . dropExtension) . 
-                  filter ((==".msg") . takeExtension) <$>
-                  getDirectoryContents (dropFileName fname)
+       pkgMsgs <- map B.pack <$> pkgMessages dir
        case r of
          Left err -> do putStrLn $ "ERROR: " ++ err
                         exitWith (ExitFailure (-2))
-         Right msg -> do fname' <- hsName
-                         let pkgMsgs' = map B.pack pkgMsgs
-                         msgType <- runAnalysis $
-                                    generateMsgType pkgHier pkgMsgs' msg
-                         B.writeFile fname' msgType
-    where hsName = do createDirectoryIfMissing True d'
-                      return $ d' </> f
-          (d,f) = splitFileName $ replaceExtension fname ".hs"
-          cap s = toUpper (head s) : tail s
-          pkgName = cap . last . init . splitPath $ d
-          pkgHier = B.pack $ "Ros." ++ init pkgName ++ "."
-          d' = d </> "haskell" </> "Ros" </> pkgName
+         Right msg -> runAnalysis $ 
+                      do hMsg <- generateMsgType pkgHier pkgMsgs msg
+                         md5 <- msgMD5 msg
+                         return (hMsg, md5)
+    where pkgHier = B.pack $ "Ros." ++ init pkgName ++ "."
+          dir = dropFileName fname
+          pkgName = cap . last . init . splitPath $ dir
 
 -- |Run "roshask gen" on all the .msg files in each of the given
 -- package directories.
@@ -64,7 +78,9 @@ help = [ "Usage: roshask command [[arguments]]"
 main :: IO ()
 main = do args <- getArgs
           case args of
-            ["gen",name] -> canonicalizeName name >>= generate
+            ["gen",name] -> canonicalizeName name >>= generateAndSave
+            ["md5",name] -> canonicalizeName name >>= 
+                            generate >>= putStrLn . snd
             ("create":pkgName:deps) -> initPkg pkgName deps
             ["dep"] -> getCurrentDirectory >>= findPackageDeps >>= buildDepMsgs
             ["dep",name] -> findPackageDeps name >>= buildDepMsgs

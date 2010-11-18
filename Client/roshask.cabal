@@ -34,13 +34,14 @@ Library
                        binary,
                        bytestring,
                        containers,
+                       deepseq == 1.1.*,
                        unix,
                        network == 2.2.1.*,
                        network-bytestring >= 0.1.2 && < 0.2,
                        Cabal >= 1.8 && < 1.9,
                        stm,
-                       mtl,
-                       monads-fd,
+                       mtl == 1.1.*,
+                       monads-fd == 0.1.*,
                        time == 1.1.*,
                        BoundedChan >= 1.0.0.2 && < 1.1,
                        parsec >= 3.1 && < 3.2,
@@ -74,12 +75,13 @@ Executable roshask
                   attoparsec > 0.8 && < 0.9,
                   directory > 1.0 && < 1.1,
                   process >= 1.0.1.2 && < 1.1,
-                  xml >= 1.3.5 && < 1.4
+                  xml >= 1.3.5 && < 1.4,
+                  nano-md5 == 0.1.*
 
   GHC-Options:    -Odph -Wall -fno-warn-name-shadowing
   Main-Is:        Ros/Core/Msg/Main.hs
   Other-modules:  Ros.Core.Msg.Parse Ros.Core.Msg.Gen Ros.Core.Msg.Analysis 
-                  Ros.Core.Msg.ResolutionTypes
+                  Ros.Core.Msg.ResolutionTypes Ros.Core.Msg.MD5
                   Ros.Core.Build.Init Ros.Core.Build.SetupUtil
                   Ros.Core.Msg.BinaryInstance Ros.Core.Msg.StorableInstance
                   Ros.Core.Msg.FieldImports Ros.Core.Msg.NFDataInstance

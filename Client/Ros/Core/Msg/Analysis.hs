@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, TupleSections, PackageImports #-}
-module Ros.Core.Msg.Analysis (MsgInfo, liftIO, getTypeInfo, withMsg, 
+module Ros.Core.Msg.Analysis (MsgInfo, liftIO, getTypeInfo, withMsg, getMsg,
                               runAnalysis, isFlat, SerialInfo(..)) where
 import Control.Applicative
 import Control.Arrow ((&&&))
@@ -14,6 +14,10 @@ import Ros.Core.Msg.Types
 import Ros.Core.Msg.Parse
 import Ros.Core.Msg.ResolutionTypes
 import Ros.Core.Build.DepFinder (findMessagesInPkg)
+
+-- Synonym for a Msg paired with its SerialInfo. This tuple is cached
+-- for message types as they are visited.
+type SerialMsg = (SerialInfo, Msg)
 
 -- Front-end to run analyses.
 runAnalysis :: MsgInfo a -> IO a
@@ -38,33 +42,33 @@ getPackage pkgName =
 
 -- Try to get a 'Msg' from a given package. The first argument is the
 -- package name, the second argument is the unqualified message name.
-getMsgFromPkg :: ByteString -> ByteString -> MsgInfo (Maybe SerialInfo)
+getMsgFromPkg :: ByteString -> ByteString -> MsgInfo (Maybe SerialMsg)
 getMsgFromPkg pkgName msgName = getPackage pkgName >>= lookupMsg . msgCache
-    where lookupMsg :: MsgCache -> MsgInfo (Maybe SerialInfo)
+    where lookupMsg :: MsgCache -> MsgInfo (Maybe SerialMsg)
           lookupMsg cache = maybe (return Nothing) 
                                   (return . Just <=< loadMsg)
                                   (M.lookup msgName cache)
-          loadMsg :: (Either FilePath SerialInfo) -> MsgInfo SerialInfo
+          loadMsg :: (Either FilePath SerialMsg) -> MsgInfo SerialMsg
           loadMsg (Left fp) = either error addMsg =<< liftIO (parseMsg fp)
           loadMsg (Right m) = return m
           msgCache (_,_,c)  = c
 
-getMsg :: ByteString -> MsgInfo SerialInfo
+getMsg :: ByteString -> MsgInfo SerialMsg
 getMsg msgName = check <$>
                  if B.null msgType
                  then getMsgFromPkg "roslib" msgName >>= checkLocal
                  else getMsgFromPkg msgPkg (B.tail msgType)
     where (msgPkg, msgType) = B.span (/= '/') msgName
-          check :: Maybe SerialInfo -> SerialInfo
+          check :: Maybe SerialMsg -> SerialMsg
           check Nothing = error $ "Couldn't resolve type " ++ unpack msgName
           check (Just m) = m
-          checkLocal :: Maybe SerialInfo -> MsgInfo (Maybe SerialInfo)
+          checkLocal :: Maybe SerialMsg -> MsgInfo (Maybe SerialMsg)
           checkLocal Nothing = do home <- homePkg <$> get
                                   getMsgFromPkg home msgName
           checkLocal info    = return info
 
 isFlat :: Msg -> MsgInfo Bool
-isFlat = fmap (all isStorable) . mapM (getTypeInfo . snd) . fields
+isFlat = fmap (all isStorable) . mapM (getTypeInfo . fieldType) . fields
 
 isStorable :: SerialInfo -> Bool
 isStorable = isJust . size
@@ -72,7 +76,7 @@ isStorable = isJust . size
 -- Add bindings for every MsgType referenced by this Msg to a Haskell
 -- type and serialization information for that type to a 'MsgInfo'
 -- context.
-addMsg :: Msg -> MsgInfo SerialInfo
+addMsg :: Msg -> MsgInfo SerialMsg
 addMsg msg = do oldHome <- homePkg <$> get
                 let pkgName = pack $ takeWhile (/= '/') (longName msg)
                     sName = pack $ shortName msg
@@ -80,9 +84,9 @@ addMsg msg = do oldHome <- homePkg <$> get
                 setHomePkg pkgName
                 flat <- isFlat msg
                 let ser = (if flat then defaultFlat else defaultNonFlat) $ tName
-                addParsedMsg pkgName sName ser
+                addParsedMsg pkgName sName ser msg
                 when (not (B.null oldHome)) (setHomePkg oldHome)
-                return ser
+                return (ser,msg)
 
 withMsg :: Msg -> MsgInfo a -> MsgInfo a
 withMsg msg action = do _ <- addMsg msg
@@ -141,7 +145,7 @@ addField t@(RFixedArray n el) =
                       return $ SerialInfo lst "putFixedList" "getFixedList"
                                           Nothing
        setTypeInfo t arr
-addField t@(RUserType n) = do userFlat <- isStorable <$> getMsg n
+addField t@(RUserType n) = do userFlat <- isStorable . fst <$> getMsg n
                               t' <- ros2Hask t
                               setTypeInfo t $ (if userFlat
                                                then defaultFlat

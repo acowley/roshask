@@ -7,7 +7,7 @@ import Data.Map (Map, insert, alter)
 
 import Ros.Core.Msg.Types
 
-type MsgCache = Map ByteString (Either FilePath SerialInfo)
+type MsgCache = Map ByteString (Either FilePath (SerialInfo, Msg))
 type TypeCache = Map MsgType SerialInfo
 type PkgCache = (FilePath, TypeCache, MsgCache)
 
@@ -56,8 +56,9 @@ alterPkgMap f = modify aux
 
 -- Add a binding from a message type string to a parsed 'Msg' value to
 -- a package's existing map.
-addParsedMsg :: ByteString -> ByteString -> SerialInfo -> MsgInfo ()
-addParsedMsg pkg msgType info = do ctxt <- get
-                                   let defs' = alter (fmap aux) pkg (msgDefs ctxt)
-                                   put $ ctxt { msgDefs = defs' }
-    where aux (p, tc, mc) = (p, tc, insert msgType (Right info) mc)
+addParsedMsg :: ByteString -> ByteString -> SerialInfo -> Msg -> MsgInfo ()
+addParsedMsg pkg msgType info msg = 
+  do ctxt <- get
+     let defs' = alter (fmap aux) pkg (msgDefs ctxt)
+     put $ ctxt { msgDefs = defs' }
+  where aux (p, tc, mc) = (p, tc, insert msgType (Right (info, msg)) mc)

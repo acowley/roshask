@@ -5,24 +5,25 @@ import Control.Applicative ((<$>), (<*>))
 import Data.ByteString.Char8 (pack, ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Char (toUpper)
-import Ros.Core.Msg.Analysis (MsgInfo, SerialInfo(..), withMsg, 
-                              getTypeInfo, liftIO)
+import Ros.Core.Msg.Analysis (MsgInfo, SerialInfo(..), withMsg, getTypeInfo)
 import Ros.Core.Msg.Types
 import Ros.Core.Msg.BinaryInstance
 import Ros.Core.Msg.FieldImports
 import Ros.Core.Msg.StorableInstance
 import Ros.Core.Msg.NFDataInstance
+import Ros.Core.Msg.MD5
 
 generateMsgType :: ByteString -> [ByteString] -> Msg -> MsgInfo ByteString
-generateMsgType pkgPath pkgMsgs msg@(Msg name _ _ fields _) =
+generateMsgType pkgPath pkgMsgs msg =
   do (fDecls, binInst, st, cons) <- withMsg msg $
-                                    (,,,) <$> mapM generateField fields
+                                    (,,,) <$> mapM generateField (fields msg)
                                           <*> genBinaryInstance msg
                                           <*> genStorableInstance msg
                                           <*> genConstants msg
      let fieldSpecs = B.intercalate lineSep fDecls
          (storableImport, storableInstance) = st
-     msgHash <- liftIO $ genHasHash msg
+     --msgHash <- liftIO $ genHasHash msg
+     msgHash <- genHasHash msg
      return $ B.concat [ modLine, "\n"
                        , imports
                        , storableImport
@@ -33,7 +34,8 @@ generateMsgType pkgPath pkgMsgs msg@(Msg name _ _ fields _) =
                        , genHasHeader msg
                        , msgHash
                        , cons ]
-    where tName = pack $ toUpper (head name) : tail name
+    where name = shortName msg
+          tName = pack $ toUpper (head name) : tail name
           modLine = B.concat ["{-# LANGUAGE OverloadedStrings #-}\n",
                               "module ", pkgPath, tName, " where"]
           imports = B.concat ["import qualified Prelude as P\n",
@@ -41,17 +43,18 @@ generateMsgType pkgPath pkgMsgs msg@(Msg name _ _ fields _) =
                               "import Control.Applicative\n",
                               "import Ros.Core.RosBinary\n",
                               "import Ros.Core.Msg.MsgInfo\n",
-                              genImports pkgPath pkgMsgs (map snd fields),
+                              genImports pkgPath pkgMsgs 
+                                         (map fieldType (fields msg)),
                               nfImport]
           dataLine = B.concat ["\ndata ", tName, " = ", tName, " { "]
           fieldIndent = B.replicate (B.length dataLine - 3) ' '
           lineSep = B.concat ["\n", fieldIndent, ", "]
 
 genHasHeader :: Msg -> ByteString
-genHasHeader m@(Msg name _ _ fields _) = 
+genHasHeader m = 
     if hasHeader m
-    then let hn = fst (head fields) -- The header field name
-         in B.concat ["instance HasHeader ", pack name, " where\n",
+    then let hn = fieldName (head (fields m)) -- The header field name
+         in B.concat ["instance HasHeader ", pack (shortName m), " where\n",
                       "  getSequence = Header.seq . ", hn, "\n",
                       "  getFrame = Header.frame_id . ", hn, "\n",
                       "  getStamp = Header.stamp . " , hn, "\n",
@@ -59,21 +62,20 @@ genHasHeader m@(Msg name _ _ fields _) =
                       " = (", hn, " x') { Header.seq = seq } }\n\n"]
     else ""
 
-genHasHash :: Msg -> IO ByteString
-genHasHash (Msg sname lname md5 _ _) = 
-    md5 >>= \md5 -> return $
-        B.concat ["instance MsgInfo ", pack sname,
-                  " where\n  sourceMD5 _ = \"", pack md5,
-                  "\"\n  msgTypeName _ = \"", pack lname,
-                  "\"\n"]
+genHasHash :: Msg -> MsgInfo ByteString
+genHasHash m = msgMD5 m >>= return . aux
+  where aux md5 = B.concat ["instance MsgInfo ", pack (shortName m),
+                            " where\n  sourceMD5 _ = \"", pack md5,
+                            "\"\n  msgTypeName _ = \"", pack (longName m),
+                            "\"\n"]
 
-generateField :: (ByteString, MsgType) -> MsgInfo ByteString
-generateField (name, t) = do t' <- hType <$> getTypeInfo t
-                             return $ B.concat [name, " :: ", t']
+generateField :: MsgField -> MsgInfo ByteString
+generateField (MsgField name t _) = do t' <- hType <$> getTypeInfo t
+                                       return $ B.concat [name, " :: ", t']
 
 genConstants :: Msg -> MsgInfo ByteString
 genConstants = fmap B.concat . mapM buildLine . constants
-    where buildLine (name, rosType, val) = 
+    where buildLine (MsgConst name rosType val _) = 
               do t <- hType <$> getTypeInfo rosType
                  return $ B.concat ["\n",name, " :: ", t, "\n", 
                                     name, " = ", val, "\n"]

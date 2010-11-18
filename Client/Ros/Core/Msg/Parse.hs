@@ -1,7 +1,8 @@
 {-# LANGUAGE OverloadedStrings, TupleSections #-}
-module Ros.Core.Msg.Parse (parseMsg) where
+module Ros.Core.Msg.Parse (parseMsg, simpleFieldAssoc) where
 import Prelude hiding (takeWhile)
 import Control.Applicative hiding (many)
+import Control.Arrow ((***), (&&&))
 import Data.Attoparsec.Char8
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (pack, unpack)
@@ -13,6 +14,15 @@ import System.Environment (getEnvironment)
 import System.FilePath (dropExtension, takeFileName, splitDirectories, (</>))
 import System.Process (readProcess)
 import Ros.Core.Msg.Types
+
+simpleFieldTypes :: [MsgType]
+simpleFieldTypes = [ RBool, RInt8, RUInt8, RInt16, RUInt16, RInt32, RUInt32, 
+                     RInt64, RUInt64, RFloat32, RFloat64, RString, 
+                     RTime, RDuration ]
+
+simpleFieldAssoc :: [(MsgType, ByteString)]
+simpleFieldAssoc = map (id &&& B.pack . map toLower . tail . show) 
+                       simpleFieldTypes
 
 eatLine :: Parser ()
 eatLine = manyTill anyChar (eitherP endOfLine endOfInput) *> skipSpace
@@ -30,25 +40,17 @@ parseInt = foldl' (\s x -> s*10 + digitToInt x) 0 <$> many1 digit
 comment :: Parser [()]
 comment = many $ skipSpace *> try (char '#' *> eatLine)
 
-typeString :: MsgType -> Parser ByteString
-typeString = string . pack . map toLower . tail . show
+simpleParser :: (MsgType, ByteString) -> Parser (ByteString, MsgType)
+simpleParser (t,b) = (, t) <$> (string b *> space *> parseName)
 
-simpleFieldTypes :: [MsgType]
-simpleFieldTypes = [ RBool, RInt8, RUInt8, RInt16, RUInt16, RInt32, RUInt32, 
-                     RInt64, RUInt64, RFloat32, RFloat64, RString, 
-                     RTime, RDuration ]
+fixedArrayParser :: (MsgType, ByteString) -> Parser (ByteString, MsgType)
+fixedArrayParser (t,b) = (\len name -> (name, RFixedArray len t)) <$>
+                         (string b *> char '[' *> parseInt <* char ']') <*> 
+                         (space *> parseName)
 
-simpleParser :: MsgType -> Parser (ByteString, MsgType)
-simpleParser x = (, x) <$> (typeString x *> space *> parseName)
-
-fixedArrayParser :: MsgType -> Parser (ByteString, MsgType)
-fixedArrayParser x = (\len name -> (name, RFixedArray len x)) <$>
-                     (typeString x *> char '[' *> parseInt <* char ']') <*> 
-                     (space *> parseName)
-
-varArrayParser :: MsgType -> Parser (ByteString, MsgType)
-varArrayParser x = (, RVarArray x) <$> 
-                   (typeString x *> string "[]" *> space *> parseName)
+varArrayParser :: (MsgType, ByteString) -> Parser (ByteString, MsgType)
+varArrayParser (t,b) = (, RVarArray t) <$> 
+                       (string b *> string "[]" *> space *> parseName)
 
 userTypeParser :: Parser (ByteString, MsgType)
 userTypeParser = choice [userSimple, userVarArray, userFixedArray]
@@ -97,8 +99,7 @@ constParser s x = (,x,) <$>
 constParsers :: [Parser (ByteString, MsgType, ByteString)]
 constParsers = map (uncurry constParser) $
                [("byte", RUInt8), ("char", RInt8)] ++
-               zip typeNames simpleFieldTypes
-    where typeNames = map (pack . map toLower . tail . show) simpleFieldTypes
+               (map (\(x,y) -> (y,x)) simpleFieldAssoc)
 
 -- String constants are parsed somewhat differently from numeric
 -- constants. For numerical constants, we drop comments and trailing
@@ -110,21 +111,26 @@ sanitizeConstants (name, RString, val) =
 sanitizeConstants (name, t, val) = 
     (name, t, B.takeWhile (\c -> c /= '#' && not (isSpace c)) val)
 
+-- Parsers fields and constants.
 fieldParsers :: [Parser (Either (ByteString, MsgType) 
                                 (ByteString, MsgType, ByteString))]
 fieldParsers = map (comment *>) $
                map (Right . sanitizeConstants <$>) constParsers ++ 
                map (Left <$>) (deprecated ++ builtIns ++ [userTypeParser])
-    where builtIns = concatMap (flip map simpleFieldTypes)
+    where builtIns = concatMap (flip map simpleFieldAssoc)
                                [simpleParser, fixedArrayParser, varArrayParser]
--- fieldParsers = deprecated ++ builtIns ++ [comment *> userTypeParser]
---     where builtIns = concatMap (\f -> map ((comment *>) . f) simpleFieldTypes)
---                                [simpleParser, fixedArrayParser, varArrayParser]
 
-mkParser :: String -> String -> Parser Msg
-mkParser sname lname = uncurry (Msg sname lname (return "")) . 
-                       partitionEithers <$> 
-                       many (choice fieldParsers)
+mkParser :: String -> String -> ByteString -> Parser Msg
+mkParser sname lname txt = uncurry (Msg sname lname txt) . 
+                           (map buildField *** map buildConst) .
+                           partitionEithers <$> 
+                           many (choice fieldParsers)
+
+buildField :: (ByteString, MsgType) -> MsgField
+buildField (name,typ) = MsgField (sanitize name) typ name
+
+buildConst :: (ByteString, MsgType, ByteString) -> MsgConst
+buildConst (name,typ,val) = MsgConst (sanitize name) typ val name
 
 {-
 testMsg :: ByteString
@@ -134,25 +140,23 @@ test :: Result Msg
 test = feed (parse (mkParser "" "") testMsg) ""
 -}
 
--- Ensure that field names do not coincide with Haskell reserved words.
-sanitize :: Msg -> Msg
-sanitize msg = msg { fields = map (first sanitizeField) (fields msg)
-                   , constants = map (fiirst sanitizeField) (constants msg) }
-    where sanitizeField "data"   = "_data"
-          sanitizeField "type"   = "_type"
-          sanitizeField "class"  = "_class"
-          sanitizeField "module" = "_module"
-          sanitizeField x        = B.cons (toLower (B.head x)) (B.tail x)
-          first f (x, y) = (f x, y)
-          fiirst f (x, y, z) = (f x, y, z)
-
-addHash :: IO String -> Msg -> Msg
-addHash hash msg = msg { md5sum = hash }
+-- Ensure that field and constant names are valid Haskell identifiers
+-- and do not coincide with Haskell reserved words.
+sanitize :: ByteString -> ByteString
+sanitize "data" = "_data"
+sanitize "type" = "_type"
+sanitize "class" = "_class"
+sanitize "module" = "_module"
+sanitize x = B.cons (toLower (B.head x)) (B.tail x)
 
 genName :: FilePath -> String
 genName f = let parts = splitDirectories f
                 [pkg,_,msgFile] = drop (length parts - 3) parts
             in pkg ++ "/" ++ dropExtension msgFile
+
+{-
+addHash :: IO String -> Msg -> Msg
+addHash hash msg = msg { md5sum = hash }
 
 -- Use roslib/scripts/gendeps to compute the MD5 ROS uses to uniquely
 -- identify versions of msg files.
@@ -164,18 +168,17 @@ genRosMD5 fname =
                         Nothing -> error "Environment variable ROS_ROOT not set"
            gendeps = ros_root</>"core"</>"roslib"</>"scripts"</>"gendeps"
        init <$> readProcess gendeps ["-m", fname] "" 
+-}
 
 parseMsg :: FilePath -> IO (Either String Msg)
 parseMsg fname = do msgFile <- B.readFile fname
-                    let --hash = pack . show . md5 . BL.fromChunks $ [msgFile]
-                        shortName = dropExtension . takeFileName $ fname
+                    let shortName = dropExtension . takeFileName $ fname
                         longName = genName fname
-                        parser = mkParser shortName longName
-                    let hash = genRosMD5 fname
+                        parser = mkParser shortName longName msgFile
+                    -- let hash = genRosMD5 fname
                     case feed (parse parser msgFile) "" of
                       Done leftOver msg
-                          | B.null leftOver -> return . Right . 
-                                               addHash hash . sanitize $ 
+                          | B.null leftOver -> return . Right $ -- . addHash hash $ 
                                                msg
                           | otherwise -> return $ Left $ "Couldn't parse " ++ 
                                                          unpack leftOver

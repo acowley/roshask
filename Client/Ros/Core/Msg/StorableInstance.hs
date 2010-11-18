@@ -14,7 +14,8 @@ genStorableInstance msg = isFlat msg >>= aux
           aux True = do sz <- totalSize msg
                         return (smImp, stInst sz)
           peekFields = map (const "SM.peek") (fields msg)
-          pokeFields = map (\(n,_) -> B.concat ["SM.poke (", n, " obj')"]) 
+          pokeFields = map ((\n -> B.concat ["SM.poke (", n, " obj')"]) . 
+                            fieldName)
                            (fields msg)
           name = pack (shortName msg)
           stInst sz = B.concat ["instance Storable ", name, " where\n",
@@ -31,7 +32,7 @@ genStorableInstance msg = isFlat msg >>= aux
                            , " as SM\n" ]
 
 totalSize :: Msg -> MsgInfo ByteString
-totalSize msg = B.intercalate sep `fmap` mapM (aux . snd) (fields msg)
+totalSize msg = B.intercalate sep `fmap` mapM (aux . fieldType) (fields msg)
     where aux = getTypeInfo >=> return . fromJust . size
           sep = B.append " +\n" $ B.replicate 13 ' '
 

@@ -13,13 +13,25 @@ data MsgType = RBool | RInt8 | RUInt8 | RInt16 | RUInt16
              | RUserType ByteString
                deriving (Show, Eq, Ord)
 
+data MsgField = MsgField { fieldName    :: ByteString
+                         , fieldType    :: MsgType
+                         , rawFieldName :: ByteString }
+                deriving Show
+
+data MsgConst = MsgConst { constName    :: ByteString
+                         , constType    :: MsgType
+                         , rawValue     :: ByteString 
+                         , rawConstName :: ByteString }
+                deriving Show
+
 -- |A message has a short name, a long name, an md5 sum, and a list of
 -- named, typed fields.
 data Msg = Msg { shortName :: String
                , longName  :: String
-               , md5sum    :: IO String
-               , fields    :: [(ByteString, MsgType)]
-               , constants :: [(ByteString, MsgType, ByteString)] }
+               --, md5sum    :: IO String
+               , txt       :: ByteString
+               , fields    :: [MsgField]
+               , constants :: [MsgConst] }
 
 instance Show Msg where
     show (Msg sn ln _ f c) = intercalate " " 
@@ -27,5 +39,6 @@ instance Show Msg where
 
 hasHeader :: Msg -> Bool
 hasHeader msg = case fields msg of
-                  ((_, RUserType "Header"):_) -> True
+                  --((_, RUserType "Header"):_) -> True
+                  (MsgField _ (RUserType "Header") _ : _) -> True
                   _ -> False

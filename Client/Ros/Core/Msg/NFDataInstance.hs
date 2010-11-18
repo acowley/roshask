@@ -13,9 +13,10 @@ genNFDataInstance msg =
   B.concat[ "instance D.NFData ", name, " where\n"
           , "  rnf = "
           , B.intercalate " `seqAp` " 
-                          (map (\n -> B.append "D.rnf . " n) fieldNames)
+                          (map (\n -> B.concat ["(D.rnf . ", n, ")"]) 
+                               fieldNames)
           , "\n"
           , "    where seqAp f g = (\\x y -> x `P.seq` y `P.seq` ()) <$> f <*> g\n\n"
           ]
     where name = B.pack (shortName msg)
-          fieldNames = map fst (fields msg)
+          fieldNames = map fieldName (fields msg)

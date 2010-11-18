@@ -7,6 +7,7 @@
 -- common scenario of same-machine transport.
 module Ros.Core.RosBinary where
 import Control.Applicative ((<$>), (<*>))
+import Control.DeepSeq
 import Control.Monad (replicateM)
 import Data.Binary.Get
 import Data.Binary.Put
@@ -134,3 +135,6 @@ getFixed n = bytesToVector n <$> getByteString (n*(sizeOf (undefined::a)))
 
 putFixed :: (Storable a, RosBinary a) => V.Vector a -> Put
 putFixed = putByteString . vectorToBytes
+
+instance (Storable a, NFData a) => NFData (V.Vector a) where
+  rnf v = V.length v `seq` ()
