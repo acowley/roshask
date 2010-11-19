@@ -8,7 +8,9 @@
 -- using either qualification (e.g. @import qualified Ros.TopicUtil as
 -- T@) or the @hiding@ clause.
 module Ros.TopicUtil where
+import Prelude hiding (filter)
 import Control.Applicative
+import Control.Arrow ((***))
 import Control.Concurrent
 import Control.Monad ((<=<))
 import "monads-fd" Control.Monad.Trans
@@ -76,6 +78,21 @@ break p = go []
         check acc (x,t)
           | p x = go (x:acc) t
           | otherwise = return (reverse (x:acc), t)
+
+-- |@splitAt n t@ returns a tuple whose first element is the prefix of
+-- @t@ of length @n@, and whose second element is the remainder of the
+-- 'Topic'.
+splitAt :: Monad m => Int -> Topic m a -> m ([a], Topic m a)
+splitAt n = go n []
+  where go 0 acc t = return (reverse acc, t)
+        go n acc t = do (x,t') <- runTopic t
+                        go (n-1) (x:acc) t'
+
+-- |Splits a 'Topic' into two 'Topic's: the elements of the first
+-- 'Topic' all satisfy the given predicate, while none of the elements
+-- of the second 'Topic' do.
+partition :: (a -> Bool) -> Topic IO a -> IO (Topic IO a, Topic IO a)
+partition p = fmap (filter p *** filter (not . p)) . tee
 
 -- |Removes one level of monadic structure, projecting the values
 -- produced by a 'Topic' into the monad encapsulating each step the
