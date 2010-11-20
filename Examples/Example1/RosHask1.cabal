@@ -22,7 +22,6 @@ Build-type:          Custom
 -- Extra-source-files:  
 Executable RosHask1
   Build-Depends:  base >= 4.2 && < 6,
-                  deepseq == 1.1.*,
                   roshask
 
   GHC-Options:    -Odph

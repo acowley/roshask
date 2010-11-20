@@ -10,7 +10,7 @@ import Ros.Core.Msg.Types
 import Ros.Core.Msg.BinaryInstance
 import Ros.Core.Msg.FieldImports
 import Ros.Core.Msg.StorableInstance
-import Ros.Core.Msg.NFDataInstance
+--import Ros.Core.Msg.NFDataInstance
 import Ros.Core.Msg.MD5
 
 generateMsgType :: ByteString -> [ByteString] -> Msg -> MsgInfo ByteString
@@ -30,7 +30,7 @@ generateMsgType pkgPath pkgMsgs msg =
                        , dataLine, fieldSpecs, " } deriving P.Show\n\n"
                        , binInst, "\n\n"
                        , storableInstance
-                       , genNFDataInstance msg
+                       --, genNFDataInstance msg
                        , genHasHeader msg
                        , msgHash
                        , cons ]
@@ -44,8 +44,8 @@ generateMsgType pkgPath pkgMsgs msg =
                               "import Ros.Core.RosBinary\n",
                               "import Ros.Core.Msg.MsgInfo\n",
                               genImports pkgPath pkgMsgs 
-                                         (map fieldType (fields msg)),
-                              nfImport]
+                                         (map fieldType (fields msg))]
+                              --nfImport]
           dataLine = B.concat ["\ndata ", tName, " = ", tName, " { "]
           fieldIndent = B.replicate (B.length dataLine - 3) ' '
           lineSep = B.concat ["\n", fieldIndent, ", "]

@@ -1,120 +1,13 @@
-{-# LANGUAGE PackageImports #-}
--- |Utility functions for working with 'Topic's. These functions
--- present familiar operations on list-like data structures, as well
--- as combinators for fusing two 'Topic's in various ways.
--- 
--- /Note/: Many of these operations have the same names as similar
--- operations on lists in the "Prelude". The ambiguity may be resolved
--- using either qualification (e.g. @import qualified Ros.TopicUtil as
--- T@) or the @hiding@ clause.
+-- |Utility functions for working with 'Topic's. These functions are
+-- primarily combinators for fusing two 'Topic's in various ways.
 module Ros.TopicUtil where
-import Prelude hiding (filter)
+import Prelude hiding (dropWhile, filter, splitAt)
 import Control.Applicative
 import Control.Arrow ((***))
 import Control.Concurrent
 import Control.Monad ((<=<))
-import "monads-fd" Control.Monad.Trans
+import qualified Data.Foldable as F
 import Ros.Topic
-
--- |Return the first value produced by a 'Topic'.
-head :: Functor m => Topic m a -> m a
-head = fmap fst . runTopic
-
--- |Returns a 'Topic' containing all the values from the given 'Topic'
--- after the first.
-tail :: Monad m => Topic m a -> Topic m a
-tail = Topic . (runTopic . snd <=< runTopic)
-
--- |Returns a 'Topic' containing only those elements of the supplied
--- 'Topic' for which the given predicate returns 'True'.
-filter :: Monad m => (a -> Bool) -> Topic m a -> Topic m a
-filter p = go 
-  where go = Topic . (aux <=< runTopic)
-        aux (x, t') | p x       = return (x, go t')
-                    | otherwise = runTopic $ go t'
-
--- |@take n t@ returns the prefix of @t@ of length @n@.
-take :: Monad m => Int -> Topic m a -> m [a]
-take n t = aux n t []
-  where aux 0 _ acc = return (reverse acc)
-        aux n t acc = do (x, t') <- runTopic t
-                         aux (n-1) t' (x:acc)
-
--- |Run a 'Topic' for the specified number of iterations, discarding
--- the values it produces.
-take_ :: Monad m => Int -> Topic m a -> m ()
-take_ 0 = const $ return ()
-take_ n = take_ (n-1) . snd <=< runTopic
-
--- |@drop n t@ returns the suffix of @t@ after the first @n@ elements.
-drop :: Monad m => Int -> Topic m a -> Topic m a
-drop n = Topic . aux n
-  where aux 0 = runTopic
-        aux n = aux (n-1) . snd <=< runTopic
-
--- |@dropWhile p t@ returns the suffix of @t@ after all elements
--- satisfying predicate @p@ have been dropped.
-dropWhile :: Monad m => (a -> Bool) -> Topic m a -> Topic m a
-dropWhile p = Topic . go
-  where go = check <=< runTopic
-        check (x,t) | p x       = go t
-                    | otherwise = runTopic t
-
--- |@takeWhile p t@ returns the longest prefix (possibly empty) of @t@
--- all of whose elements satisfy the predicate @p@.
-takeWhile :: Monad m => (a -> Bool) -> Topic m a -> m [a]
-takeWhile p = go []
-  where go acc t = do (x,t') <- runTopic t
-                      if p x then go (x:acc) t' 
-                             else return . reverse $ x:acc
-
--- |@break p t@ returns a tuple whose first element is the longest
--- prefix (possibly empty) of @t@ all of whose elements satisfy the
--- predicate @p@, and whose second element is the remainder of the
--- 'Topic'.
-break :: Monad m => (a -> Bool) -> Topic m a -> m ([a], Topic m a)
-break p = go []
-  where go acc = check acc <=< runTopic
-        check acc (x,t)
-          | p x = go (x:acc) t
-          | otherwise = return (reverse (x:acc), t)
-
--- |@splitAt n t@ returns a tuple whose first element is the prefix of
--- @t@ of length @n@, and whose second element is the remainder of the
--- 'Topic'.
-splitAt :: Monad m => Int -> Topic m a -> m ([a], Topic m a)
-splitAt n = go n []
-  where go 0 acc t = return (reverse acc, t)
-        go n acc t = do (x,t') <- runTopic t
-                        go (n-1) (x:acc) t'
-
--- |Splits a 'Topic' into two 'Topic's: the elements of the first
--- 'Topic' all satisfy the given predicate, while none of the elements
--- of the second 'Topic' do.
-partition :: (a -> Bool) -> Topic IO a -> IO (Topic IO a, Topic IO a)
-partition p = fmap (filter p *** filter (not . p)) . tee
-
--- |Removes one level of monadic structure, projecting the values
--- produced by a 'Topic' into the monad encapsulating each step the
--- 'Topic' takes.
-join :: (Functor m, Monad m) => Topic m (m a) -> Topic m a
-join t = Topic $ do (x, t') <- runTopic t
-                    x' <- x
-                    return (x', join t')
-
--- |@forever t@ runs all monadic actions a 'Topic' produces. This is
--- useful for 'Topic's whose steps produce side-effects, but not
--- useful pure values.
-forever :: Monad m => Topic m a -> m b
-forever = forever . snd <=< runTopic
-
--- |Returns a 'Topic' whose values are consecutive values from the
--- original 'Topic'.
-consecutive :: Monad m => Topic m a -> Topic m (a,a)
-consecutive t = Topic $ do (x, t') <- runTopic t
-                           runTopic $ go x t'
-  where go x t' = Topic$ do (y, t'') <- runTopic t'
-                            return ((x,y), go y t'')
 
 -- |Tee a 'Topic' into two duplicate 'Topic's. Each returned 'Topic'
 -- will receive all the values of the original 'Topic', while any
@@ -129,13 +22,19 @@ tee t = do c1 <- newChan
                 (\x -> writeChan c1 x >> writeChan c2 x) <$> t
            return (Topic $ feed c1, Topic $ feed c2)
 
--- |Apply the given function to a value from each 'Topic' in
--- lockstep. This means that the function advances down the two
--- 'Topic's without dropping any elements at the rate of the slower
--- input 'Topic'.
-inStep :: (Applicative m, Monad m) => 
-          (a -> b -> c) -> Topic m a -> Topic m b -> Topic m c
-inStep f s1 s2 = f <$> s1 <*> s2
+-- |Splits a 'Topic' into two 'Topic's: the elements of the first
+-- 'Topic' all satisfy the given predicate, while none of the elements
+-- of the second 'Topic' do.
+partition :: (a -> Bool) -> Topic IO a -> IO (Topic IO a, Topic IO a)
+partition p = fmap (filter p *** filter (not . p)) . tee
+
+-- |Returns a 'Topic' whose values are consecutive values from the
+-- original 'Topic'.
+consecutive :: Monad m => Topic m a -> Topic m (a,a)
+consecutive t = Topic $ do (x, t') <- runTopic t
+                           runTopic $ go x t'
+  where go x t' = Topic$ do (y, t'') <- runTopic t'
+                            return ((x,y), go y t'')
 
 -- |Interleave two 'Topic's. Items from each component 'Topic' will be
 -- tagged with an 'Either' constructor and added to the combined
@@ -152,7 +51,6 @@ inStep f s1 s2 = f <$> s1 <*> s2
                          aux
 infixl 7 <+>
 
-
 -- |Returns a 'Topic' that produces a new pair every time either of
 -- the component 'Topic's produces a new value. The value of the
 -- other element of the pair will be the newest available value. The
@@ -162,6 +60,7 @@ infixl 7 <+>
 everyNew :: Topic IO a -> Topic IO b -> Topic IO (a,b)
 everyNew t1 t2 = Topic $ warmup =<< runTopic (t1 <+> t2)
   where warmup (Left x, t)     = warmupR x =<< runTopic t
+        warmup (Right y, t)    = warmupL y =<< runTopic t
         warmupR _ (Left x, t)  = warmupR x =<< runTopic t
         warmupR x (Right y, t) = return ((x,y), Topic $ runTopic t >>= go x y)
         warmupL _ (Right y, t) = warmupL y =<< runTopic t
@@ -191,9 +90,116 @@ merge t1 t2 = either id id <$> t1 <+> t2
 finiteDifference :: (Functor m, Monad m) => (a -> a -> b) -> Topic m a -> Topic m b
 finiteDifference f = fmap (uncurry f) . consecutive
 
--- |Print all the values produced by a 'Topic'.
-showTopic :: (MonadIO m, Functor m, Show a) => Topic m a -> Topic m ()
-showTopic = join . fmap (liftIO . putStrLn . show)
+-- |Compute a running \"average\" of a 'Stream' using a user-provided
+-- normalization function applied to the sum of products. The
+-- arguments are a constat @alpha@ that is used to scale the current
+-- average, a constant @invAlpha@ used to scale the newest value, a
+-- function for adding two scaled values, a function for scaling
+-- input values, a function for normalizing the sum of scaled values,
+-- and finally the stream to average. Parameterizing over all the
+-- arithmetic to this extent allows for the use of denormalizing
+-- scaling factors, as might be used to keep all arithmetic
+-- integral. An example would be scaling the average by the integer
+-- 7, the new value by the integer 1, then normalizing by dividing
+-- the sum of scaled values by 8.
+weightedMeanNormalized :: Monad m =>
+                          n -> n -> (b -> b -> c) -> (n -> a -> b) -> 
+                          (c -> a) -> Topic m a -> Topic m a
+weightedMeanNormalized alpha invAlpha plus scale normalize = Topic . warmup
+    where warmup = uncurry go <=< runTopic
+          go avg t = do (x,t') <- runTopic t
+                        let !avg' = normalize $ plus (scale alpha avg) 
+                                                     (scale invAlpha x)
+                        return (avg', Topic $ go avg' t')
+{-# INLINE weightedMeanNormalized #-}
+
+-- |Perform numerical integration of a 'Stream' using Simpson's rule
+-- applied at three consecutive points. This requires a function for
+-- adding values from the 'Stream', and a function for scaling values
+-- by a fractional number.
+simpsonsRule :: (Monad m, Fractional n) => 
+                (a -> a -> a) -> (n -> a -> a) -> Topic m a -> Topic m a
+simpsonsRule plus scale t = Topic $ do ([x,y], t') <- splitAt 2 t
+                                       go x y t'
+  where go x y t = do (z,t') <- runTopic t
+                      return (simpson x y z, Topic $ go y z t')
+        simpson a mid b = scale c $ plus (plus a (scale 4 mid)) b
+        c = 1 / 6
+    -- where go stream = Cons (simpson (S.take 3 stream)) (go (S.tail stream))
+    --       c = 1 / 6
+    --       simpson [a,mid,b] = scale c $ plus (plus a (scale 4 mid)) b
+    --       simpson _ = error "Impossible pattern in simpson"
+{-# INLINE simpsonsRule #-}
+
+-- |Compute a running \"average\" of a 'Stream' by summing the product
+-- of @alpha@ and the current average with the product of @1 - alpha@
+-- and the newest value. The first parameter is the constant @alpha@,
+-- the second is an addition function, the third a scaling function,
+-- and the fourth the input 'Stream'.
+weightedMean :: (Monad m, Num n) => 
+                n -> (a -> a -> a) -> (n -> a -> a) -> Topic m a -> Topic m a
+weightedMean alpha plus scale = weightedMean2 alpha (1 - alpha) plus scale
+{-# INLINE weightedMean #-}
+
+-- |Compute a running \"average\" of a 'Stream' by summing the product
+-- of @alpha@ and the current average with the product of @invAlpha@
+-- and the newest value. The first parameter is the constant @alpha@,
+-- the second is the constant @invAlpha@, the third is an addition
+-- function, the fourth a scaling function, and the fifth the input
+-- 'Stream'.
+weightedMean2 :: Monad m =>
+                 n -> n -> (a -> a -> a) -> (n -> a -> a) -> Topic m a -> Topic m a
+weightedMean2 alpha invAlpha plus scale = Topic . warmup
+    where warmup = uncurry go <=< runTopic
+          go avg t = do (x, t') <- runTopic t
+                        let !savg = scale alpha avg
+                            !sx = scale invAlpha x
+                            !avg' = plus savg sx
+                        return (avg', Topic $ go avg' t')
+{-# INLINE weightedMean2 #-}
+
+-- |Use a 'Topic' of functions to filter a 'Topic' of values. Each
+-- function is applied to the second 'Topic' until it returns
+-- 'True'. At that point, 'filterBy' produces the accepted value of
+-- the second 'Topic' and moves on to the next function which is
+-- applied to the rest of the second 'Stream'.
+filterBy :: Monad m => Topic m (a -> Bool) -> Topic m a -> Topic m a
+filterBy tf tx = Topic $ do (f, tf') <- runTopic tf
+                            (x, tx') <- uncons $ dropWhile (not . f) tx
+                            return (x, filterBy tf' tx')
+
+-- |Produce elements of the first 'Topic' no faster than elements of
+-- the second 'Topic' are produced.
+gate :: (Applicative m, Monad m) => Topic m a -> Topic m b -> Topic m a
+gate t1 t2 = const <$> t1 <*> t2
+
+-- |Flatten a 'Topic' of 'F.Foldable' values. For example, turn a
+-- @Topic m [a]@ of finite lists into a @Topic a@ by taking each
+-- element from each list in sequence.
+concats :: (Monad m, F.Foldable f) => Topic m (f a) -> Topic m a
+concats t = Topic $ do (x, t') <- runTopic t
+                       F.foldr (\x z -> return (x, Topic z)) 
+                               (runTopic $ concats t') 
+                               x
+
+-- |Flatten a 'Topic' of 'F.Foldable' values such that old values are
+-- discarded as soon as the original 'Topic' produces a new
+-- 'F.Foldable'.
+interruptible :: F.Foldable t => Topic IO (t a) -> Topic IO a
+interruptible s = Topic $
+    do feeder <- newEmptyMVar         -- Active feeder thread
+       latestItem <- newEmptyMVar     -- Next available item
+       let feedItems ys = do ft <- tryTakeMVar feeder
+                             maybe (return ()) killThread ft
+                             t <- forkIO $ F.traverse_ (putMVar latestItem) ys
+                             putMVar feeder t 
+           watchForItems t = do (x,t') <- runTopic t
+                                feedItems x 
+                                watchForItems t'
+           getAll = do x <- takeMVar latestItem
+                       return (x, Topic getAll)
+       _ <- forkIO $ watchForItems s
+       getAll
 
 {-
 nats :: Topic IO Int

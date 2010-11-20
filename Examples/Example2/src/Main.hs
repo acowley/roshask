@@ -6,11 +6,11 @@ import Ros.Node
 wait n = threadDelay (1000000 * n)
 
 publish = go 1
-    where go n = Cons (wait 3 >> return (S.String (show n ++ " HA HA HA")))
-                      (go (n+1))
+    where go n = Topic $ wait 3 >> 
+                         return (S.String (show n ++ " HA HA HA"), go (n+1))
 
-handle (Cons m ms) = putStrLn ("roskell got "++S._data m) >> handle ms
+handle msg = putStrLn ("roskell got "++S._data msg)
 
-main = runNode "/roskell" $ do advertiseIO "/MyMessage" publish
+main = runNode "/roskell" $ do advertise "/MyMessage" publish
                                chat <- subscribe "/chat"
-                               runHandler (handle chat)
+                               runHandler handle chat

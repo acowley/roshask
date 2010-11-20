@@ -1,11 +1,11 @@
-{-# LANGUAGE PackageImports #-}
+{-# LANGUAGE CPP #-}
 module Ros.SlaveAPI (RosSlave(..), runSlave, requestTopicClient, 
                      cleanupNode) where
 import Control.Applicative
 import Control.Concurrent (killThread, forkIO, threadDelay, MVar, putMVar,
                            isEmptyMVar, readMVar, modifyMVar_)
 import Control.Concurrent.QSem
-import "monads-fd" Control.Monad.Trans (liftIO)
+import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.UTF8 as BU
 import qualified Data.ByteString.Lazy.UTF8 as BLU
 import Snap.Http.Server (httpServe)
@@ -15,7 +15,9 @@ import qualified Network.Socket as Net
 import Network.XmlRpc.Internals (Value)
 import Network.XmlRpc.Server (handleCall, methods, fun)
 import Network.XmlRpc.Client (remote)
+#ifndef mingw32_HOST_OS
 import System.Posix.Process (getProcessID)
+#endif
 import System.Process (readProcess)
 import Ros.Util.XmlRpcTuples ()
 import Ros.Core.RosTypes
@@ -32,6 +34,11 @@ class RosSlave a where
     getTopicPortTCP :: a -> TopicName -> Maybe Int
     setShutdownAction :: a -> IO () -> IO ()
     stopNode :: a -> IO ()
+
+#ifdef mingw32_HOST_OS
+getProcessID :: IO Int
+getProcessID = return 42
+#endif
 
 -- |Unregister all of a node's publishers and subscribers, then stop
 -- the node's servers.

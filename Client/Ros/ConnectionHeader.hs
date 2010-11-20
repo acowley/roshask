@@ -9,9 +9,6 @@ import Data.Binary.Get (getWord32le, Get, getLazyByteString, runGetState)
 import Data.Binary.Put (runPut, putWord32le)
 import Data.ByteString.Lazy.Char8 (ByteString, pack, unpack)
 import qualified Data.ByteString.Lazy.Char8 as B
-import Data.Word (Word32)
-import Unsafe.Coerce (unsafeCoerce)
---import Ros.BinaryIter (BinaryIter(..), Iter(..))
 
 -- |Wrapper for the Connection Header type that is a list of key-value
 -- pairs.
@@ -25,17 +22,14 @@ genHeader = tagLength .
             map (tagLength . uncurry B.append . 
                  second (B.cons '=') . (pack *** pack))
 
-toWord32 :: Integral a => a -> Word32
-toWord32 x = unsafeCoerce (fromIntegral x :: Int)
-
 -- Prefix a ByteString with its length encoded as a 4-byte little
 -- endian integer.
 tagLength :: ByteString -> ByteString
-tagLength x = let len = runPut $ putWord32le (toWord32 (B.length x))
+tagLength x = let len = runPut $ putWord32le (fromIntegral (B.length x))
               in B.append len x
 
 getInt :: Get Int
-getInt = unsafeCoerce <$> getWord32le
+getInt = fromIntegral <$> getWord32le
 
 -- Each entry in the header is a 4-byte little endian integer denoting
 -- the length of the entry, the field name string, an equals sign, and

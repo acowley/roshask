@@ -1,9 +1,9 @@
-{-# LANGUAGE OverloadedStrings, TupleSections, PackageImports #-}
+{-# LANGUAGE OverloadedStrings, TupleSections #-}
 module Ros.Core.Msg.Analysis (MsgInfo, liftIO, getTypeInfo, withMsg, getMsg,
                               runAnalysis, isFlat, SerialInfo(..)) where
 import Control.Applicative
 import Control.Arrow ((&&&))
-import "monads-fd" Control.Monad.State
+import Control.Monad.State
 import Data.ByteString.Char8 (pack, unpack, ByteString)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as M

@@ -1,5 +1,7 @@
 module Main (main) where
 import Ros.Node
+import Ros.Topic (unfold)
+import Ros.TopicUtil (tee)
 import Ros.Rate
 import Ros.Roslib.Header
 import Ros.Sensor_msgs.Image (Image(Image))
@@ -15,16 +17,15 @@ grabStream rate = do putStrLn "Starting camera"
                                     h = fromIntegral $ height frame
                                     head = Header 0 (0,0) ""
                                 return (w,h,head, isColor frame)
-                     let grabAll = Cons grab grabAll
-                     return grabAll
+                     return $ unfold grab
 
 pubMono (w,h,head,frame) = Image head h w "mono8" 0 w (toMono frame)
 pubColor (w,h,head,frame) = Image head h w "bgr8" 0 (w*3) (packPixels frame)
 
 main = runNode "/CamPub" $ 
        do rateCap <- getParam' "~rate" 30
-          images <- liftIO $ grabStream rateCap
-          advertiseIO "/cam" $ fmap (fmap pubMono) images
-          advertiseIO "/cam_color" $ fmap (fmap pubColor) images
+          (img1,img2) <- liftIO $ tee =<< grabStream rateCap
+          advertise "/cam" $ fmap pubMono img1
+          advertise "/cam_color" $ fmap pubColor img2
                               
 

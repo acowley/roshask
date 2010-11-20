@@ -5,7 +5,7 @@ import Data.Word (Word8)
 import qualified Data.Vector.Storable as V
 import Ros.Sensor_msgs.Image
 import Ros.Node
-import Ros.StreamCombinators (finiteDifference)
+import Ros.TopicUtil (finiteDifference)
 
 -- Convert a 32-bit signed integer to an 8-bit unsigned integer.
 toAbsWords :: V.Vector Int -> V.Vector Word8

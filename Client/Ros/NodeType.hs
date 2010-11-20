@@ -1,11 +1,11 @@
-{-# LANGUAGE PackageImports, MultiParamTypeClasses, FlexibleInstances, 
-             ExistentialQuantification #-}
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, 
+             ExistentialQuantification, GeneralizedNewtypeDeriving #-}
 module Ros.NodeType where
 import Control.Applicative (Applicative(..), (<$>))
 import Control.Concurrent (MVar, putMVar)
 import Control.Concurrent.STM (atomically, TVar, readTVar, writeTVar)
-import "monads-fd" Control.Monad.State
-import "monads-fd" Control.Monad.Reader
+import Control.Monad.State
+import Control.Monad.Reader
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Set (Set)
@@ -39,22 +39,10 @@ data NodeState = NodeState { nodeName       :: String
 type Params = [(String, ParamVal)]
 type Remap = [(String,String)]
 
---newtype Node a = Node { unNode :: StateT NodeState IO a }
+-- |A 'Node' carries with it parameters, topic remappings, and some
+-- state encoding the status of its subscriptions and publications.
 newtype Node a = Node { unNode :: ReaderT (Params, Remap) (StateT NodeState IO) a }
-
-instance Functor Node where
-    fmap f (Node s) = Node (fmap f s)
-
-instance Applicative Node where
-    pure = Node . pure
-    Node f <*> Node x = Node (f <*> x)
-
-instance Monad Node where
-    (Node s) >>= f = Node $ s >>= unNode . f
-    return = Node . return
-
-instance MonadIO Node where
-    liftIO m = Node $ liftIO m
+  deriving (Functor, Applicative, Monad, MonadIO)
 
 instance MonadState NodeState Node where
     get = Node get

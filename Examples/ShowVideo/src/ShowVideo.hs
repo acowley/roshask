@@ -1,13 +1,12 @@
 module ShowVideo (main) where
 import Control.Applicative
 import Control.Concurrent
-import Control.Monad (forever, when)
+import Control.Monad (when)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import qualified MySDL as SDL
 import SurfaceUtil
 import Ros.Node
 import Ros.Sensor_msgs.Image (Image, width, height, _data, encoding)
-import Data.Foldable (traverse_)
 
 setVideo :: Int -> Int -> IO SDL.Surface
 setVideo w h = SDL.setVideoMode w h 32 [SDL.HWSurface]
@@ -38,5 +37,5 @@ main = do showImage <- sdlInit
           runNode "ShowVideo" $
             do source <- getParam' "~video" "/video"
                images <- subscribe source
-               runHandler $ traverse_ showImage images
+               runHandler showImage images
                

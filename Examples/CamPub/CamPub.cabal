@@ -8,7 +8,6 @@ Build-type:          Custom
 Executable CamPub
   Build-Depends:  base >= 4.2 && < 5,
                   HOpenCV >= 0.1.2.2.1,
-                  deepseq,
                   vector,
                   BoundedChan,
                   roshask

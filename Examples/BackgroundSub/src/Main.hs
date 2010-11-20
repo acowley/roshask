@@ -1,12 +1,11 @@
 module Main (main) where
 import Control.Applicative
 import qualified Data.Vector.Storable as V
-import qualified Ros.Stream as S
 import Data.Word
 import Ros.Node
 import Ros.Roslib.Header
 import Ros.Sensor_msgs.Image
-import Ros.StreamCombinators
+import qualified Ros.TopicUtil as T
 import qualified AI.CV.OpenCV.HighCV as H
 
 -- An IntImage has a width, a height, and some integer pixel data.
@@ -40,7 +39,7 @@ maskMotion (IntImage _ _ i1) (IntImage w h i2) =
 
 main = runNode "backsub" $ do
        raw <- fmap toIntPixels <$> subscribe "cam"
-       let avg = weightedMeanNormalized 7 1 add iscale (shift 8) raw
-           streamMotion = fmap (uncurry maskMotion)
+       (r1,r2) <- liftIO $ T.tee raw
+       let avg = T.weightedMeanNormalized 7 1 add iscale (shift 8) r1
        tname <- getParam' "~topic" "motion"
-       advertise tname $ streamMotion (lockstep (S.drop 1 raw) avg)
+       advertise tname $ maskMotion <$> T.drop 1 r2 <*> avg

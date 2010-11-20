@@ -1,11 +1,10 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
-module Ros.RosTcp (subStream, runServer, runServerIO) where
+module Ros.RosTcp (subStream, runServer) where
 import Control.Applicative ((<$>))
 import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar
 import Control.Monad (forever, when)
-import Data.Word (Word32)
 import Data.Binary.Put (runPut, putWord32le)
 import Data.Binary.Get (runGet, getWord32le)
 import Data.ByteString.Lazy (ByteString)
@@ -16,29 +15,22 @@ import Network.Socket hiding (send, sendTo, recv, recvFrom, Stream)
 import qualified Network.Socket as Sock
 import Network.Socket.ByteString
 import System.IO (IOMode(ReadMode))
-import System.IO.Unsafe
 import Text.URI (parseURI, uriRegName)
-import Unsafe.Coerce (unsafeCoerce)
-
 import Ros.BinaryIter (streamIn)
 import Ros.Core.RosTypes
+import Ros.Topic (Topic(..))
 import Ros.Core.RosBinary
 import Ros.ConnectionHeader
-import qualified Ros.Core.Stream as S
 import Ros.Core.Msg.MsgInfo
 import Ros.SlaveAPI (requestTopicClient)
-
 import Ros.Util.RingChan
-
-toWord32 :: Integral a => a -> Word32
-toWord32 x = unsafeCoerce (fromIntegral x :: Int)
 
 -- |Push each item from this client's buffer over the connected
 -- socket.
 serviceClient :: RingChan ByteString -> Socket -> IO ()
 serviceClient c s = forever $ do bs <- readChan c
                                  let len = runPut $ 
-                                           putWord32le . toWord32 $ 
+                                           putWord32le . fromIntegral $ 
                                            BL.length bs
                                  --sendAll s (BL.append len bs)
                                  sendMany s (BL.toChunks (BL.append len bs))
@@ -52,7 +44,7 @@ recvAll s len = go len []
 
 negotiatePub :: String -> String -> Socket -> IO ()
 negotiatePub ttype md5 sock = 
-    do headerLength <- runGet (unsafeCoerce <$> getWord32le) <$>
+    do headerLength <- runGet (fromIntegral <$> getWord32le) <$>
                        BL.fromChunks . (:[]) <$> recvAll sock 4
        headerBytes <- BL.fromChunks . (:[]) <$> recvAll sock headerLength
        let connHeader = parseHeader headerBytes
@@ -101,14 +93,14 @@ acceptClients sock clients negotiate mkBuffer = forever acceptClient
                             atomically $ readTVar clients >>= 
                                          writeTVar clients . ((cleanup2,chan) :)
 
--- |Publish each item obtained from a Stream to each connected client.
-pubStream :: RosBinary a => 
-             Stream a -> TVar [(b, RingChan ByteString)] -> IO ()
-pubStream s clients = go 0 s
-    where go !n (Cons !x xs) = let bytes = runPut $ putMsg n x
-                               in do cs <- readTVarIO clients
-                                     mapM_ (flip writeChan bytes . snd) cs
-                                     go (n+1) xs
+-- |Publish each item obtained from a 'Topic' to each connected client.
+pubStream :: RosBinary a => Topic IO a -> TVar [(b, RingChan ByteString)] -> IO ()
+pubStream t clients = go 0 t
+  where go !n t = do (x, t') <- runTopic t
+                     let bytes = runPut $ putMsg n x
+                     cs <- readTVarIO clients
+                     mapM_ (flip writeChan bytes . snd) cs
+                     go (n+1) t'
 
 -- Negotiate a TCPROS subscriber connection.
 negotiateSub :: Socket -> String -> String -> String -> IO ()
@@ -117,7 +109,7 @@ negotiateSub sock tname ttype md5 =
                 genHeader [ ("callerid", "roshask"), ("topic", tname)
                           , ("md5sum", md5), ("type", ttype) 
                           , ("tcp_nodelay", "1") ]
-       responseLength <- runGet (unsafeCoerce <$> getWord32le) <$>
+       responseLength <- runGet (fromIntegral <$> getWord32le) <$>
                          BL.fromChunks . (:[]) <$> recvAll sock 4
        headerBytes <- BL.fromChunks . (:[]) <$> recvAll sock responseLength
        let connHeader = parseHeader headerBytes
@@ -137,7 +129,7 @@ negotiateSub sock tname ttype md5 =
 -- |Connect to a publisher and return the stream of data it is
 -- publishing.
 subStream :: forall a. (RosBinary a, MsgInfo a) => 
-             URI -> String -> (Int -> IO ()) -> IO (Stream a)
+             URI -> String -> (Int -> IO ()) -> IO (Topic IO a)
 subStream target tname _updateStats = 
     do putStrLn $ "Opening stream to " ++target++" for "++tname
        response <- requestTopicClient target "/roshask" tname 
@@ -155,7 +147,7 @@ subStream target tname _updateStats =
        h <- socketToHandle sock ReadMode
        --hSetBuffering h NoBuffering
        putStrLn $ "Streaming "++tname++" from "++target
-       streamIn h
+       return $ streamIn h
     where host = case parseURI target of
                    Just u -> case uriRegName u of
                                Just host -> host
@@ -199,20 +191,6 @@ runServerAux negotiate pubAction _updateStats bufferSize =
 -- this publication server along with the port the server is listening
 -- on.
 runServer :: forall a. (RosBinary a, MsgInfo a) => 
-             Stream a -> (URI -> Int -> IO ()) -> Int -> IO (IO (), Int)
+             Topic IO a -> (URI -> Int -> IO ()) -> Int -> IO (IO (), Int)
 runServer stream = runServerAux (mkPubNegotiator (undefined::a)) 
                                 (pubStream stream)
-
--- |The server starts a thread that peels IO actions off the stream as
--- they become available, runs them, and sends them to all connected
--- clients. Returns an action for cleaning up resources allocated by
--- this publication server along with the port the server is
--- listening on.
-runServerIO :: forall a. (RosBinary a, MsgInfo a) => 
-               Stream (IO a) -> (URI -> Int -> IO ()) -> Int -> IO (IO (), Int)
-runServerIO stream = runServerAux (mkPubNegotiator (undefined::a)) pubIO
-    where pubIO clients = 
-              let popIO s = do x <- S.head s
-                               xs <- unsafeInterleaveIO $ popIO (S.tail s)
-                               return $ Cons x xs
-              in popIO stream >>= flip pubStream clients

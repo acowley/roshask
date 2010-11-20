@@ -1,7 +1,6 @@
-{-# LANGUAGE PackageImports #-}
 -- |A monad within which to perform message type resolution.
 module Ros.Core.Msg.ResolutionTypes where
-import "monads-fd" Control.Monad.State
+import Control.Monad.State
 import Data.ByteString.Char8 (ByteString)
 import Data.Map (Map, insert, alter)
 

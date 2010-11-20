@@ -5,7 +5,7 @@ import Control.Concurrent.MVar
 import Control.Concurrent.QSem
 import Data.Sequence (Seq, (|>), viewl, ViewL(..))
 import qualified Data.Sequence as Seq
-import System.IO.Unsafe
+import System.IO.Unsafe (unsafeInterleaveIO)
 
 -- import Control.Concurrent.BoundedChan hiding writeChan
 

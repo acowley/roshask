@@ -1,35 +1,32 @@
-{-# LANGUAGE PackageImports, MultiParamTypeClasses, ScopedTypeVariables, 
-             FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 -- |The primary entrypoint to the ROS client library portion of
 -- roshask. This module defines the actions used to configure a ROS
 -- Node.
-module Ros.Node (Node, runNode, advertise, advertiseIO, advertiseBufferedIO, 
-                 advertiseBuffered, subscribe, streamIO,
+module Ros.Node (Node, runNode, advertise, advertiseBuffered, subscribe, 
                  getShutdownAction, runHandler, getParam, getParam', liftIO,
-                 module Ros.Core.RosTypes) where
+                 module Ros.Core.RosTypes, Topic(..)) where
 import Control.Applicative ((<$>))
 import Control.Concurrent (newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (newTVarIO)
-import Control.DeepSeq (NFData, deepseq)
 import Control.Monad (when)
-import "monads-fd" Control.Monad.State (liftIO, get, put, execStateT)
-import "monads-fd" Control.Monad.Reader (ask, asks, runReaderT)
+import Control.Monad.State (liftIO, get, put, execStateT)
+import Control.Monad.Reader (ask, asks, runReaderT)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Concurrent (forkIO, ThreadId)
 import System.Environment (getEnvironment, getArgs)
-import System.IO.Unsafe (unsafeInterleaveIO)
 import Network.XmlRpc.Internals (XmlRpcType)
 import Ros.Core.Msg.MsgInfo
 import Ros.NodeType
 import qualified Ros.ParameterServerAPI as P
 import Ros.Core.RosBinary (RosBinary)
 import Ros.Core.RosTypes
-import Ros.RosTcp (subStream, runServer, runServerIO)
+import Ros.RosTcp (subStream, runServer)
 import qualified Ros.RunNode as RN
 import Ros.TopicStats (recvMessageStat, sendMessageStat)
 import Ros.Util.ArgRemapping
+import Ros.Topic
 
 -- |Maximum number of items to buffer for a subscriber.
 recvBufferSize :: Int
@@ -41,15 +38,16 @@ addSource :: (RosBinary a, MsgInfo a) =>
              String -> (URI -> Int -> IO ()) -> BoundedChan a -> URI -> 
              IO ThreadId
 addSource tname updateStats c uri = 
-    forkIO $ subStream uri tname (updateStats uri) >>= go
-    where go (Cons x xs) = writeChan c x >> go xs
+    forkIO $ subStream uri tname (updateStats uri) >>= 
+             forever . join . fmap (writeChan c)
 
 -- Create a new Subscription value that will act as a named input
 -- channel with zero or more connected publishers.
 mkSub :: forall a. (RosBinary a, MsgInfo a) => 
-         String -> IO (Stream a, Subscription)
+         String -> IO (Topic IO a, Subscription)
 mkSub tname = do c <- newBoundedChan recvBufferSize
-                 stream <- list2stream <$> getChanContents c
+                 let stream = Topic $ do x <- readChan c
+                                         return (x, stream)
                  known <- newTVarIO S.empty
                  stats <- newTVarIO M.empty
                  let topicType = msgTypeName (undefined::a)
@@ -57,16 +55,10 @@ mkSub tname = do c <- newBoundedChan recvBufferSize
                      sub = Subscription known (addSource tname updateStats c) 
                                         topicType stats
                  return (stream, sub)
-    where list2stream (x:xs) = Cons x (list2stream xs)
-          list2stream [] = error "mkSub expected an infinite list"
 
 mkPub :: forall a. (RosBinary a, MsgInfo a) => 
-         Stream a -> Int -> IO Publication
+         Topic IO a -> Int -> IO Publication
 mkPub = mkPubAux (msgTypeName (undefined::a)) . runServer
-
-mkPubIO :: forall a. (RosBinary a, MsgInfo a) =>
-           Stream (IO a) -> Int -> IO Publication
-mkPubIO = mkPubAux (msgTypeName (undefined::a)) . runServerIO
 
 mkPubAux :: String -> ((URI -> Int -> IO ()) -> Int -> IO (IO (), Int)) ->
             Int -> IO Publication
@@ -78,7 +70,7 @@ mkPubAux trep runServer' bufferSize =
 
 -- |Subscribe to the given Topic. Returns the @Stream@ of values
 -- received on over the Topic.
-subscribe :: (RosBinary a, MsgInfo a) => TopicName -> Node (Stream a)
+subscribe :: (RosBinary a, MsgInfo a) => TopicName -> Node (Topic IO a)
 subscribe name = do n <- get
                     name' <- canonicalizeName =<< remapName name
                     let subs = subscriptions n
@@ -89,9 +81,10 @@ subscribe name = do n <- get
                                return stream
 
 -- |Spin up a thread within a Node. This is typically used for message
--- handlers.
-runHandler :: IO () -> Node ThreadId
-runHandler = liftIO . forkIO
+-- handlers. Note that the supplied 'Topic' is traversed solely for
+-- any side effects of its steps; the produced values are ignored.
+runHandler :: (a -> IO b) -> Topic IO a -> Node ThreadId
+runHandler = ((liftIO . forkIO . forever . join) .) . fmap
 
 advertiseAux :: (Int -> IO Publication) -> Int -> TopicName -> Node ()
 advertiseAux mkPub' bufferSize name = 
@@ -106,30 +99,12 @@ advertiseAux mkPub' bufferSize name =
 -- |Advertise a Topic publishing a 'Stream' of pure values with a
 -- per-client transmit buffer of the specified size.
 advertiseBuffered :: (RosBinary a, MsgInfo a) => 
-                     Int -> TopicName -> Stream a -> Node ()
+                     Int -> TopicName -> Topic IO a -> Node ()
 advertiseBuffered bufferSize name s = advertiseAux (mkPub s) bufferSize name
 
 -- |Advertise a Topic publishing a 'Stream' of pure values.
-advertise :: (RosBinary a, MsgInfo a) => TopicName -> Stream a -> Node ()
+advertise :: (RosBinary a, MsgInfo a) => TopicName -> Topic IO a -> Node ()
 advertise = advertiseBuffered 1
-
--- |Convert a 'Stream' of 'IO' actions to a 'Stream' of pure values.
-streamIO :: NFData a => Stream (IO a) -> IO (Stream a)
-streamIO (Cons x xs) = unsafeInterleaveIO $
-                       do x' <- x
-                          xs' <- streamIO xs
-                          return . deepseq x' $ Cons x' xs'
-
--- |Advertise a Topic publishing a 'Stream' of 'IO' values.
-advertiseIO :: (RosBinary a, MsgInfo a) => 
-               TopicName -> Stream (IO a) -> Node ()
-advertiseIO = advertiseBufferedIO 1
-
--- |Advertise a Topic publishing a 'Stream' of 'IO' values with a
--- per-client transmit buffer of the specified size.
-advertiseBufferedIO :: (RosBinary a, MsgInfo a) =>
-                       Int -> TopicName -> Stream (IO a) -> Node ()
-advertiseBufferedIO bufferSize name s = advertiseAux (mkPubIO s) bufferSize name
 
 -- |Get an action that will shutdown this Node.
 getShutdownAction :: Node (IO ())

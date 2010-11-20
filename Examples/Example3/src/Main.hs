@@ -4,8 +4,7 @@ import qualified Ros.Std_msgs.String as S
 import Ros.Std_msgs.Int32 (Int32(..))
 import Ros.Node
 
-lengthTransform (Cons m ms) = Cons (Int32 (length (S._data m))) 
-                                   (lengthTransform ms)
+lengthTransform msg = Int32 (length (S._data msg))
 
 main = runNode "/roskell" $ 
-       advertise "/len" =<< lengthTransform <$> subscribe "/chat"
+       advertise "/len" =<< fmap lengthTransform <$> subscribe "/chat"
