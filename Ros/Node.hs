@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, PackageImports #-}
 -- |The primary entrypoint to the ROS client library portion of
 -- roshask. This module defines the actions used to configure a ROS
 -- Node.
@@ -10,8 +10,8 @@ import Control.Concurrent (newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent.BoundedChan
 import Control.Concurrent.STM (newTVarIO)
 import Control.Monad (when)
-import Control.Monad.State (liftIO, get, put, execStateT)
-import Control.Monad.Reader (ask, asks, runReaderT)
+import "monads-fd" Control.Monad.State (liftIO, get, put, execStateT)
+import "monads-fd" Control.Monad.Reader (ask, asks, runReaderT)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Concurrent (forkIO, ThreadId)

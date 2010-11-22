@@ -32,6 +32,10 @@ head = fmap fst . runTopic
 uncons :: Topic m a -> m (a, Topic m a)
 uncons = runTopic
 
+-- |Prepend a single item to the front of a 'Topic'.
+cons :: Monad m => a -> Topic m a -> Topic m a
+cons x t = Topic $ return (x, t)
+
 -- |Returns a 'Topic' containing all the values from the given 'Topic'
 -- after the first.
 tail :: Monad m => Topic m a -> Topic m a

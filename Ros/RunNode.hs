@@ -21,7 +21,7 @@ registerSubscription :: RosSlave n =>
                         String -> n -> String -> String -> 
                         (TopicName, TopicType, a) -> IO ()
 registerSubscription name n master uri (tname, ttype, _) = 
-    do putStrLn $ "Registring subscription to "++tname++" for "++ttype++"s"
+    do putStrLn $ "Registring subscription to "++tname++" for "++ttype
        (r,_,publishers) <- registerSubscriber master name tname ttype uri
        if r == 1 
          then publisherUpdate n tname publishers

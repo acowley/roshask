@@ -132,7 +132,7 @@ subStream :: forall a. (RosBinary a, MsgInfo a) =>
              URI -> String -> (Int -> IO ()) -> IO (Topic IO a)
 subStream target tname _updateStats = 
     do putStrLn $ "Opening stream to " ++target++" for "++tname
-       response <- requestTopicClient target "/roshask" tname 
+       response <- requestTopicClient target "roshask" tname 
                                       [["TCPROS"]]
        let port = case response of
                     (1,_,("TCPROS",_,port')) -> fromIntegral port'
