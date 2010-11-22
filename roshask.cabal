@@ -78,7 +78,7 @@ Executable roshask
                   directory > 1.0 && < 1.1,
                   process >= 1.0.1.2 && < 1.1,
                   xml >= 1.3.5 && < 1.4,
-                  nano-md5 == 0.1.*
+                  pureMD5 == 2.1.*
 
   GHC-Options:    -Odph -Wall -fno-warn-name-shadowing
   Main-Is:        Ros/Core/Msg/Main.hs
