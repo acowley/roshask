@@ -1,3 +1,4 @@
+-- |The main entry point for the roshask executable.
 module Main (main) where
 import Control.Applicative
 import qualified Data.ByteString.Char8 as B
@@ -65,7 +66,7 @@ help :: [String]
 help = [ "Usage: roshask command [[arguments]]"
        , "Available commands:"
        , "  create pkgName [[dependencies]]  -- Create a new ROS package with "
-       , "                                      roskell support"
+       , "                                      roshask support"
        , ""
        , "  gen file.msg                     -- Generate Haskell message code"
        , ""
@@ -73,7 +74,10 @@ help = [ "Usage: roshask command [[arguments]]"
        , "                                      depends on"
        , ""
        , "  dep directory                    -- Build all messages the specified "
-       , "                                      package depends on" ]
+       , "                                      package depends on" 
+       , ""
+       , "  md5 file.msg                     -- Generate an MD5 sum for a ROS "
+       , "                                      message type" ]
 
 main :: IO ()
 main = do args <- getArgs
