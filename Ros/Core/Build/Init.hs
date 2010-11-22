@@ -67,7 +67,7 @@ format fields = B.concat $ map indent fields
 prepSetup :: String -> IO ()
 prepSetup pkgName = B.writeFile (pkgName</>"Setup.hs") $
                     B.concat [ "import Distribution.Simple\n"
-                             , "import Ros.Build.SetupUtil\n\n"
+                             , "import Ros.Core.Build.SetupUtil\n\n"
                              , "main = defaultMainWithHooks $\n"
                              , "       simpleUserHooks { confHook = "
                              , "rosConf, buildHook = rosBuild }\n" ]
