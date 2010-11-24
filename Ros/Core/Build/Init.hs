@@ -49,6 +49,7 @@ prepCabal pkgName = B.writeFile (pkgName</>(pkgName++".cabal")) $
                    [ B.concat ["Executable ", pack pkgName]
                    , "  Build-Depends:  base >= 4.2 && < 5,"
                    , "                  vector == 0.7.*,"
+                   , "                  time == 1.1.*,"
                    , "                  roshask == 0.1.*"
                    , B.concat ["  GHC-Options:    -Odph -main-is ", 
                                pack pkgName']

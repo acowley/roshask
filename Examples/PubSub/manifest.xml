@@ -1,0 +1,15 @@
+<package>
+  <description brief="PubSub">
+
+     PubSub
+
+  </description>
+  <author>Anthony Cowley</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/PubSub</url>
+  <depend package="std_msgs"/>
+
+</package>
+
+
