@@ -16,4 +16,3 @@ type ROSTime = (Word32, Word32)
 
 -- |ROSDuration is a tuple of (seconds, nanoseconds)
 type ROSDuration = (Word32, Word32)
-

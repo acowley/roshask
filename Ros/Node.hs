@@ -4,7 +4,8 @@
 -- Node.
 module Ros.Node (Node, runNode, advertise, advertiseBuffered, subscribe, 
                  getShutdownAction, runHandler, getParam, getParam', liftIO,
-                 module Ros.Core.RosTypes, Topic(..)) where
+                 module Ros.Core.RosTypes, Topic(..), rateLimiter,
+                 module Ros.Core.RosTime) where
 import Control.Applicative ((<$>))
 import Control.Concurrent (newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent.BoundedChan
@@ -26,7 +27,9 @@ import Ros.RosTcp (subStream, runServer)
 import qualified Ros.RunNode as RN
 import Ros.TopicStats (recvMessageStat, sendMessageStat)
 import Ros.Util.ArgRemapping
+import Ros.Rate (rateLimiter)
 import Ros.Topic
+import Ros.Core.RosTime
 
 -- |Maximum number of items to buffer for a subscriber.
 recvBufferSize :: Int
