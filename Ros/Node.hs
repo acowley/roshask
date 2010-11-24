@@ -5,7 +5,7 @@
 module Ros.Node (Node, runNode, advertise, advertiseBuffered, subscribe, 
                  getShutdownAction, runHandler, getParam, getParam', liftIO,
                  module Ros.Core.RosTypes, Topic(..), rateLimiter,
-                 module Ros.Core.RosTime) where
+                 module Ros.Core.RosTime, getName, getNamespace) where
 import Control.Applicative ((<$>))
 import Control.Concurrent (newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent.BoundedChan
@@ -151,6 +151,14 @@ getParam var = do var' <- remapName =<< canonicalizeName var
 -- value.
 getParam' :: (XmlRpcType a, FromParam a) => String -> a -> Node a
 getParam' var def = maybe def id <$> getParam var
+
+-- |Get the current node's name.
+getName :: Node String
+getName = nodeName <$> get
+
+-- |Get the current namespace.
+getNamespace :: Node String
+getNamespace = namespace <$> get
                         
 -- |Run a ROS Node.
 runNode :: NodeName -> Node a -> IO ()
