@@ -8,6 +8,7 @@ import Control.Concurrent
 import Control.Monad ((<=<))
 import qualified Data.Foldable as F
 import Ros.Topic
+import qualified Ros.Util.PID as P
 
 -- |Tee a 'Topic' into two duplicate 'Topic's. Each returned 'Topic'
 -- will receive all the values of the original 'Topic', while any
@@ -124,11 +125,7 @@ simpsonsRule plus scale t = Topic $ do ([x,y], t') <- splitAt 2 t
   where go x y t = do (z,t') <- runTopic t
                       return (simpson x y z, Topic $ go y z t')
         simpson a mid b = scale c $ plus (plus a (scale 4 mid)) b
-        c = 1 / 6
-    -- where go stream = Cons (simpson (S.take 3 stream)) (go (S.tail stream))
-    --       c = 1 / 6
-    --       simpson [a,mid,b] = scale c $ plus (plus a (scale 4 mid)) b
-    --       simpson _ = error "Impossible pattern in simpson"
+        c = 1 / 3
 {-# INLINE simpsonsRule #-}
 
 -- |Compute a running \"average\" of a 'Stream' by summing the product
@@ -200,6 +197,16 @@ interruptible s = Topic $
                        return (x, Topic getAll)
        _ <- forkIO $ watchForItems s
        getAll
+
+-- |@pid kp ki kd setpoint t@ runs a PID controller that transforms
+-- 'Topic' @t@ of process outputs into a 'Topic' of control signals
+-- designed to steer the output to the given setpoint using the PID
+-- gains @kp@, @ki@, and @kd@.
+pid :: Fractional a => a -> a -> a -> a -> Topic IO a -> Topic IO a
+pid kp ki kd setpoint t = Topic $ 
+                          do controller <- P.pidIO kp ki kd setpoint
+                             runTopic . join $ controller <$> t
+{-# INLINE pid #-}
 
 {-
 nats :: Topic IO Int
