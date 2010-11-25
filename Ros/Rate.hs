@@ -1,6 +1,6 @@
 -- |Provides a rate limiting mechanism that can be used to control the
 -- rate at which 'IO' actions produce values.
-module Ros.Rate (rateLimiter, pid, pidIO) where
+module Ros.Rate (rateLimiter) where
 import Control.Concurrent (threadDelay)
 import Control.Monad (when)
 import Data.IORef (newIORef, readIORef, writeIORef)
@@ -13,13 +13,16 @@ timeDiff = curry $ realToFrac . uncurry diffUTCTime
 -- |Produces an action that runs the supplied 'IO' action no faster
 -- than given rate in Hz.
 rateLimiter :: Double -> IO a -> IO (IO a)
-rateLimiter hz action = do control <- pidIO (-0.2) (-0.1) (-0.1) period
+rateLimiter hz action = do control <- pidWithTimeIO (-0.2) (-0.02) (-0.01) period
                            prevDelay <- newIORef period
                            prevTime <- getCurrentTime >>= newIORef
+                           start <- getCurrentTime
                            return $ do t1 <- getCurrentTime
                                        t0 <- readIORef prevTime
                                        let tdiff = timeDiff t1 t0 * 1000000
-                                       change <- control tdiff
+                                           t1' = realToFrac $ 
+                                                 diffUTCTime t1 start
+                                       change <- control (t1', tdiff)
                                        delay <- readIORef prevDelay
                                        let delay' = delay + change
                                        when (delay' > 0)
