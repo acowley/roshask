@@ -124,6 +124,10 @@ join t = Topic $ do (x, t') <- runTopic t
 forever :: Monad m => Topic m a -> m b
 forever = forever . snd <=< runTopic
 
+-- |Map a monadic action over a 'Topic'.
+mapM :: (Functor m, Monad m) => (a -> m b) -> Topic m a -> Topic m b
+mapM = (join .) . fmap
+
 -- |Print all the values produced by a 'Topic'.
 showTopic :: (MonadIO m, Functor m, Show a) => Topic m a -> Topic m ()
 showTopic = join . fmap (liftIO . putStrLn . show)
