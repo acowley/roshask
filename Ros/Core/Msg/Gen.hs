@@ -27,7 +27,9 @@ generateMsgType pkgPath pkgMsgs msg =
      return $ B.concat [ modLine, "\n"
                        , imports
                        , storableImport
-                       , dataLine, fieldSpecs, " } deriving P.Show\n\n"
+                       , dataLine, fieldSpecs
+                       , "\n", fieldIndent
+                       , "} deriving (P.Show, P.Eq, P.Ord)\n\n"
                        , binInst, "\n\n"
                        , storableInstance
                        --, genNFDataInstance msg
