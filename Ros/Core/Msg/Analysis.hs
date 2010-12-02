@@ -158,6 +158,8 @@ mkFlatType :: MsgType -> ByteString
 mkFlatType RBool         = "P.Bool"
 mkFlatType RInt8         = "Int.Int8"
 mkFlatType RUInt8        = "Word.Word8"
+mkFlatType RByte         = "Word.Word8"
+mkFlatType RChar         = "Int.Int8"
 mkFlatType RInt16        = "Int.Int16"
 mkFlatType RUInt16       = "Word.Word16"
 mkFlatType RInt32        = "P.Int"

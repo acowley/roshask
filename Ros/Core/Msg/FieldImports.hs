@@ -30,7 +30,9 @@ vectorDeps = S.fromList [ "qualified Data.Vector.Storable as V" ]
 -- for.
 typeDependency :: ByteString -> [ByteString] -> MsgType -> Set ByteString
 typeDependency _ _ RInt8                = intImport
+typeDependency _ _ RChar                = intImport
 typeDependency _ _ RUInt8               = wordImport
+typeDependency _ _ RByte                = wordImport
 typeDependency _ _ RInt16               = intImport
 typeDependency _ _ RUInt16              = wordImport
 typeDependency _ _ RUInt32              = wordImport

@@ -35,7 +35,7 @@ md5sum = show . md5 . fromChunks . (:[])
 -- * constants reordered ahead of other declarations
 -- from http://www.ros.org/wiki/ROS/Technical%20Overview
 --
--- For user defined types, rather recording a field as "type
+-- For user defined types, rather than recording a field as "type
 -- identifier", we record "md5 identifier".
 msgMD5 :: Msg -> MsgInfo String
 msgMD5 m = let cs = map constantText (constants m)
@@ -45,4 +45,3 @@ msgMD5 m = let cs = map constantText (constants m)
   where constantText (MsgConst _ t v n) = B.concat [tMap ! t, " ", n, "=", v]
         fieldText (MsgField _ t n) = do t' <- typeText t
                                         return $ B.concat [t', " ", n]
-

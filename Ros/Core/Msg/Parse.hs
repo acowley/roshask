@@ -10,15 +10,13 @@ import qualified Data.ByteString.Char8 as B
 import Data.Char (toLower, digitToInt)
 import Data.Either (partitionEithers)
 import Data.List (foldl')
-import System.Environment (getEnvironment)
-import System.FilePath (dropExtension, takeFileName, splitDirectories, (</>))
-import System.Process (readProcess)
+import System.FilePath (dropExtension, takeFileName, splitDirectories)
 import Ros.Core.Msg.Types
 
 simpleFieldTypes :: [MsgType]
 simpleFieldTypes = [ RBool, RInt8, RUInt8, RInt16, RUInt16, RInt32, RUInt32, 
                      RInt64, RUInt64, RFloat32, RFloat64, RString, 
-                     RTime, RDuration ]
+                     RTime, RDuration, RByte, RChar ]
 
 simpleFieldAssoc :: [(MsgType, ByteString)]
 simpleFieldAssoc = map (id &&& B.pack . map toLower . tail . show) 
@@ -69,27 +67,9 @@ userFixedArray = (\t n name -> (name, RFixedArray n (RUserType t))) <$>
                  (char '[' *> parseInt <* char ']') <*> 
                  (space *> parseName)
 
--- Parsers for deprecated "byte" and "char" types. These have been
--- replaced by uint8 and int8, respectively.
-deprecated :: [Parser (ByteString, MsgType)]
-deprecated = map (comment *>) . concatMap (\x -> map ($ x) builders) $ 
-             [("byte", RUInt8), ("char", RInt8)]
-    where builders = map uncurry [depField, depFixedArray, depVarArray]
-
-depField :: ByteString -> MsgType -> Parser (ByteString, MsgType)
-depField s x = (, x) <$> (string s *> space *> parseName)
-
-depFixedArray :: ByteString -> MsgType -> Parser (ByteString, MsgType)
-depFixedArray s x = (\len name -> (name, RFixedArray len x)) <$>
-                    (string s *> char '[' *> parseInt <* char ']') <*>
-                    (space *> parseName)
-
-depVarArray :: ByteString -> MsgType -> Parser (ByteString, MsgType)
-depVarArray s x = (, RVarArray x) <$> 
-                  (string s *> string "[]" *> space *> parseName)
-
 -- Parse constants defined in the message
-constParser :: ByteString -> MsgType -> Parser (ByteString, MsgType, ByteString)
+constParser :: ByteString -> MsgType -> 
+               Parser (ByteString, MsgType, ByteString)
 constParser s x = (,x,) <$> 
                   (string s *> space *> identifier) <*> 
                   (skipSpace *> char '=' *> skipSpace *> restOfLine <* skipSpace)
@@ -97,9 +77,8 @@ constParser s x = (,x,) <$>
           restOfLine = pack <$> manyTill anyChar (eitherP endOfLine endOfInput)
 
 constParsers :: [Parser (ByteString, MsgType, ByteString)]
-constParsers = map (uncurry constParser) $
-               [("byte", RUInt8), ("char", RInt8)] ++
-               (map (\(x,y) -> (y,x)) simpleFieldAssoc)
+constParsers = map (uncurry constParser . swap) simpleFieldAssoc
+  where swap (x,y) = (y,x)
 
 -- String constants are parsed somewhat differently from numeric
 -- constants. For numerical constants, we drop comments and trailing
@@ -116,7 +95,7 @@ fieldParsers :: [Parser (Either (ByteString, MsgType)
                                 (ByteString, MsgType, ByteString))]
 fieldParsers = map (comment *>) $
                map (Right . sanitizeConstants <$>) constParsers ++ 
-               map (Left <$>) (deprecated ++ builtIns ++ [userTypeParser])
+               map (Left <$>) (builtIns ++ [userTypeParser])
     where builtIns = concatMap (flip map simpleFieldAssoc)
                                [simpleParser, fixedArrayParser, varArrayParser]
 

@@ -10,7 +10,7 @@ data MsgType = RBool | RInt8 | RUInt8 | RInt16 | RUInt16
              | RInt32 | RUInt32 | RInt64 | RUInt64
              | RFloat32 | RFloat64 | RString | RTime | RDuration
              | RFixedArray Int MsgType | RVarArray MsgType
-             | RUserType ByteString
+             | RUserType ByteString | RByte | RChar
                deriving (Show, Eq, Ord)
 
 data MsgField = MsgField { fieldName    :: ByteString
