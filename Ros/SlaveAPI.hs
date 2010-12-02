@@ -9,7 +9,7 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.UTF8 as BU
 import qualified Data.ByteString.Lazy.UTF8 as BLU
 import Snap.Http.Server (httpServe)
-import Snap.Types (Snap, getRequestBody, writeBS)
+import Snap.Types (Snap, getRequestBody, writeLBS)
 import Network.Socket hiding (Stream)
 import qualified Network.Socket as Net
 import Network.XmlRpc.Internals (Value)
@@ -19,7 +19,6 @@ import Network.XmlRpc.Client (remote)
 import System.Posix.Process (getProcessID)
 #endif
 import System.Process (readProcess)
-import Ros.Util.XmlRpcTuples ()
 import Ros.Core.RosTypes
 import Ros.TopicStats
 import Ros.MasterAPI
@@ -141,7 +140,7 @@ requestTopicClient = flip remote "requestTopic"
 -- parameter is a value that provides the necessary reflective API as
 -- to ROS Node state. The second parameter is a semaphore indicating
 -- that the node should terminate.
-slaveRPC :: (RosSlave a) => a -> QSem -> String -> IO String
+slaveRPC :: (RosSlave a) => a -> QSem -> String -> IO BLU.ByteString
 slaveRPC n = -- \q s -> putStrLn ("Slave call "++s)>>(handleCall (dispatch q) s)
     handleCall . dispatch
     where dispatch q = methods [ ("getBusStats", fun (getBusStats n))
@@ -192,4 +191,4 @@ runSlave n = do quitNow <- newQSem 0
                 return (wait, port)
     where rpc f = do body <- BLU.toString <$> getRequestBody
                      response <- liftIO $ f body
-                     writeBS $ BU.fromString response
+                     writeLBS response
