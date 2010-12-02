@@ -74,7 +74,7 @@ dropWhile :: Monad m => (a -> Bool) -> Topic m a -> Topic m a
 dropWhile p = Topic . go
   where go = check <=< runTopic
         check (x,t) | p x       = go t
-                    | otherwise = runTopic t
+                    | otherwise = return (x, t)
 
 -- |@takeWhile p t@ returns the longest prefix (possibly empty) of @t@
 -- all of whose elements satisfy the predicate @p@.
