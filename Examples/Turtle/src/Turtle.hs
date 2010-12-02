@@ -2,7 +2,7 @@ module Turtle (main) where
 import Data.VectorSpace
 import Ros.Node
 import Ros.Topic (cons, uncons, unfold)
-import Ros.TopicUtil (tee, filterBy, everyNew, interruptible)
+import Ros.TopicUtil (tee, filterBy, everyNew, interruptible, gate)
 import Ros.Turtlesim.Pose
 import Ros.Turtlesim.Velocity
 import System.IO (hFlush, stdout)
@@ -18,25 +18,28 @@ showPose = putStrLn . show
 getTraj :: Topic IO [Point]
 getTraj = unfold (putStr "Enter waypoints: " >> hFlush stdout >> read `fmap` getLine)
 
+wrapAngle theta | theta < 0 = theta + 2 * pi
+wrapAngle theta | theta > 2*pi = theta - 2 * pi
+wrapAngle theta = theta
+
+angleDiff x y = let x' = if x < 0 then x + 2*pi else x
+                    y' = if y < 0 then y + 2*pi else y
+                in wrapAngle (x' + pi - y') - pi
+
 -- Navigate to a goal given a current pose estimate.
 navigate :: (Point, Pose) -> Velocity
-navigate (goal, pos) = Velocity 2 angVel
-  where (vx, vy)     = goal ^-^ (x pos, y pos)
-        thetaDesired = atan2 vy vx * (180 / pi)
-        thetaErr     = thetaDesired - theta pos
+navigate (goal, pos) = Velocity (min 2 (magnitude v)) angVel
+  where v@(vx, vy)   = goal ^-^ (x pos, y pos)
+        thetaDesired = atan2 vy vx
+        thetaErr     = (angleDiff thetaDesired (theta pos)) * (180 / pi)
         angVel       = signum thetaErr * (min 2 (abs thetaErr))
-
-posePrinter = runNode "HaskellBTurtle" $ 
-              runHandler showPose =<< subscribe "/turtle1/pose"
-
--- Just move forward
-trans = runNode "Go" $ advertise "/turtle1/command_velocity" go
-  where go = Topic (threadDelay 1000000 >> return (Velocity 2 0, go))
 
 main = runNode "HaskellBTurtle" $
        do (p1, p2) <- liftIO . tee =<< subscribe "/turtle1/pose"
-          (g1, gs) <- liftIO $ uncons (interruptible getTraj)
-          let arrived g p = magnitudeSq (g ^-^ p) < 1.5
+          (gs1, gs2) <- liftIO . tee . interruptible $ getTraj
+          let arrived g p = magnitude (g ^-^ p) < 1.5
               p2v p = (x p, y p)
-              arrivals = cons g1 (filterBy (fmap arrived (cons g1 gs)) (fmap p2v p1))
-          advertise "/turtle1/command_velocity" $ fmap navigate (everyNew arrivals p2)
+              arrivals = filterBy (fmap arrived gs1) (fmap p2v p1)
+              goals = gate gs2 (cons () (fmap (const ()) arrivals))
+          advertise "/turtle1/command_velocity" $ 
+                    fmap navigate (everyNew goals p2)
