@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, OverloadedStrings #-}
 module Ros.SlaveAPI (RosSlave(..), runSlave, requestTopicClient, 
                      cleanupNode) where
 import Control.Applicative
@@ -9,7 +9,8 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.UTF8 as BU
 import qualified Data.ByteString.Lazy.UTF8 as BLU
 import Snap.Http.Server (httpServe)
-import Snap.Types (Snap, getRequestBody, writeLBS)
+import Snap.Types (Snap, getRequestBody, writeLBS, 
+                   getResponse, putResponse, setContentLength)
 import Network.Socket hiding (Stream)
 import qualified Network.Socket as Net
 import Network.XmlRpc.Internals (Value)
@@ -192,3 +193,5 @@ runSlave n = do quitNow <- newQSem 0
     where rpc f = do body <- BLU.toString <$> getRequestBody
                      response <- liftIO $ f body
                      writeLBS response
+                     let len = fromIntegral $ BLU.length response
+                     putResponse . setContentLength len =<< getResponse
