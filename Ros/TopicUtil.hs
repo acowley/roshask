@@ -8,7 +8,18 @@ import Control.Concurrent
 import Control.Monad ((<=<))
 import qualified Data.Foldable as F
 import Ros.Topic
-import qualified Ros.Util.PID as P
+
+toList :: Topic IO a -> IO [a]
+toList t = do c <- newChan
+              let feed t = do (x, t') <- runTopic t
+                              writeChan c x
+                              feed t'
+              _ <- forkIO $ feed t
+              getChanContents c
+
+fromList :: Monad m => [a] -> Topic m a
+fromList (x:xs) = Topic $ return (x, fromList xs)
+fromList [] = error "Ran out of list elements"
 
 -- |Tee a 'Topic' into two duplicate 'Topic's. Each returned 'Topic'
 -- will receive all the values of the original 'Topic', while any
@@ -198,46 +209,6 @@ interruptible s = Topic $
        _ <- forkIO $ watchForItems s
        getAll
 
--- |@pidUniform kp ki kd setpoint t@ runs a PID controller that
--- transforms 'Topic' @t@ of process outputs into a 'Topic' of control
--- signals designed to steer the output to the given setpoint using
--- the PID gains @kp@, @ki@, and @kd@. The interval between samples
--- produced by the 'Topic' is assumed to be 1.
-pidUniform :: Fractional a => a -> a -> a -> a -> Topic IO a -> Topic IO a
-pidUniform kp ki kd setpoint t = 
-  Topic $ do controller <- P.pidUniformIO kp ki kd setpoint
-             runTopic . join $ controller <$> t
-
--- |@pidFixed kp ki kd setpoint dt t@ runs a PID controller that
--- transforms 'Topic' @t@ of process outputs into a 'Topic' of control
--- signals designed to steer the output to the given setpoint using
--- the PID gains @kp@, @ki@, and @kd@, along with an assumed fixed
--- time interval, @dt@, between samples.
-pidFixed :: Fractional a => a -> a -> a -> a -> a -> Topic IO a -> Topic IO a
-pidFixed kp ki kd setpoint dt t = 
-  Topic $ do controller <- P.pidFixedIO kp ki kd setpoint dt
-             runTopic . join $ controller <$> t
-
--- |@pidTimed kp ki kd setpoint t@ runs a PID controller that
--- transforms 'Topic' @t@ of process outputs into a 'Topic' of control
--- signals designed to steer the output to the given setpoint using
--- the PID gains @kp@, @ki@, and @kd@. The system clock is checked for
--- each value produced by the input 'Topic' to determine the actual
--- sampling rate.
-pidTimed :: Fractional a => a -> a -> a -> a -> Topic IO a -> Topic IO a
-pidTimed kp ki kd setpoint t = 
-  Topic $ do controller <- P.pidTimedIO kp ki kd setpoint
-             runTopic . join $ controller <$> t
-
--- |@pidTimed kp ki kd setpoint t@ runs a PID controller that
--- transforms 'Topic' @t@ of process outputs into a 'Topic' of control
--- signals designed to steer the output to the given setpoint using
--- the PID gains @kp@, @ki@, and @kd@. Values produced by the 'Topic'
--- are paired with a timestamp with the form (timeStamp, sample).
-pidStamped :: Fractional a => a -> a -> a -> a -> Topic IO (a,a) -> Topic IO a
-pidStamped kp ki kd setpoint t =
-  Topic $ do controller <- P.pidWithTimeIO kp ki kd setpoint
-             runTopic . join $ controller <$> t
 
 {-
 nats :: Topic IO Int

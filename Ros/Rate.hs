@@ -13,7 +13,8 @@ timeDiff = curry $ realToFrac . uncurry diffUTCTime
 -- |Produces an action that runs the supplied 'IO' action no faster
 -- than given rate in Hz.
 rateLimiter :: Double -> IO a -> IO (IO a)
-rateLimiter hz action = do control <- pidWithTimeIO (-0.2) (-0.02) (-0.01) period
+rateLimiter hz action = do control' <- pidWithTimeIO (-0.2) (-0.02) (-0.01)
+                           let control = control' period
                            prevDelay <- newIORef period
                            prevTime <- getCurrentTime >>= newIORef
                            start <- getCurrentTime

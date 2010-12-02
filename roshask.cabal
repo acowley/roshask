@@ -20,6 +20,7 @@ Library
   Exposed-modules:     Ros.Node
                        Ros.Topic
                        Ros.TopicUtil
+                       Ros.TopicPID
                        Ros.Rate
                        Ros.Core.Msg.MsgInfo
                        Ros.Core.Msg.HeaderSupport 
