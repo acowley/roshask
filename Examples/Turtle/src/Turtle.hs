@@ -3,7 +3,7 @@ module Turtle (main) where
 import Data.VectorSpace
 import Ros.Node
 import Ros.Topic (cons, unfold)
-import Ros.TopicUtil (tee, filterBy, everyNew, interruptible, gate, toList, fromList)
+import Ros.TopicUtil (tee, filterBy, everyNew, interruptible, gate)
 import Ros.Turtlesim.Pose
 import Ros.Turtlesim.Velocity
 import Ros.Logging
@@ -45,16 +45,3 @@ main = runNode "HaskellBTurtle" $
               goals = gate gs2 (cons () (fmap (const ()) arrivals))
           advertise "/turtle1/command_velocity" $ 
                     fmap navigate (everyNew goals p2)
-
--- Using lists. Notice that we've moved the explicit sharing burden
--- from tee to fromList applications.
-main' = runNode "HaskellBTurtle" $
-       do ps <- liftIO . toList =<< subscribe "/turtle1/pose"
-          gs <- liftIO . toList . interruptible $ getTraj
-          let arrived g p = magnitude (g ^-^ p) < 1.5
-              p2v p = (x p, y p)
-              arrivals = filterBy (fromList (map arrived gs)) 
-                                  (fromList (map p2v ps))
-              goals = gate (fromList gs) (cons () (fmap (const ()) arrivals))
-          advertise "/turtle1/command_velocity" $ 
-                    fmap navigate (everyNew goals (fromList ps))

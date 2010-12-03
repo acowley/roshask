@@ -5,7 +5,8 @@ import Prelude hiding (dropWhile, filter, splitAt)
 import Control.Applicative
 import Control.Arrow ((***))
 import Control.Concurrent
-import Control.Monad ((<=<))
+import Control.Concurrent.STM
+import Control.Monad ((<=<), when)
 import qualified Data.Foldable as F
 import Ros.Topic
 
@@ -24,15 +25,45 @@ fromList [] = error "Ran out of list elements"
 -- |Tee a 'Topic' into two duplicate 'Topic's. Each returned 'Topic'
 -- will receive all the values of the original 'Topic', while any
 -- side-effect produced by each step of the original 'Topic' will
--- occur only once.
+-- occur only once. This version of @tee@ eagerly pulls data from the
+-- original 'Topic' as soon as it is available. This behavior is
+-- undesirable when lazily consuming the data stream is preferred. For
+-- instance, using 'interruptible' with 'teeEager' will likely not work
+-- well. However, 'teeEager' performs better than 'tee'.
+teeEager :: Topic IO a -> IO (Topic IO a, Topic IO a)
+teeEager t = do c1 <- newChan
+                c2 <- newChan
+                let feed c = do x <- readChan c
+                                return (x, Topic $ feed c)
+                _ <- forkIO . forever . join $
+                     (\x -> writeChan c1 x >> writeChan c2 x) <$> t
+                return (Topic $ feed c1, Topic $ feed c2)
+
+-- |Tee a 'Topic' into two duplicate 'Topic's. Each returned 'Topic'
+-- will receive all the values of the original 'Topic' while any
+-- side-effect produced by each step of the original 'Topic' will
+-- occur only once. This version of @tee@ lazily pulls data from the
+-- original 'Topic' when it is first required by a consumer of either
+-- of the returned 'Topic's. This behavior is crucial when lazily
+-- consuming the data stream is preferred. For instance, using
+-- 'interruptible' with 'tee' will allow for a chunk of data to be
+-- abandoned before being fully consumed as long as neither consumer
+-- has forced its way too far down the stream.
 tee :: Topic IO a -> IO (Topic IO a, Topic IO a)
-tee t = do c1 <- newChan
-           c2 <- newChan
-           let feed c = do x <- readChan c
-                           return (x, Topic $ feed c)
-           _ <- forkIO . forever . join $
-                (\x -> writeChan c1 x >> writeChan c2 x) <$> t
-           return (Topic $ feed c1, Topic $ feed c2)
+tee t = do c1 <- newTChanIO
+           c2 <- newTChanIO
+           signal <- newTVarIO True
+           let feed c = do atomically $ do f <- isEmptyTChan c
+                                           when f (writeTVar signal False)
+                           atomically $ readTChan c
+               produce t = do atomically $ readTVar signal >>= flip when retry
+                              (x,t') <- runTopic t
+                              atomically $ writeTChan c1 x >>
+                                           writeTChan c2 x >>
+                                           writeTVar signal True
+                              produce t'
+           _ <- forkIO $ produce t
+           return (unfold (feed c1), unfold (feed c2))
 
 -- |Splits a 'Topic' into two 'Topic's: the elements of the first
 -- 'Topic' all satisfy the given predicate, while none of the elements
