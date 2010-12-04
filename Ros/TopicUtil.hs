@@ -6,9 +6,9 @@ import Control.Applicative
 import Control.Arrow ((***))
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Monad ((<=<), when)
+import Control.Monad ((<=<), when, replicateM)
 import qualified Data.Foldable as F
-import Ros.Topic
+import Ros.Topic hiding (mapM)
 
 toList :: Topic IO a -> IO [a]
 toList t = do c <- newChan
@@ -64,6 +64,23 @@ tee t = do c1 <- newTChanIO
                               produce t'
            _ <- forkIO $ produce t
            return (unfold (feed c1), unfold (feed c2))
+
+-- |Fan out one 'Topic' out to a number of duplicate 'Topic's, each of
+-- which will produce the same values. Side effects caused by the
+-- original 'Topic''s production will occur only once.
+fan :: Int -> Topic IO a -> IO [Topic IO a]
+fan n t = do cs <- replicateM n newTChanIO
+             signal <- newTVarIO True
+             let feed c = do atomically $ do f <- isEmptyTChan c
+                                             when f (writeTVar signal False)
+                             atomically $ readTChan c
+                 produce t = do atomically $ readTVar signal >>= flip when retry
+                                (x,t') <- runTopic t
+                                atomically $ mapM_ (flip writeTChan x) cs >>
+                                             writeTVar signal True
+                                produce t'
+             _ <- forkIO $ produce t
+             return $ map (unfold . feed) cs
 
 -- |Splits a 'Topic' into two 'Topic's: the elements of the first
 -- 'Topic' all satisfy the given predicate, while none of the elements
