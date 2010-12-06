@@ -1,19 +1,49 @@
 Name:                roshask
-Version:             0.1
-Synopsis:            Haskell support for ROS.
-Description:         Library for building ROS Nodes in Haskell.
+Version:             0.1.0
+Synopsis:            Haskell support for the ROS robotics framework.
 License:             BSD3
 License-file:        LICENSE
 Cabal-version:       >=1.6
 Author:              Anthony Cowley
-Maintainer:          acowley@seas.upenn.edu
+Maintainer:          Anthony Cowley <acowley@seas.upenn.edu>
 Copyright:           (c) 2010 Anthony Cowley
 Category:            Robotics
 Build-type:          Simple
+Bug-reports:         http://github.com/acowley/roshask/issues
+Tested-with:         GHC==6.12.3
+Description:         Tools for working with ROS in Haskell.
+                     .
+                     ROS (<http://www.ros.org>) is a software
+                     framework developed by Willow Garage
+                     (<http://http://www.willowgarage.com/) that aims
+                     to provide a standard software architecture for
+                     robotic systems. The main idea of the framework
+                     is to support the development and execution of
+                     loosely coupled /Node/s connected by typed
+                     /Topic/s. Each Node represents a locus of
+                     processing, ideally with a minimal interface
+                     specified in terms of the types of Topics it
+                     takes as input and offers as output.
+                     .
+                     This package provides libraries for creating new
+                     ROS Nodes in Haskell, along with the @roshask@
+                     executable for creating new ROS packages and
+                     generating Haskell code from message definition
+                     files (see the ROS documentation for information
+                     on message types).
+                     .
+                     See
+                     <http://github.com/acowley/roshask/wiki> for more
+                     information on getting started.
+
+Source-repository this
+  type:     git
+  location: http://github.com/acowley/roshask.git
+  tag:      0.1.0
 
 -- Extra files to be distributed with the package, such as examples or
 -- a README.
-Extra-source-files:  Ros/Logging.hs
+-- Extra-source-files:  
 
 Flag logging
  Description: Enable ROS Logging support.
@@ -59,7 +89,7 @@ Library
                        snap-core >= 0.2.16 && < 0.3, 
                        snap-server >= 0.2.16 && < 0.3,
                        transformers == 0.2.*,
-                       haxr == 3000.*,
+                       haxr >= 3000.8 && < 3001,
                        utf8-string >= 0.3.6 && < 4,
                        uri >= 0.1.5 && < 0.2
 
