@@ -9,7 +9,7 @@ locus of processing, ideally with a minimal interface specified in
 terms of the types of Topics it takes as input and offers as output.
 
 This package provides libraries for creating new ROS Nodes in Haskell,
-along with the @roshask@ executable for creating new ROS packages and
+along with the `roshask` executable for creating new ROS packages and
 generating Haskell code from message definition files (see the ROS
 documentation for information on message types).
 
