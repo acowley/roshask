@@ -15,7 +15,7 @@ type Point = (Float,Float)
 -- A Topic of user-supplied waypoint trajectories.
 getTraj :: Topic IO [Point]
 getTraj = unfold (do putStr "Enter waypoints: " >> hFlush stdout
-                     $(logInfo "Got new traj")
+                     $(logInfo "Waiting for new traj")
                      read `fmap` getLine)
 
 wrapAngle theta 
@@ -26,6 +26,13 @@ wrapAngle theta
 angleDiff x y = wrapAngle (x' + pi - y') - pi
   where x' = if x < 0 then x + 2*pi else x
         y' = if y < 0 then y + 2*pi else y
+
+-- Produce a unit value every time a goal is reached.
+arrivalTrigger :: Topic IO Point -> Topic IO Pose -> Topic IO ()
+arrivalTrigger goals poses = fmap (const ()) $
+                             filterBy (fmap arrived goals) (fmap p2v poses)
+  where arrived goal pose = magnitude (goal ^-^ pose) < 1.5
+        p2v (Pose x y _ _ _) = (x, y)
 
 -- Navigate to a goal given a current pose estimate.
 navigate :: (Point, Pose) -> Velocity
@@ -39,9 +46,6 @@ main = runNode "HaskellBTurtle" $
        do enableLogging (Just Warn)
           (p1, p2) <- liftIO . tee =<< subscribe "/turtle1/pose"
           (gs1, gs2) <- liftIO . tee . interruptible $ getTraj
-          let arrived g p = magnitude (g ^-^ p) < 1.5
-              p2v p = (x p, y p)
-              arrivals = filterBy (fmap arrived gs1) (fmap p2v p1)
-              goals = gate gs2 (cons () (fmap (const ()) arrivals))
+          let goals = gate gs2 (cons () (arrivalTrigger gs1 p1))
           advertise "/turtle1/command_velocity" $ 
                     fmap navigate (everyNew goals p2)
