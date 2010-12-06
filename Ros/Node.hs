@@ -2,10 +2,11 @@
 -- |The primary entrypoint to the ROS client library portion of
 -- roshask. This module defines the actions used to configure a ROS
 -- Node.
-module Ros.Node (Node, runNode, advertise, advertiseBuffered, subscribe, 
-                 getShutdownAction, runHandler, getParam, getParam', liftIO,
-                 module Ros.Core.RosTypes, Topic(..), rateLimiter,
-                 module Ros.Core.RosTime, getName, getNamespace) where
+module Ros.Node (Node, runNode, advertise, advertiseBuffered, 
+                 subscribe, getShutdownAction, runHandler, getParam, 
+                 getParamOpt, getName, getNamespace, rateLimiter,
+                 module Ros.Core.RosTypes, Topic(..), 
+                 module Ros.Core.RosTime, liftIO) where
 import Control.Applicative ((<$>))
 import Control.Concurrent (newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent.BoundedChan
@@ -99,13 +100,14 @@ advertiseAux mkPub' bufferSize name =
          else do pub <- liftIO $ mkPub' bufferSize
                  put n { publications = M.insert name' pub pubs }
 
--- |Advertise a Topic publishing a 'Stream' of pure values with a
+-- |Advertise a 'Topic' publishing a stream of 'IO' values with a
 -- per-client transmit buffer of the specified size.
 advertiseBuffered :: (RosBinary a, MsgInfo a) => 
                      Int -> TopicName -> Topic IO a -> Node ()
 advertiseBuffered bufferSize name s = advertiseAux (mkPub s) bufferSize name
 
--- |Advertise a Topic publishing a 'Stream' of pure values.
+-- |Advertise a 'Topic' publishing a stream of values produced in
+-- the 'IO' monad.
 advertise :: (RosBinary a, MsgInfo a) => TopicName -> Topic IO a -> Node ()
 advertise = advertiseBuffered 1
 
@@ -138,19 +140,21 @@ getServerParam var = do state <- get
                           Right True -> liftIO $ P.getParam masterUri myName var
                           _ -> return Nothing
 
--- |Get the value associated with the given parameter name.
-getParam :: (XmlRpcType a, FromParam a) => String -> Node (Maybe a)
-getParam var = do var' <- remapName =<< canonicalizeName var
-                  params <- fst <$> ask
-                  case lookup var' params of
-                    Just val -> return . Just $ fromParam val
-                    Nothing -> getServerParam var'
+-- |Get the value associated with the given parameter name. If the
+-- parameter is not set, then 'Nothing' is returned; if the parameter
+-- is set to @x@, then @Just x@ is returned.
+getParamOpt :: (XmlRpcType a, FromParam a) => String -> Node (Maybe a)
+getParamOpt var = do var' <- remapName =<< canonicalizeName var
+                     params <- fst <$> ask
+                     case lookup var' params of
+                       Just val -> return . Just $ fromParam val
+                       Nothing -> getServerParam var'
 
 -- |Get the value associated with the given parameter name. If the
 -- parameter is not set, return the second argument as the default
 -- value.
-getParam' :: (XmlRpcType a, FromParam a) => String -> a -> Node a
-getParam' var def = maybe def id <$> getParam var
+getParam :: (XmlRpcType a, FromParam a) => String -> a -> Node a
+getParam var def = maybe def id <$> getParamOpt var
 
 -- |Get the current node's name.
 getName :: Node String

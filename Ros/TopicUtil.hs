@@ -28,8 +28,9 @@ fromList [] = error "Ran out of list elements"
 -- occur only once. This version of @tee@ eagerly pulls data from the
 -- original 'Topic' as soon as it is available. This behavior is
 -- undesirable when lazily consuming the data stream is preferred. For
--- instance, using 'interruptible' with 'teeEager' will likely not work
--- well. However, 'teeEager' performs better than 'tee'.
+-- instance, using 'interruptible' with 'teeEager' will likely not
+-- work well. However, 'teeEager' may have slightly better performance
+-- than 'tee'.
 teeEager :: Topic IO a -> IO (Topic IO a, Topic IO a)
 teeEager t = do c1 <- newChan
                 c2 <- newChan
@@ -115,7 +116,7 @@ infixl 7 <+>
 -- the component 'Topic's produces a new value. The value of the
 -- other element of the pair will be the newest available value. The
 -- resulting 'Topic' will produce a new value at the rate of the
--- faster component 'Stream', and may contain duplicate consecutive
+-- faster component 'Topic', and may contain duplicate consecutive
 -- elements.
 everyNew :: Topic IO a -> Topic IO b -> Topic IO (a,b)
 everyNew t1 t2 = Topic $ warmup =<< runTopic (t1 <+> t2)
@@ -150,7 +151,7 @@ merge t1 t2 = either id id <$> t1 <+> t2
 finiteDifference :: (Functor m, Monad m) => (a -> a -> b) -> Topic m a -> Topic m b
 finiteDifference f = fmap (uncurry f) . consecutive
 
--- |Compute a running \"average\" of a 'Stream' using a user-provided
+-- |Compute a running \"average\" of a 'Topic' using a user-provided
 -- normalization function applied to the sum of products. The
 -- arguments are a constat @alpha@ that is used to scale the current
 -- average, a constant @invAlpha@ used to scale the newest value, a
@@ -173,9 +174,9 @@ weightedMeanNormalized alpha invAlpha plus scale normalize = Topic . warmup
                         return (avg', Topic $ go avg' t')
 {-# INLINE weightedMeanNormalized #-}
 
--- |Perform numerical integration of a 'Stream' using Simpson's rule
+-- |Perform numerical integration of a 'Topic' using Simpson's rule
 -- applied at three consecutive points. This requires a function for
--- adding values from the 'Stream', and a function for scaling values
+-- adding values from the 'Topic', and a function for scaling values
 -- by a fractional number.
 simpsonsRule :: (Monad m, Fractional n) => 
                 (a -> a -> a) -> (n -> a -> a) -> Topic m a -> Topic m a
@@ -187,22 +188,22 @@ simpsonsRule plus scale t = Topic $ do ([x,y], t') <- splitAt 2 t
         c = 1 / 3
 {-# INLINE simpsonsRule #-}
 
--- |Compute a running \"average\" of a 'Stream' by summing the product
--- of @alpha@ and the current average with the product of @1 - alpha@
--- and the newest value. The first parameter is the constant @alpha@,
--- the second is an addition function, the third a scaling function,
--- and the fourth the input 'Stream'.
+-- |Compute a running \"average\" of a 'Topic'. The application
+-- @weightedMean alpha plus scale t@ sums the product of @alpha@ and
+-- the current average with the product of @1 - alpha@ and the newest
+-- value produced by 'Topic' @t@. The addition and scaling operations
+-- are performed using the supplied @plus@ and @scale@ functions.
 weightedMean :: (Monad m, Num n) => 
                 n -> (a -> a -> a) -> (n -> a -> a) -> Topic m a -> Topic m a
 weightedMean alpha plus scale = weightedMean2 alpha (1 - alpha) plus scale
 {-# INLINE weightedMean #-}
 
--- |Compute a running \"average\" of a 'Stream' by summing the product
--- of @alpha@ and the current average with the product of @invAlpha@
--- and the newest value. The first parameter is the constant @alpha@,
--- the second is the constant @invAlpha@, the third is an addition
--- function, the fourth a scaling function, and the fifth the input
--- 'Stream'.
+-- |Compute a running \"average\" of a 'Topic'. The application
+-- @weightedMean2 alpha invAlpha plus scale t@ sums the product of
+-- @alpha@ and the current average with the product of @invAlpha@ and
+-- the newest value produced by 'Topic' @t@. The addition and scaling
+-- operations are performed using the supplied @plus@ and @scale@
+-- functions.
 weightedMean2 :: Monad m =>
                  n -> n -> (a -> a -> a) -> (n -> a -> a) -> Topic m a -> Topic m a
 weightedMean2 alpha invAlpha plus scale = Topic . warmup
@@ -214,11 +215,12 @@ weightedMean2 alpha invAlpha plus scale = Topic . warmup
                         return (avg', Topic $ go avg' t')
 {-# INLINE weightedMean2 #-}
 
--- |Use a 'Topic' of functions to filter a 'Topic' of values. Each
--- function is applied to the second 'Topic' until it returns
--- 'True'. At that point, 'filterBy' produces the accepted value of
--- the second 'Topic' and moves on to the next function which is
--- applied to the rest of the second 'Stream'.
+-- |Use a 'Topic' of functions to filter a 'Topic' of values. The
+-- application @filterBy t1 t2@ causes each function from 'Topic' @t1@
+-- to be applied to values produced by @t2@ until it returns
+-- 'True'. At that point, the 'filterBy' application produces the
+-- accepted value of the @t2@ and moves on to the next function from
+-- @t1@ which is applied to the rest of @t2@ in the same manner.
 filterBy :: Monad m => Topic m (a -> Bool) -> Topic m a -> Topic m a
 filterBy tf tx = Topic $ do (f, tf') <- runTopic tf
                             (x, tx') <- uncons $ dropWhile (not . f) tx
