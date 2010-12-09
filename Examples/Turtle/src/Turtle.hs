@@ -2,7 +2,7 @@
 module Turtle (main) where
 import Data.VectorSpace
 import Ros.Node
-import Ros.Topic (cons, unfold)
+import Ros.Topic (cons, repeatM)
 import Ros.TopicUtil (tee, filterBy, everyNew, interruptible, gate)
 import Ros.Turtlesim.Pose
 import Ros.Turtlesim.Velocity
@@ -14,9 +14,9 @@ type Point = (Float,Float)
 
 -- A Topic of user-supplied waypoint trajectories.
 getTraj :: Topic IO [Point]
-getTraj = unfold (do putStr "Enter waypoints: " >> hFlush stdout
-                     $(logInfo "Waiting for new traj")
-                     read `fmap` getLine)
+getTraj = repeatM (do putStr "Enter waypoints: " >> hFlush stdout
+                      $(logInfo "Waiting for new traj")
+                      read `fmap` getLine)
 
 wrapAngle theta 
   | theta < 0    = theta + 2 * pi
