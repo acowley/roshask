@@ -107,6 +107,7 @@ Library
                       Ros.RosTcp Ros.ConnectionHeader Ros.TopicStats 
                       Ros.BinaryIter Ros.Util.RingChan Ros.Util.ArgRemapping 
                       Ros.Core.Build.DepFinder Ros.Core.RosTime Ros.Util.PID
+                      Ros.Util.AppConfig
 
 -- The ROS .msg definition parser and Haskell code generation utility.
 Executable roshask

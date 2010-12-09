@@ -128,7 +128,7 @@ requestTopic :: RosSlave a => a -> CallerID -> TopicName -> [[Value]] ->
                 RpcResult (String,String,Int)
 requestTopic n _ topic _protocols = 
     case getTopicPortTCP n topic of
-      Just p -> do putStrLn $ topic++" requested "++show p
+      Just p -> do --putStrLn $ topic++" requested "++show p
                    host <- myName n
                    return (1, "", ("TCPROS",host,p))
       Nothing -> return (0, "Unknown topic", ("TCPROS", "", 0))

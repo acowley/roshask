@@ -15,6 +15,7 @@ import Ros.Core.RosTypes (URI)
 import Ros.SlaveAPI (RosSlave(..))
 import Ros.TopicStats
 import Ros.Util.ArgRemapping (ParamVal)
+import Ros.Util.AppConfig (ConfigOptions)
 
 data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , addPub    :: URI -> IO ThreadId
@@ -39,16 +40,20 @@ data NodeState = NodeState { nodeName       :: String
 type Params = [(String, ParamVal)]
 type Remap = [(String,String)]
 
+data NodeConfig = NodeConfig { nodeParams :: Params
+                             , nodeRemaps :: Remap
+                             , nodeAppConfig :: ConfigOptions }
+
 -- |A 'Node' carries with it parameters, topic remappings, and some
 -- state encoding the status of its subscriptions and publications.
-newtype Node a = Node { unNode :: ReaderT (Params, Remap) (StateT NodeState IO) a }
+newtype Node a = Node { unNode :: ReaderT NodeConfig (StateT NodeState IO) a }
   deriving (Functor, Applicative, Monad, MonadIO)
 
 instance MonadState NodeState Node where
     get = Node get
     put = Node . put
 
-instance MonadReader (Params, Remap) Node where
+instance MonadReader NodeConfig Node where
     ask = Node ask
     local f m = Node $ withReaderT f (unNode m)
 

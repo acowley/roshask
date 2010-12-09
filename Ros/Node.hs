@@ -27,6 +27,7 @@ import Ros.Core.RosTypes
 import Ros.RosTcp (subStream, runServer)
 import qualified Ros.RunNode as RN
 import Ros.TopicStats (recvMessageStat, sendMessageStat)
+import Ros.Util.AppConfig (Config, parseAppConfig, forkConfig, configured)
 import Ros.Util.ArgRemapping
 import Ros.Topic
 import Ros.TopicUtil (topicRate)
@@ -40,47 +41,51 @@ recvBufferSize = 10
 -- Chan.
 addSource :: (RosBinary a, MsgInfo a) => 
              String -> (URI -> Int -> IO ()) -> BoundedChan a -> URI -> 
-             IO ThreadId
+             Config ThreadId
 addSource tname updateStats c uri = 
-    forkIO $ subStream uri tname (updateStats uri) >>= 
-             forever . join . fmap (writeChan c)
+    forkConfig $ subStream uri tname (updateStats uri) >>= 
+                 liftIO . forever . join . fmap (writeChan c)
 
 -- Create a new Subscription value that will act as a named input
 -- channel with zero or more connected publishers.
 mkSub :: forall a. (RosBinary a, MsgInfo a) => 
-         String -> IO (Topic IO a, Subscription)
-mkSub tname = do c <- newBoundedChan recvBufferSize
+         String -> Config (Topic IO a, Subscription)
+mkSub tname = do c <- liftIO $ newBoundedChan recvBufferSize
                  let stream = Topic $ do x <- readChan c
                                          return (x, stream)
-                 known <- newTVarIO S.empty
-                 stats <- newTVarIO M.empty
+                 known <- liftIO $ newTVarIO S.empty
+                 stats <- liftIO $ newTVarIO M.empty
+                 r <- ask
                  let topicType = msgTypeName (undefined::a)
                      updateStats = recvMessageStat stats
-                     sub = Subscription known (addSource tname updateStats c) 
-                                        topicType stats
+                     addSource' = flip runReaderT r . addSource tname updateStats c
+                     sub = Subscription known addSource' topicType stats
                  return (stream, sub)
 
 mkPub :: forall a. (RosBinary a, MsgInfo a) => 
-         Topic IO a -> Int -> IO Publication
+         Topic IO a -> Int -> Config Publication
 mkPub = mkPubAux (msgTypeName (undefined::a)) . runServer
 
-mkPubAux :: String -> ((URI -> Int -> IO ()) -> Int -> IO (IO (), Int)) ->
-            Int -> IO Publication
+mkPubAux :: String -> ((URI -> Int -> IO ()) -> Int -> Config (Config (), Int)) ->
+            Int -> Config Publication
 mkPubAux trep runServer' bufferSize = 
-    do stats <- newTVarIO M.empty
+    do stats <- liftIO $ newTVarIO M.empty
        (cleanup, port) <- runServer' (sendMessageStat stats) bufferSize
-       known <- newTVarIO S.empty
-       return $ Publication known trep port cleanup stats
+       known <- liftIO $ newTVarIO S.empty
+       cleanup' <- configured cleanup
+       return $ Publication known trep port cleanup' stats
 
 -- |Subscribe to the given Topic. Returns the @Stream@ of values
 -- received on over the Topic.
 subscribe :: (RosBinary a, MsgInfo a) => TopicName -> Node (Topic IO a)
 subscribe name = do n <- get
                     name' <- canonicalizeName =<< remapName name
+                    r <- nodeAppConfig <$> ask
                     let subs = subscriptions n
                     if M.member name' subs
                        then error $ "Already subscribed to "++name'
-                       else do (stream, sub) <- liftIO (mkSub name')
+                       else do (stream, sub) <- liftIO $
+                                                runReaderT (mkSub name') r
                                put n { subscriptions = M.insert name' sub subs }
                                return stream
 
@@ -90,14 +95,15 @@ subscribe name = do n <- get
 runHandler :: (a -> IO b) -> Topic IO a -> Node ThreadId
 runHandler = ((liftIO . forkIO . forever . join) .) . fmap
 
-advertiseAux :: (Int -> IO Publication) -> Int -> TopicName -> Node ()
+advertiseAux :: (Int -> Config Publication) -> Int -> TopicName -> Node ()
 advertiseAux mkPub' bufferSize name = 
     do n <- get
        name' <- remapName =<< canonicalizeName name
+       r <- nodeAppConfig <$> ask
        let pubs = publications n
        if M.member name' pubs
          then error $ "Already advertised " ++ name'
-         else do pub <- liftIO $ mkPub' bufferSize
+         else do pub <- liftIO $ runReaderT (mkPub' bufferSize) r
                  put n { publications = M.insert name' pub pubs }
 
 -- |Advertise a 'Topic' publishing a stream of 'IO' values with a
@@ -117,7 +123,7 @@ getShutdownAction = get >>= liftIO . readMVar . signalShutdown
 
 -- |Apply any matching renames to a given name.
 remapName :: String -> Node String
-remapName name = asks (maybe name id . lookup name . snd)
+remapName name = asks (maybe name id . lookup name . nodeRemaps)
 
 -- |Convert relative names to absolute names. Leaves absolute names
 -- unchanged.
@@ -145,7 +151,7 @@ getServerParam var = do state <- get
 -- is set to @x@, then @Just x@ is returned.
 getParamOpt :: (XmlRpcType a, FromParam a) => String -> Node (Maybe a)
 getParamOpt var = do var' <- remapName =<< canonicalizeName var
-                     params <- fst <$> ask
+                     params <- nodeParams <$> ask
                      case lookup var' params of
                        Just val -> return . Just $ fromParam val
                        Nothing -> getServerParam var'
@@ -163,14 +169,14 @@ getName = nodeName <$> get
 -- |Get the current namespace.
 getNamespace :: Node String
 getNamespace = namespace <$> get
-                        
+
 -- |Run a ROS Node.
 runNode :: NodeName -> Node a -> IO ()
 runNode name (Node n) = 
     do myURI <- newEmptyMVar
        sigStop <- newEmptyMVar
        env <- liftIO getEnvironment
-       args <- liftIO getArgs
+       (conf, args) <- parseAppConfig <$> liftIO getArgs
        let getConfig' var def = maybe def id $ lookup var env
            getConfig = flip lookup env
            master = getConfig' "ROS_MASTER_URI" "http://localhost:11311"
@@ -198,6 +204,8 @@ runNode name (Node n) =
                       Nothing -> return ()
                       Just n -> putMVar myURI $! "http://"++n
          Just ip -> putMVar myURI $! "http://"++ip
-       go name' . execStateT (runReaderT n (params', nameMap')) $
-         NodeState name' namespace master myURI sigStop M.empty M.empty
-    where go name' ns = ns >>= RN.runNode name'
+       let configuredNode = runReaderT n (NodeConfig params' nameMap' conf)
+           initialState = NodeState name' namespace master myURI sigStop 
+                                    M.empty M.empty
+           statefulNode = execStateT configuredNode initialState
+       statefulNode >>= flip runReaderT conf . RN.runNode name'
