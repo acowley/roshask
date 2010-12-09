@@ -55,6 +55,7 @@ Library
                        Ros.Topic
                        Ros.TopicUtil
                        Ros.TopicPID
+                       Ros.TopicMT
                        Ros.Rate
                        Ros.Core.Msg.MsgInfo
                        Ros.Core.Msg.HeaderSupport 
