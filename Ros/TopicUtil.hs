@@ -3,11 +3,13 @@
 module Ros.TopicUtil where
 import Prelude hiding (dropWhile, filter, splitAt)
 import Control.Applicative
-import Control.Arrow ((***))
+import Control.Arrow ((***), second)
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Monad ((<=<), when, replicateM)
+import Control.Monad.IO.Class
 import qualified Data.Foldable as F
+import Ros.Rate (rateLimiter)
 import Ros.Topic hiding (mapM)
 
 toList :: Topic IO a -> IO [a]
@@ -64,7 +66,7 @@ tee t = do c1 <- newTChanIO
                                            writeTVar signal True
                               produce t'
            _ <- forkIO $ produce t
-           return (unfold (feed c1), unfold (feed c2))
+           return (repeatM (feed c1), repeatM (feed c2))
 
 -- |Fan out one 'Topic' out to a number of duplicate 'Topic's, each of
 -- which will produce the same values. Side effects caused by the
@@ -81,7 +83,16 @@ fan n t = do cs <- replicateM n newTChanIO
                                              writeTVar signal True
                                 produce t'
              _ <- forkIO $ produce t
-             return $ map (unfold . feed) cs
+             return $ map (repeatM . feed) cs
+
+-- |The application @topicRate rate t@ runs 'Topic' @t@ no faster than
+-- @rate@ Hz.
+topicRate :: (Functor m, MonadIO m) => Double -> Topic m a -> Topic m a
+topicRate p t0 = Topic $ 
+                 do delay <- liftIO $ rateLimiter p (return ())
+                    (x,t') <- runTopic t0
+                    let go t = Topic $ liftIO delay >> second go <$> runTopic t
+                    return (x, go t')
 
 -- |Splits a 'Topic' into two 'Topic's: the elements of the first
 -- 'Topic' all satisfy the given predicate, while none of the elements

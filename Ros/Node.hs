@@ -4,8 +4,8 @@
 -- Node.
 module Ros.Node (Node, runNode, advertise, advertiseBuffered, 
                  subscribe, getShutdownAction, runHandler, getParam, 
-                 getParamOpt, getName, getNamespace, rateLimiter,
-                 module Ros.Core.RosTypes, Topic(..), 
+                 getParamOpt, getName, getNamespace, 
+                 module Ros.Core.RosTypes, Topic(..), topicRate, 
                  module Ros.Core.RosTime, liftIO) where
 import Control.Applicative ((<$>))
 import Control.Concurrent (newEmptyMVar, readMVar, putMVar)
@@ -28,8 +28,8 @@ import Ros.RosTcp (subStream, runServer)
 import qualified Ros.RunNode as RN
 import Ros.TopicStats (recvMessageStat, sendMessageStat)
 import Ros.Util.ArgRemapping
-import Ros.Rate (rateLimiter)
 import Ros.Topic
+import Ros.TopicUtil (topicRate)
 import Ros.Core.RosTime
 
 -- |Maximum number of items to buffer for a subscriber.

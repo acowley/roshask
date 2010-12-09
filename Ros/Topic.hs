@@ -106,9 +106,16 @@ splitAt n = go n []
 
 -- |Repeatedly execute a monadic action feeding the values into a
 -- 'Topic'.
-unfold :: Monad m => m a -> Topic m a
-unfold action = go
+repeatM :: Monad m => m a -> Topic m a
+repeatM action = go
   where go = Topic $ action >>= \x -> return (x, go)
+
+-- |Build a 'Topic' from a seed value. The supplied function is
+-- applied to the seed value to produce both a value that goes into
+-- the 'Topic' and a new seed value for the next recursive call.
+unfold :: Functor m => (b -> m (a,b)) -> b -> Topic m a
+unfold f z0 = go z0
+  where go z = Topic $ second go <$> f z
 
 -- |Removes one level of monadic structure, projecting the values
 -- produced by a 'Topic' into the monad encapsulating each step the
