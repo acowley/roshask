@@ -2,7 +2,7 @@
 \mainpage
 \htmlinclude manifest.html
 
-\b PubSub is ... 
+\b PubSub is an example of publishing and subscribing to Topics using roshask.
 
 <!-- 
 Provide an overview of your package.

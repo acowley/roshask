@@ -36,14 +36,19 @@ Description:         Tools for working with ROS in Haskell.
                      <http://github.com/acowley/roshask/wiki> for more
                      information on getting started.
 
+Extra-source-files:  Examples/PubSub/CMakeLists.txt
+                     Examples/PubSub/Makefile
+                     Examples/PubSub/PubSub.cabal
+                     Examples/PubSub/Setup.hs
+                     Examples/PubSub/mainpage.dox
+                     Examples/PubSub/manifest.xml
+                     Examples/PubSub/src/Talker.hs
+                     Examples/PubSub/src/Listener.hs
+
 Source-repository this
   type:     git
   location: http://github.com/acowley/roshask.git
   tag:      0.1.0
-
--- Extra files to be distributed with the package, such as examples or
--- a README.
--- Extra-source-files:  
 
 Flag logging
  Description: Enable ROS Logging support.
