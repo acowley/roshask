@@ -104,6 +104,13 @@ splitAt n = go n []
         go n acc t = do (x,t') <- runTopic t
                         go (n-1) (x:acc) t'
 
+-- |Returns a 'Topic' that includes only the 'Just' values from the
+-- given 'Topic'.
+catMaybes :: Monad m => Topic m (Maybe a) -> Topic m a
+catMaybes (Topic ma) = Topic $ ma >>= aux
+  where aux (Nothing, t') = runTopic $ catMaybes t'
+        aux (Just x, t')  = return (x, catMaybes t')
+
 -- |Repeatedly execute a monadic action feeding the values into a
 -- 'Topic'.
 repeatM :: Monad m => m a -> Topic m a
