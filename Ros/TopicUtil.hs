@@ -12,6 +12,7 @@ import qualified Data.Foldable as F
 import Ros.Rate (rateLimiter)
 import Ros.Topic hiding (mapM)
 
+-- |Produce an infinite list from a 'Topic'.
 toList :: Topic IO a -> IO [a]
 toList t = do c <- newChan
               let feed t = do (x, t') <- runTopic t
@@ -20,6 +21,7 @@ toList t = do c <- newChan
               _ <- forkIO $ feed t
               getChanContents c
 
+-- |Produce a 'Topic' from an infinite list.
 fromList :: Monad m => [a] -> Topic m a
 fromList (x:xs) = Topic $ return (x, fromList xs)
 fromList [] = error "Ran out of list elements"
@@ -269,21 +271,3 @@ interruptible s = Topic $
                        return (x, Topic getAll)
        _ <- forkIO $ watchForItems s
        getAll
-
-
-{-
-nats :: Topic IO Int
-nats = aux 0
-  where aux n = Topic $ threadDelay 2000000 >> return (n, aux (n+1))
-
-chars :: Topic IO Char
-chars = aux 'a'
-  where aux 'z' = Topic $ threadDelay 200000 >> return ('z', aux 'a')
-        aux c = Topic $ threadDelay 200000 >> return (c, aux (toEnum (fromEnum c + 1)))
-
-
-fastAndSlow = take_ 21 . showTopic $ chars <+> nats
-fastAndSlow2 = take_ 20 . showTopic $ everyNew chars nats
-testBothNew = take_ 10 . showTopic $ bothNew chars nats
-testDiffs = take_ 10 . showTopic $ finiteDifference (flip (-)) nats
--}
