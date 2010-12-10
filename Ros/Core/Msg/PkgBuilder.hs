@@ -38,4 +38,3 @@ buildPkgMsgs fname = do liftIO . putStrLn $ "Generating package " ++ fname
           pkgHier = B.pack $ "Ros." ++ pkgName ++ "."
           isLeft (Left _) = True
           isLeft _ = False
-          

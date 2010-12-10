@@ -41,15 +41,19 @@ rosBuild pkg lbi uh bfs = do binfo <- addRosMsgPaths targets
                       Nothing -> Executables exeTargets
                       Just _ -> LibraryAndExecutables exeTargets
 
--- |The @confHook@ override takes over @cabal install@'s @--bindir@ and
+-- The @confHook@ override takes over @cabal install@'s @--bindir@ and
 -- @--libdir@ options to force binary outputs into the @bin@ and @lib@
 -- subdirectories of the package directory.
+
+-- |The @confHook@ override takes over @cabal install@'s @--bindir@
+-- option to force binary outputs into the @bin@ subdirectory of the
+-- package directory.
 rosConf :: (GenericPackageDescription, HookedBuildInfo) -> ConfigFlags -> 
            IO LocalBuildInfo
 rosConf x cf = do lbi <- (confHook simpleUserHooks) x cf
                   let oldDirs = installDirTemplates lbi
-                      customDirs = oldDirs { bindir = toPathTemplate "bin"
-                                           , libdir = toPathTemplate "lib" }
+                      customDirs = oldDirs { bindir = toPathTemplate "bin" }
+                                           -- , libdir = toPathTemplate "lib" }
                       lbi' = lbi { installDirTemplates = customDirs }
                   return lbi'
 

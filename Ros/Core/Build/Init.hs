@@ -39,7 +39,7 @@ prepCMakeLists pkgName = B.appendFile (pkgName</>"CMakeLists.txt") cmd
 prepCabal :: String -> IO ()
 prepCabal pkgName = B.writeFile (pkgName</>(pkgName++".cabal")) $
                     B.concat [preamble,"\n",target]
-    where preamble = format [ ("Name", B.pack pkgName)
+    where preamble = format [ ("Name", B.append "ROS-" $ B.pack pkgName)
                             , ("Version","0.0")
                             , ("Synopsis","I am code")
                             , ("Cabal-version",">=1.6")
