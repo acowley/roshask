@@ -10,7 +10,7 @@ import System.Directory (doesFileExist, doesDirectoryExist,
                          getDirectoryContents)
 import System.Environment (getEnvironment)
 import System.FilePath ((</>), splitSearchPath, takeExtension, 
-                        dropExtension, takeFileName)
+                        dropExtension, takeFileName, splitDirectories)
 import Text.XML.Light
 
 type Package = String
@@ -61,6 +61,11 @@ getRosPaths =
            allPaths = rPath : (rPath</>"core") : splitSearchPath pPaths
        concat <$> (mapM packagePaths =<< filterM doesDirectoryExist allPaths)
 
+-- Packages that we will ignore for tracking down message definition
+-- dependencies.
+ignoredPackages :: [String]
+ignoredPackages = ["genmsg_cpp", "rospack"]
+
 -- |Find the paths to the packages this package depends on as
 -- indicated by the manifest.xml file in this package's root
 -- directory.
@@ -73,12 +78,17 @@ findPackageDeps pkgRoot =
           txt <- readFile man
           let pkgs = case getPackages txt of
                        Nothing -> error "Couldn't parse manifest.xml"
-                       Just pkgs -> pkgs
+                       Just pkgs -> filter (not . (`elem` ignoredPackages)) pkgs
           searchPaths <- getRosPaths
           -- Add an implicit dependency on the "roslib" package.
-          pkgPaths <- mapM (findPackagePath searchPaths) ("roslib":pkgs)
+          let pkgs' = case last (splitDirectories pkgRoot) of
+                        "roslib" -> pkgs
+                        _ -> "roslib":pkgs
+          pkgPaths <- mapM (findPackagePath searchPaths) pkgs'
           case findIndex isNothing pkgPaths of
-            Just i -> error $ "Couldn't find path to package " ++ (pkgs !! i)
+            Just i -> putStrLn ("Looking for "++show pkgs'++
+                                ", dependencies of"++pkgRoot) >>
+                      error ("Couldn't find path to package " ++ (pkgs' !! i))
             Nothing -> return $ map fromJust pkgPaths
 
 -- |Return the full path to every .msg file in the given package
@@ -115,7 +125,8 @@ findMessage msgPkg msgType =
        let pkgs = [ msgPkg, "roslib" ]
        pkgPaths <- mapM (findPackagePath searchPaths) pkgs
        case findIndex isNothing pkgPaths of
-         Just i -> error $ "Couldn't find path to package " ++ (pkgs !! i)
+         Just i -> putStrLn ("Looking for "++msgPkg++"."++msgType) >>
+                   error ("Couldn't find path to package " ++ (pkgs !! i))
          Nothing -> find isMsg . concat <$> 
                     mapM (findMessages . fromJust) pkgPaths
     where isMsg = (== msgType) . dropExtension . takeFileName
