@@ -5,7 +5,7 @@ import Ros.Topic (repeatM)
 import qualified Ros.Std_msgs.String as S
 
 sayHello :: Topic IO S.String
-sayHello = mkMsg `fmap` repeatM getCurrentTime
+sayHello = repeatM (fmap mkMsg getCurrentTime)
   where mkMsg = S.String . ("Hello world " ++) . show
 
 main = runNode "talker" $ advertise "chatter" (topicRate 1 sayHello)
