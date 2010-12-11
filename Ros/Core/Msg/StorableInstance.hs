@@ -9,7 +9,10 @@ import Ros.Core.Msg.Types
 import Ros.Core.Msg.Analysis
 
 genStorableInstance :: Msg -> MsgInfo (ByteString, ByteString)
-genStorableInstance msg = isFlat msg >>= aux
+genStorableInstance msg 
+  | null (fields msg) = return ("import Foreign.Storable (Storable(..))\n",
+                                singletonStorable)
+  | otherwise = isFlat msg >>= aux
     where aux False = return ("", "")
           aux True = do sz <- totalSize msg
                         return (smImp, stInst sz)
@@ -30,6 +33,12 @@ genStorableInstance msg = isFlat msg >>= aux
           smImp = B.concat [ "import Foreign.Storable (Storable(..))\n"
                            , "import qualified Ros.Core.Util.StorableMonad"
                            , " as SM\n" ]
+          singletonStorable = B.concat [ "instance Storable ", name, " where\n"
+                                       , "  sizeOf _ = 1\n"
+                                       , "  alignment _ = 1\n"
+                                       , "  peek _ = pure ", name, "\n"
+                                       , "  poke _ _ = pure ()\n\n" ]
+
 
 totalSize :: Msg -> MsgInfo ByteString
 totalSize msg = B.intercalate sep `fmap` mapM (aux . fieldType) (fields msg)

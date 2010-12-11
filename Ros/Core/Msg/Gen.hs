@@ -27,9 +27,13 @@ generateMsgType pkgPath pkgMsgs msg =
      return $ B.concat [ modLine, "\n"
                        , imports
                        , storableImport
-                       , dataLine, fieldSpecs
-                       , "\n", fieldIndent
-                       , "} deriving (P.Show, P.Eq, P.Ord)\n\n"
+                       , if null fDecls
+                         then dataSingleton
+                         else B.concat [ dataLine
+                                       , fieldSpecs
+                                       , "\n"
+                                       , fieldIndent
+                                       , "} deriving (P.Show, P.Eq, P.Ord)\n\n"]
                        , binInst, "\n\n"
                        , storableInstance
                        --, genNFDataInstance msg
@@ -49,6 +53,8 @@ generateMsgType pkgPath pkgMsgs msg =
                                          (map fieldType (fields msg))]
                               --nfImport]
           dataLine = B.concat ["\ndata ", tName, " = ", tName, " { "]
+          dataSingleton = B.concat ["\ndata ", tName, " = ", tName, 
+                                    " deriving (P.Show, P.Eq, P.Ord)\n\n"]
           fieldIndent = B.replicate (B.length dataLine - 3) ' '
           lineSep = B.concat ["\n", fieldIndent, ", "]
 

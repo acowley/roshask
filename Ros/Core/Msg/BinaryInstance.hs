@@ -17,14 +17,21 @@ putMsgHeader :: ByteString
 putMsgHeader = "\n  putMsg = putStampedMsg"
 
 genBinaryInstance :: Msg -> MsgInfo ByteString
-genBinaryInstance m = 
+genBinaryInstance m 
+  | null (fields m) = return $ 
+                      B.concat [ "instance RosBinary ", name'
+                               , " where\n"
+                               , "  put _  = putUnit\n"
+                               , "  get = getUnit *> pure ", name']
+  | otherwise = 
     do puts <- mapM (\f -> serialize (fieldType f) >>= 
                            return . buildPut (fieldName f)) 
                     (fields m)
        gets <- mapM (deserialize . fieldType) (fields m)
-       return $ B.concat ["instance RosBinary ", pack (shortName m), " where\n",
+       return $ B.concat ["instance RosBinary ", name', " where\n",
                           "  put obj' = ", B.intercalate " *> " puts,"\n",
-                          "  get = ", pack (shortName m), " <$> ", 
+                          "  get = ", name', " <$> ",
                           B.intercalate " <*> " gets,
                           if hasHeader m then putMsgHeader else ""]
     where buildPut f ser = B.concat [ser, " (", f, " obj')"]
+          name' = pack (shortName m)
