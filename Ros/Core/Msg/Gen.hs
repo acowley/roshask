@@ -45,7 +45,7 @@ generateMsgType pkgPath pkgMsgs msg =
           modLine = B.concat ["{-# LANGUAGE OverloadedStrings #-}\n",
                               "module ", pkgPath, tName, " where"]
           imports = B.concat ["import qualified Prelude as P\n",
-                              "import Prelude ((.), (+))\n",
+                              "import Prelude ((.), (+), (*))\n",
                               "import Control.Applicative\n",
                               "import Ros.Core.RosBinary\n",
                               "import Ros.Core.Msg.MsgInfo\n",
