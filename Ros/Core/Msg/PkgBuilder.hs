@@ -56,7 +56,7 @@ buildPkgMsgs fname = do liftIO . putStrLn $ "Generating package " ++ fname
 
 -- Convert a ROS package name to valid Cabal package name
 rosPkg2CabalPkg :: String -> String
-rosPkg2CabalPkg = ("ROSMsg-" ++) . map sanitize
+rosPkg2CabalPkg = (\x -> concat ["ROS-",x,"Msg"]) . map sanitize
   where sanitize '_' = '-'
         sanitize c   = c
 
