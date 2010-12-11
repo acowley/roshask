@@ -64,7 +64,7 @@ getRosPaths =
 -- Packages that we will ignore for tracking down message definition
 -- dependencies.
 ignoredPackages :: [String]
-ignoredPackages = ["genmsg_cpp", "rospack"]
+ignoredPackages = ["genmsg_cpp", "rospack", "rosconsole", "rosbagmigration"]
 
 -- |Find the paths to the packages this package depends on as
 -- indicated by the manifest.xml file in this package's root
