@@ -87,6 +87,25 @@ fan n t = do cs <- replicateM n newTChanIO
              _ <- forkIO $ produce t
              return $ map (repeatM . feed) cs
 
+share :: Topic IO a -> IO (Topic IO a)
+share t = do cs <- newTVarIO [] -- The individual client buffers
+             signal <- newTVarIO True
+             let addClient = atomically $ do cs0 <- readTVar cs
+                                             c <- newTChan
+                                             writeTVar cs (c:cs0)
+                                             return c
+                 feed c = do atomically $ do f <- isEmptyTChan c
+                                             when f (writeTVar signal False)
+                             atomically $ readTChan c
+                 produce t = do atomically $ readTVar signal >>= flip when retry
+                                (x,t') <- runTopic t
+                                atomically $ do cs' <- readTVar cs
+                                                mapM_ (flip writeTChan x) cs'
+                                                writeTVar signal True
+                                produce t'
+             _ <- forkIO $ produce t
+             return . Topic $ addClient >>= runTopic . repeatM . feed
+
 -- |The application @topicRate rate t@ runs 'Topic' @t@ no faster than
 -- @rate@ Hz.
 topicRate :: (Functor m, MonadIO m) => Double -> Topic m a -> Topic m a
