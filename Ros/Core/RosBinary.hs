@@ -88,6 +88,12 @@ getAscii = toEnum . fromEnum <$> getWord8
 putAscii :: Char -> Put
 putAscii = putWord8 . toEnum . fromEnum
 
+putUnit :: Put
+putUnit = putWord8 0
+
+getUnit :: Get ()
+getUnit = getWord8 >> return ()
+
 instance RosBinary String where
     put s = let s' = BC8.pack s
             in putInt32 (BC8.length s') >> putByteString s'
