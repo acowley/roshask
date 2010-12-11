@@ -86,7 +86,9 @@ main = do args <- getArgs
             ["md5",name] -> canonicalizeName name >>= 
                             generate >>= putStrLn . snd
             ("create":pkgName:deps) -> initPkg pkgName deps
-            ["dep"] -> getCurrentDirectory >>= findPackageDeps >>= buildDepMsgs
-            ["dep",name] -> findPackageDeps name >>= buildDepMsgs
+            ["dep"] -> do d <- getCurrentDirectory 
+                          deps <- findPackageDeps d
+                          buildDepMsgs (deps++[d])
+            ["dep",name] -> findPackageDeps name >>= (buildDepMsgs . (++[name]))
             _ -> do mapM_ putStrLn help
                     exitWith (ExitFailure (-1))
