@@ -1,11 +1,12 @@
 -- Use a package's manifest.xml file to find paths to the packages on
 -- which this package is dependent.
-module Ros.Core.Build.DepFinder (findPackageDeps, findMessages, 
-                                 findMessage, findMessagesInPkg) where
+module Ros.Core.Build.DepFinder (findPackageDeps, findPackageDepNames, 
+                                 findMessages, findMessage, 
+                                 findMessagesInPkg) where
 import Control.Applicative ((<$>))
 import Control.Monad (when, filterM)
 import Data.Maybe (mapMaybe, isNothing, fromJust)
-import Data.List (find, findIndex)
+import Data.List (find, findIndex, nub)
 import System.Directory (doesFileExist, doesDirectoryExist, 
                          getDirectoryContents)
 import System.Environment (getEnvironment)
@@ -66,30 +67,37 @@ getRosPaths =
 ignoredPackages :: [String]
 ignoredPackages = ["genmsg_cpp", "rospack", "rosconsole", "rosbagmigration"]
 
+-- |Find the names of the ROS packages this package depends on as
+-- indicated by the manifest.xml file in this package's root
+-- directory.
+findPackageDepNames :: FilePath -> IO [String]
+findPackageDepNames pkgRoot = 
+  let man = pkgRoot </> "manifest.xml"
+  in do exists <- doesFileExist man
+        when (not exists)
+             (error $ "Couldn't find "++man)
+        txt <- readFile man
+        case getPackages txt of
+          Nothing -> error $ "Couldn't parse " ++ man
+          Just pkgs -> return $ filter (not . (`elem` ignoredPackages)) pkgs
+
 -- |Find the paths to the packages this package depends on as
 -- indicated by the manifest.xml file in this package's root
 -- directory.
 findPackageDeps :: FilePath -> IO [FilePath]
 findPackageDeps pkgRoot = 
-    let man = pkgRoot </> "manifest.xml"
-    in do exists <- doesFileExist man
-          when (not exists)
-               (error "Couldn't find manifest.xml")
-          txt <- readFile man
-          let pkgs = case getPackages txt of
-                       Nothing -> error "Couldn't parse manifest.xml"
-                       Just pkgs -> filter (not . (`elem` ignoredPackages)) pkgs
-          searchPaths <- getRosPaths
-          -- Add an implicit dependency on the "roslib" package.
-          let pkgs' = case last (splitDirectories pkgRoot) of
-                        "roslib" -> pkgs
-                        _ -> "roslib":pkgs
-          pkgPaths <- mapM (findPackagePath searchPaths) pkgs'
-          case findIndex isNothing pkgPaths of
-            Just i -> putStrLn ("Looking for "++show pkgs'++
-                                ", dependencies of"++pkgRoot) >>
-                      error ("Couldn't find path to package " ++ (pkgs' !! i))
-            Nothing -> return $ map fromJust pkgPaths
+    do pkgs <- findPackageDepNames pkgRoot
+       searchPaths <- getRosPaths
+       -- Add an implicit dependency on the "roslib" package.
+       let pkgs' = case last (splitDirectories pkgRoot) of
+                     "roslib" -> nub pkgs
+                     _ -> nub $ "roslib":pkgs
+       pkgPaths <- mapM (findPackagePath searchPaths) pkgs'
+       case findIndex isNothing pkgPaths of
+         Just i -> putStrLn ("Looking for "++show pkgs'++
+                             ", dependencies of"++pkgRoot) >>
+                   error ("Couldn't find path to package " ++ (pkgs' !! i))
+         Nothing -> return $ map fromJust pkgPaths
 
 -- |Return the full path to every .msg file in the given package
 -- directory.
