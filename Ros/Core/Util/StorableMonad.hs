@@ -1,9 +1,8 @@
-{-# LANGUAGE PackageImports #-}
 -- |An applicative interface for working with Storable values. The idea
 -- is that the underlying pointer is threaded through the computation
 -- to make reading and writing consecutive values easier.
 module Ros.Core.Util.StorableMonad (peek, poke, runStorable, StorableM) where
-import "monads-fd" Control.Monad.State.Strict
+import Control.Monad.State.Strict
 import Foreign.Ptr
 import Foreign.Storable hiding (peek, poke)
 import qualified Foreign.Storable as S

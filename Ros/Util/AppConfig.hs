@@ -1,7 +1,6 @@
-{-# LANGUAGE PackageImports #-}
 -- |Support for read-only executable application configurations.
 module Ros.Util.AppConfig where
-import "monads-fd" Control.Monad.Reader
+import Control.Monad.Reader
 import Control.Concurrent
 
 data ConfigOptions = ConfigOptions { verbosity :: Int }

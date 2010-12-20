@@ -1,12 +1,11 @@
-{-# LANGUAGE PackageImports #-}
 -- |Functions for working with 'Topic's built around monad
 -- transformers. These make it possible to, for example, repeat a
 -- stateful action to produce a 'Topic''s values.
 module Ros.TopicMT where
 import Control.Arrow
-import qualified "monads-fd" Control.Monad.State.Lazy as L
-import qualified "monads-fd" Control.Monad.State.Strict as S
-import "monads-fd" Control.Monad.Reader
+import qualified Control.Monad.State.Lazy as L
+import qualified Control.Monad.State.Strict as S
+import Control.Monad.Reader
 import Ros.Topic
 
 -- |Run a 'Topic' built around a lazy @'L.StateT' s@ monad using a

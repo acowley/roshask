@@ -6,9 +6,11 @@ import Control.Concurrent (killThread, forkIO, threadDelay, MVar, putMVar,
                            isEmptyMVar, readMVar, modifyMVar_)
 import Control.Concurrent.QSem
 import Control.Monad.IO.Class (liftIO)
-import qualified Data.ByteString.UTF8 as BU
+import qualified Data.ByteString.UTF8 ()
 import qualified Data.ByteString.Lazy.UTF8 as BLU
-import Snap.Http.Server (httpServe)
+import Snap.Http.Server (simpleHttpServe)
+import Snap.Http.Server.Config (defaultConfig, addListen, Config, 
+                                ConfigListen(..))
 import Snap.Types (Snap, getRequestBody, writeLBS, 
                    getResponse, putResponse, setContentLength)
 import Network.Socket hiding (Stream)
@@ -158,9 +160,8 @@ slaveRPC n = -- \q s -> putStrLn ("Slave call "++s)>>(handleCall (dispatch q) s)
 -- Start a Snap webserver on the specified port with the specified
 -- handler.
 simpleServe :: Int -> Snap () -> IO ()
-simpleServe port handler = httpServe (pack "*") port (pack "myserver")
-                                     Nothing Nothing handler
-    where pack = BU.fromString
+simpleServe port handler = simpleHttpServe conf handler
+  where conf = addListen (ListenHttp "*" port) defaultConfig :: Config Snap ()
 
 -- Find a free port by opening a socket, getting its port, then
 -- closing it.

@@ -1,10 +1,10 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns, PackageImports #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 module Ros.RosTcp (subStream, runServer) where
 import Control.Applicative ((<$>))
 import Control.Concurrent (forkIO, killThread)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar
-import "monads-fd" Control.Monad.Reader
+import Control.Monad.Reader
 import Data.Binary.Put (runPut, putWord32le)
 import Data.Binary.Get (runGet, getWord32le)
 import Data.ByteString.Lazy (ByteString)

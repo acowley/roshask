@@ -1,11 +1,11 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, PackageImports,
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, 
              ExistentialQuantification, GeneralizedNewtypeDeriving #-}
 module Ros.NodeType where
 import Control.Applicative (Applicative(..), (<$>))
 import Control.Concurrent (MVar, putMVar)
 import Control.Concurrent.STM (atomically, TVar, readTVar, writeTVar)
-import "monads-fd" Control.Monad.State
-import "monads-fd" Control.Monad.Reader
+import Control.Monad.State
+import Control.Monad.Reader
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Set (Set)
