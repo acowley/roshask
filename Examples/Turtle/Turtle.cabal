@@ -1,4 +1,4 @@
-Name:                Turtle
+Name:                ROS-Turtle
 Version:             0.0
 Synopsis:            I am code
 Cabal-version:       >=1.6
@@ -8,9 +8,10 @@ Build-type:          Custom
 Executable Turtle
   Build-Depends:  base >= 4.2 && < 5,
                   vector == 0.7.*,
-                  vector-space,
                   time == 1.1.*,
-                  roshask == 0.1.*
+                  vector-space,
+                  roshask == 0.1.*,
+                  ROS-turtlesim-msgs
   GHC-Options:    -Odph -main-is Turtle
   Main-Is:        Turtle.hs
   Hs-Source-Dirs: src
