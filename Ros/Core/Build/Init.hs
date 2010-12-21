@@ -87,7 +87,7 @@ prepSetup pkgName = B.writeFile (pkgName</>"Setup.hs") $
                              , "import Ros.Core.Build.SetupUtil\n\n"
                              , "main = defaultMainWithHooks $\n"
                              , "       simpleUserHooks { confHook = "
-                             , "rosConf, buildHook = rosBuild }\n" ]
+                             , "rosConf }\n" ]
 
 prepMain :: String -> IO ()
 prepMain pkgName = writeFile (pkgName</>"src"</>"Main.hs") $
