@@ -57,7 +57,8 @@ buildPkgMsgs fname = do liftIO . putStrLn $ "Generating package " ++ fname
                                 (error $ "Building messages for "++
                                          pkgName++" failed")
 
--- Convert a ROS package name to valid Cabal package name
+-- |Convert a ROS package name to the corresponding Cabal package name
+-- defining the ROS package's msg types.
 rosPkg2CabalPkg :: String -> String
 rosPkg2CabalPkg = ("ROS-"++) . addSuffix . map sanitize
   where sanitize '_' = '-'
