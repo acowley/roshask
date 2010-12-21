@@ -1,4 +1,4 @@
-Name:                PubSub
+Name:                ROS-PubSub
 Version:             0.0
 Synopsis:            I am code
 Cabal-version:       >=1.6
@@ -8,7 +8,9 @@ Build-type:          Custom
 Executable talker
   Build-Depends:  base >= 4.2 && < 5,
                   vector == 0.7.*,
-                  roshask == 0.1.*
+                  time == 1.1.*,
+                  roshask == 0.1.*,
+                  ROS-std-msgs
   GHC-Options:    -Odph -main-is Talker
   Main-Is:        Talker.hs
   Hs-Source-Dirs: src
@@ -17,7 +19,8 @@ Executable listener
   Build-Depends:  base >= 4.2 && < 5,
                   vector == 0.7.*,
                   time == 1.1.*,
-                  roshask == 0.1.*
+                  roshask == 0.1.*,
+                  ROS-std-msgs
   GHC-Options:    -Odph -main-is Listener
   Main-Is:        Listener.hs
   Hs-Source-Dirs: src
