@@ -17,6 +17,19 @@ import Ros.Core.Msg.Analysis
 import Ros.Core.Msg.Gen (generateMsgType)
 import Ros.Core.Msg.Parse (parseMsg)
 import Data.ByteString.Char8 (ByteString)
+import Paths_roshask (version)
+import Data.Version (versionBranch)
+
+-- The current version of roshask.
+roshaskVersion :: B.ByteString
+roshaskVersion = B.pack . intercalate "." $ map show (versionBranch version)
+
+-- The current version of roshask with the patch level changed to an
+-- asterisk. The intension is to allow a compiled roshask package to
+-- work with newer patch levels of roshask itself.
+roshaskMajorMinor :: B.ByteString
+roshaskMajorMinor = B.pack . intercalate "." $ 
+                    map show (take 2 (versionBranch version)) ++ ["*"]
 
 -- Build all messages defined by a package.
 buildPkgMsgs :: FilePath -> MsgInfo ()
@@ -110,8 +123,9 @@ genMsgCabal pkgPath pkgName =
                   , "  Build-Depends:   base >= 4.2 && < 6,"
                   , "                   vector == 0.7.*,"
                   , "                   time == 1.1.*,"
-                  , B.append "                   roshask == 0.1.*"
-                             (if null deps then ""  else ",")
+                  , B.concat [ "                   roshask == "
+                             , roshaskMajorMinor
+                             , if null deps then ""  else "," ]
                   , B.intercalate ",\n" $
                     map (B.append "                   ") deps
                   , "  GHC-Options:     -Odph" ]
@@ -121,7 +135,7 @@ genMsgCabal pkgPath pkgName =
      return cabalFilePath
   where cabalPkg = rosPkg2CabalPkg pkgName
         preamble = format [ ("Name", B.pack cabalPkg)
-                          , ("Version", "0.1.0")
+                          , ("Version", roshaskVersion)
                           , ("Synopsis", B.append "ROS Messages from " 
                                                   (B.pack pkgName))
                           , ("Cabal-version", ">=1.6")

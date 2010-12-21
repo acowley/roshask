@@ -88,12 +88,14 @@ hasMsgs :: FilePath -> IO Bool
 hasMsgs pkgPath = not . null . filter ((== ".msg") . takeExtension) <$> 
                   getDirectoryContents (pkgPath </> "msg")
 
+{-
 -- |Returns 'True' if the ROS package at the given 'FilePath' is a
 -- roshask package (determined by the presence of a @.cabal@ file in
 -- the package's root directory).
 isRoshask :: FilePath -> IO Bool
 isRoshask pkgPath = not . null . filter ((== ".cabal") . takeExtension) <$> 
                     getDirectoryContents pkgPath
+-}
 
 -- |Find the names of the ROS packages the package at the given
 -- 'FilePath' depends on as indicated by its @manifest.xml@ file. Only
