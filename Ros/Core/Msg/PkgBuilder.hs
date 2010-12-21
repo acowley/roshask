@@ -12,7 +12,7 @@ import System.Directory (createDirectoryIfMissing, getDirectoryContents,
 import System.FilePath
 import System.Process (createProcess, proc, CreateProcess(..), waitForProcess)
 import System.Exit (ExitCode(..))
-import Ros.Core.Build.DepFinder (findMessages, findPackageDepNames)
+import Ros.Core.Build.DepFinder (findMessages, findDepsWithMessages, hasMsgs)
 import Ros.Core.Msg.Analysis
 import Ros.Core.Msg.Gen (generateMsgType)
 import Ros.Core.Msg.Parse (parseMsg)
@@ -66,10 +66,6 @@ rosPkg2CabalPkg = ("ROS-"++) . addSuffix . map sanitize
           | "msgs" `isSuffixOf` n = n
           | otherwise = n ++ "-msgs"
 
-hasMsgs :: FilePath -> IO Bool
-hasMsgs pkgPath = not. null . filter ((== ".msg") . takeExtension) <$> 
-                  getDirectoryContents (pkgPath </> "msg")
-
 removeOldCabal :: FilePath -> IO ()
 removeOldCabal pkgPath = 
   do f <- doesDirectoryExist msgPath
@@ -97,7 +93,7 @@ getHaskellMsgFiles pkgPath pkgName =
 genMsgCabal :: FilePath -> String -> IO FilePath
 genMsgCabal pkgPath pkgName = 
   do deps <- map (B.pack . rosPkg2CabalPkg) <$> 
-             findPackageDepNames pkgPath
+             findDepsWithMessages pkgPath
      msgFiles <- getHaskellMsgFiles pkgPath pkgName
      let msgModules = map (B.pack . path2MsgModule) msgFiles
          target = B.intercalate "\n" $

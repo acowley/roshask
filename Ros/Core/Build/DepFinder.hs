@@ -1,8 +1,8 @@
 -- Use a package's manifest.xml file to find paths to the packages on
 -- which this package is dependent.
 module Ros.Core.Build.DepFinder (findPackageDeps, findPackageDepNames, 
-                                 findMessages, findMessage, 
-                                 findMessagesInPkg) where
+                                 findMessages, findMessage, findMessagesInPkg,
+                                 findDepsWithMessages, hasMsgs) where
 import Control.Applicative ((<$>))
 import Control.Monad (when, filterM)
 import Data.Maybe (mapMaybe, isNothing, fromJust)
@@ -81,6 +81,23 @@ findPackageDepNames pkgRoot =
         case getPackages txt of
           Nothing -> error $ "Couldn't parse " ++ man
           Just pkgs -> return $ filter (not . (`elem` ignoredPackages)) pkgs
+
+-- |Returns 'True' if the ROS package at the given 'FilePath' defines
+-- any messages.
+hasMsgs :: FilePath -> IO Bool
+hasMsgs pkgPath = not. null . filter ((== ".msg") . takeExtension) <$> 
+                  getDirectoryContents (pkgPath </> "msg")
+
+-- |Find the names of the ROS packages the package at the given
+-- 'FilePath' depends on as indicated by its @manifest.xml@ file. Only
+-- those packages that define messages are returned.
+findDepsWithMessages :: FilePath -> IO [String]
+findDepsWithMessages pkgRoot = 
+  do names <- findPackageDepNames pkgRoot
+     searchPaths <- getRosPaths
+     pkgPaths <- mapM (findPackagePath searchPaths) names
+     map fst <$> filterM (maybe (return False) hasMsgs . snd) 
+                         (zip names pkgPaths)
 
 -- |Find the paths to the packages this package depends on as
 -- indicated by the manifest.xml file in this package's root
