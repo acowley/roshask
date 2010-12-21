@@ -58,6 +58,7 @@ prepCabal pkgName rosDeps = B.writeFile (pkgName</>(pkgName++".cabal")) $
                    , rosDeps
                    , "  GHC-Options:     -Odph"
                    , "  Hs-Source-Dirs:  src"
+                   , "  Main-Is:         Main.hs"
                    , B.append "  Other-Modules:   " pkgName' ]
           lib = B.intercalate "\n" $
                 [ "Library"
@@ -90,7 +91,7 @@ prepSetup pkgName = B.writeFile (pkgName</>"Setup.hs") $
 
 prepMain :: String -> IO ()
 prepMain pkgName = writeFile (pkgName</>"src"</>"Main.hs") $
-                   "module "++pkgName'++" (main) where\n\
+                   "module Main (main) where\n\
                    \import Ros.Node\n\
                    \import "++pkgName'++"\n\
                    \\n\
