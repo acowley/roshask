@@ -94,7 +94,7 @@ Library
                        snap-server == 0.3.*,
                        storable-tuple >= 0.0.2 && < 0.1,
                        transformers == 0.2.*,
-                       haxr >= 3000.9 && < 3001,
+                       haxr >= 3000.8.1 && < 3001,
                        utf8-string >= 0.3.6 && < 4,
                        uri >= 0.1.5 && < 0.2
 
