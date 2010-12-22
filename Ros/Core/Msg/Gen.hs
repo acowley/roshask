@@ -33,7 +33,7 @@ generateMsgType pkgPath pkgMsgs msg =
                                        , fieldSpecs
                                        , "\n"
                                        , fieldIndent
-                                       , "} deriving (P.Show, P.Eq, P.Ord)\n\n"]
+                                       , "} deriving (P.Show, P.Eq, P.Ord, T.Typeable)\n\n"]
                        , binInst, "\n\n"
                        , storableInstance
                        --, genNFDataInstance msg
@@ -42,10 +42,11 @@ generateMsgType pkgPath pkgMsgs msg =
                        , cons ]
     where name = shortName msg
           tName = pack $ toUpper (head name) : tail name
-          modLine = B.concat ["{-# LANGUAGE OverloadedStrings #-}\n",
+          modLine = B.concat ["{-# LANGUAGE OverloadedStrings, DeriveDataTypeable #-}\n",
                               "module ", pkgPath, tName, " where"]
           imports = B.concat ["import qualified Prelude as P\n",
                               "import Prelude ((.), (+), (*))\n",
+                              "import qualified Data.Typeable as T\n",
                               "import Control.Applicative\n",
                               "import Ros.Core.RosBinary\n",
                               "import Ros.Core.Msg.MsgInfo\n",

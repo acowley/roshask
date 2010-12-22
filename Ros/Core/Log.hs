@@ -1,7 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, DeriveDataTypeable #-}
 module Ros.Core.Log where
 import qualified Prelude as P
 import Prelude ((.))
+import qualified Data.Typeable as T
 import Control.Applicative
 import Ros.Core.RosBinary
 import Ros.Core.Msg.MsgInfo
@@ -17,7 +18,7 @@ data Log = Log { header :: Header.Header
                , function :: P.String
                , line :: Word.Word32
                , topics :: [P.String]
-               } deriving (P.Show, P.Eq, P.Ord)
+               } deriving (P.Show, P.Eq, P.Ord, T.Typeable)
 
 instance RosBinary Log where
   put obj' = put (header obj') *> put (level obj') *> put (name obj') *> put (msg obj') *> put (file obj') *> put (function obj') *> put (line obj') *> putList (topics obj')
