@@ -78,9 +78,12 @@ findPackageDepNames pkgRoot =
         when (not exists)
              (error $ "Couldn't find "++man)
         txt <- readFile man
-        case getPackages txt of
-          Nothing -> error $ "Couldn't parse " ++ man
-          Just pkgs -> return $ filter (not . (`elem` ignoredPackages)) pkgs
+        let pkgs = case getPackages txt of
+                     Nothing -> error $ "Couldn't parse " ++ man
+                     Just ps -> filter (not . (`elem` ignoredPackages)) ps
+        case last (splitDirectories pkgRoot) of
+          "roslib" -> return $ nub pkgs
+          _ -> return . nub $ "roslib":pkgs
 
 -- |Returns 'True' if the ROS package at the given 'FilePath' defines
 -- any messages.
@@ -116,14 +119,14 @@ findPackageDeps pkgRoot =
     do pkgs <- findPackageDepNames pkgRoot
        searchPaths <- getRosPaths
        -- Add an implicit dependency on the "roslib" package.
-       let pkgs' = case last (splitDirectories pkgRoot) of
-                     "roslib" -> nub pkgs
-                     _ -> nub $ "roslib":pkgs
-       pkgPaths <- mapM (findPackagePath searchPaths) pkgs'
+       -- let pkgs' = case last (splitDirectories pkgRoot) of
+       --               "roslib" -> nub pkgs
+       --               _ -> nub $ "roslib":pkgs
+       pkgPaths <- mapM (findPackagePath searchPaths) pkgs
        case findIndex isNothing pkgPaths of
-         Just i -> putStrLn ("Looking for "++show pkgs'++
+         Just i -> putStrLn ("Looking for "++show pkgs++
                              ", dependencies of"++pkgRoot) >>
-                   error ("Couldn't find path to package " ++ (pkgs' !! i))
+                   error ("Couldn't find path to package " ++ (pkgs !! i))
          Nothing -> return $ map fromJust pkgPaths
 
 -- |Return the full path to every .msg file in the given package
