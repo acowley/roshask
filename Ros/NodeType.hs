@@ -6,6 +6,7 @@ import Control.Concurrent (MVar, putMVar)
 import Control.Concurrent.STM (atomically, TVar, readTVar, writeTVar)
 import Control.Monad.State
 import Control.Monad.Reader
+import Data.Dynamic
 import Data.Map (Map)
 import qualified Data.Map as M
 import Data.Set (Set)
@@ -26,6 +27,7 @@ data Publication = Publication { subscribers :: TVar (Set URI)
                                , pubType     :: String
                                , pubPort     :: Int
                                , pubCleanup  :: IO ()
+                               , pubTopic    :: Dynamic
                                , pubStats    :: StatMap PubStats }
 
 data NodeState = NodeState { nodeName       :: String

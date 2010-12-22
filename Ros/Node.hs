@@ -17,6 +17,7 @@ import Control.Monad.Reader (ask, asks, runReaderT)
 import qualified Data.Map as M
 import qualified Data.Set as S
 import Control.Concurrent (forkIO, ThreadId)
+import Data.Dynamic
 import System.Environment (getEnvironment, getArgs)
 import Network.XmlRpc.Internals (XmlRpcType)
 import Ros.Core.Msg.MsgInfo
@@ -62,34 +63,43 @@ mkSub tname = do c <- liftIO $ newBoundedChan recvBufferSize
                      sub = Subscription known addSource' topicType stats
                  return (stream, sub)
 
-mkPub :: forall a. (RosBinary a, MsgInfo a) => 
+mkPub :: forall a. (RosBinary a, MsgInfo a, Typeable a) => 
          Topic IO a -> Int -> Config Publication
-mkPub = mkPubAux (msgTypeName (undefined::a)) . runServer
+mkPub t n = do t' <- liftIO $ share t
+               mkPubAux (msgTypeName (undefined::a)) t' (runServer t') n
 
-mkPubAux :: String -> ((URI -> Int -> IO ()) -> Int -> Config (Config (), Int)) ->
+mkPubAux :: Typeable a => 
+            String -> Topic IO a -> 
+            ((URI -> Int -> IO ()) -> Int -> Config (Config (), Int)) ->
             Int -> Config Publication
-mkPubAux trep runServer' bufferSize = 
+mkPubAux trep t runServer' bufferSize = 
     do stats <- liftIO $ newTVarIO M.empty
        (cleanup, port) <- runServer' (sendMessageStat stats) bufferSize
        known <- liftIO $ newTVarIO S.empty
        cleanup' <- configured cleanup
-       return $ Publication known trep port cleanup' stats
+       return $ Publication known trep port cleanup' (toDyn t) stats
 
 -- |Subscribe to the given Topic. Returns the @Stream@ of values
 -- received on over the Topic.
-subscribe :: (RosBinary a, MsgInfo a) => TopicName -> Node (Topic IO a)
+subscribe :: (RosBinary a, MsgInfo a, Typeable a) => 
+             TopicName -> Node (Topic IO a)
 subscribe name = do n <- get
                     name' <- canonicalizeName =<< remapName name
                     r <- nodeAppConfig <$> ask
                     let subs = subscriptions n
-                    if M.member name' subs
-                       then error $ "Already subscribed to "++name'
-                       else do (stream, sub) <- liftIO $
-                                                runReaderT (mkSub name') r
-                               put n { subscriptions = M.insert name' sub subs }
-                               --return stream
-                               liftIO $ share stream
-                               
+                    when (M.member name' subs) 
+                         (error $ "Already subscribed to "++name')
+                    let pubs = publications n
+                    if M.member name' pubs
+                      then return . fromDynErr . pubTopic $ pubs M.! name'
+                      else do (stream, sub) <- liftIO $
+                                               runReaderT (mkSub name') r
+                              put n { subscriptions = M.insert name' sub subs }
+                              --return stream
+                              liftIO $ share stream
+  where fromDynErr = maybe (error msg) id . fromDynamic
+        msg = "Subscription to "++name++" at a different type than "++
+              "what that Topic was already advertised at by this Node."
 
 -- |Spin up a thread within a Node. This is typically used for message
 -- handlers. Note that the supplied 'Topic' is traversed solely for
@@ -110,13 +120,14 @@ advertiseAux mkPub' bufferSize name =
 
 -- |Advertise a 'Topic' publishing a stream of 'IO' values with a
 -- per-client transmit buffer of the specified size.
-advertiseBuffered :: (RosBinary a, MsgInfo a) => 
+advertiseBuffered :: (RosBinary a, MsgInfo a, Typeable a) => 
                      Int -> TopicName -> Topic IO a -> Node ()
 advertiseBuffered bufferSize name s = advertiseAux (mkPub s) bufferSize name
 
 -- |Advertise a 'Topic' publishing a stream of values produced in
 -- the 'IO' monad.
-advertise :: (RosBinary a, MsgInfo a) => TopicName -> Topic IO a -> Node ()
+advertise :: (RosBinary a, MsgInfo a, Typeable a) => 
+             TopicName -> Topic IO a -> Node ()
 advertise = advertiseBuffered 1
 
 -- |Get an action that will shutdown this Node.
