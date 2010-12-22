@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 -- |The ROS Topic type and basic operations on Topics.
 --
 -- /Note/: Many of these operations have the same names as similar
@@ -9,6 +10,7 @@ import Control.Applicative
 import Control.Arrow
 import Control.Monad ((<=<))
 import Control.Monad.IO.Class
+import Data.Typeable
 
 -- |A Topic is an infinite stream of values that steps between values
 -- in a 'Monad'.
@@ -22,6 +24,10 @@ instance (Applicative m, Monad m) => Applicative (Topic m) where
   Topic ma <*> Topic mb = Topic $ do (f,t1) <- ma
                                      (x,t2) <- mb
                                      return (f x, t1 <*> t2)
+
+instance (Typeable1 m, Typeable a) => Typeable (Topic m a) where
+  typeOf _ = mkTyConApp (mkTyCon "Topic") 
+                        [typeOf1 (undefined::m a), typeOf (undefined::a)]
 
 -- |Return the first value produced by a 'Topic'.
 head :: Functor m => Topic m a -> m a
