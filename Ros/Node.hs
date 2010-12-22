@@ -30,7 +30,7 @@ import Ros.TopicStats (recvMessageStat, sendMessageStat)
 import Ros.Util.AppConfig (Config, parseAppConfig, forkConfig, configured)
 import Ros.Util.ArgRemapping
 import Ros.Topic
-import Ros.TopicUtil (topicRate)
+import Ros.TopicUtil (topicRate, share)
 import Ros.Core.RosTime
 
 -- |Maximum number of items to buffer for a subscriber.
@@ -87,7 +87,9 @@ subscribe name = do n <- get
                        else do (stream, sub) <- liftIO $
                                                 runReaderT (mkSub name') r
                                put n { subscriptions = M.insert name' sub subs }
-                               return stream
+                               --return stream
+                               liftIO $ share stream
+                               
 
 -- |Spin up a thread within a Node. This is typically used for message
 -- handlers. Note that the supplied 'Topic' is traversed solely for
