@@ -10,7 +10,7 @@ import qualified Data.ByteString.UTF8 ()
 import qualified Data.ByteString.Lazy.UTF8 as BLU
 import Snap.Http.Server (simpleHttpServe)
 import Snap.Http.Server.Config (defaultConfig, addListen, Config, 
-                                ConfigListen(..))
+                                ConfigListen(..), setAccessLog, setErrorLog)
 import Snap.Types (Snap, getRequestBody, writeLBS, 
                    getResponse, putResponse, setContentLength)
 import Network.Socket hiding (Stream)
@@ -161,7 +161,11 @@ slaveRPC n = -- \q s -> putStrLn ("Slave call "++s)>>(handleCall (dispatch q) s)
 -- handler.
 simpleServe :: Int -> Snap () -> IO ()
 simpleServe port handler = simpleHttpServe conf handler
-  where conf = addListen (ListenHttp "*" port) defaultConfig :: Config Snap ()
+  where conf :: Config Snap ()
+        conf = setAccessLog Nothing .
+               setErrorLog Nothing . 
+               addListen (ListenHttp "*" port) $ 
+               defaultConfig
 
 -- Find a free port by opening a socket, getting its port, then
 -- closing it.
