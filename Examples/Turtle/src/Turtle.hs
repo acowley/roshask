@@ -3,7 +3,7 @@ module Turtle (main) where
 import Data.VectorSpace
 import Ros.Node
 import Ros.Topic (cons, repeatM)
-import Ros.TopicUtil (tee, filterBy, everyNew, interruptible, gate)
+import Ros.TopicUtil (filterBy, everyNew, interruptible, gate, share)
 import Ros.Turtlesim.Pose
 import Ros.Turtlesim.Velocity
 import Ros.Logging
@@ -44,8 +44,8 @@ navigate (goal, pos) = Velocity (min 2 (magnitude v)) angVel
 
 main = runNode "HaskellBTurtle" $
        do enableLogging (Just Warn)
-          (p1, p2) <- liftIO . tee =<< subscribe "/turtle1/pose"
-          (gs1, gs2) <- liftIO . tee . interruptible $ getTraj
-          let goals = gate gs2 (cons () (arrivalTrigger gs1 p1))
-          advertise "/turtle1/command_velocity" $ 
-                    fmap navigate (everyNew goals p2)
+          poses <- subscribe "/turtle1/pose"
+          traj <- liftIO . share . interruptible $ getTraj
+          let goals = gate traj (cons () (arrivalTrigger traj poses))
+          advertise "/turtle1/command_velocity" $
+                    fmap navigate (everyNew goals poses)
