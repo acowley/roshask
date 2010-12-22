@@ -1,8 +1,9 @@
 module Ros.Util.RingChan (RingChan, newRingChan, writeChan, 
-                          readChan, getChanContents) where
+                          readChan, getChanContents, getBuffered) where
 import Control.Monad (join)
 import Control.Concurrent.MVar
 import Control.Concurrent.QSem
+import qualified Data.Foldable as F
 import Data.Sequence (Seq, (|>), viewl, ViewL(..))
 import qualified Data.Sequence as Seq
 import System.IO.Unsafe (unsafeInterleaveIO)
@@ -30,15 +31,18 @@ writeChan :: RingChan a -> a -> IO ()
 writeChan (n,sem,mv) x = 
     join $ modifyMVar mv (\q -> if Seq.length q < n
                                 then return (q |> x, signalQSem sem)
---                                 else let _ :< t = viewl q
---                                      in return (t |> x, return ()))
-                                else return (q, return ()))
+                                else let _ :< t = viewl q
+                                     in return (t |> x, return ()))
+                                -- else return (q, return ()))
 
 -- |Read an item from the channel. Blocks until an item is available.
 readChan :: RingChan a -> IO a
 readChan (_,sem,mv) = do waitQSem sem
                          modifyMVar mv (\q -> let h :< t = viewl q
                                               in return (t,h))
+
+getBuffered :: RingChan a -> IO [a]
+getBuffered (_,_,xs) = F.toList `fmap` readMVar xs
 
 -- |Return the channel's contents as a lazily realized list.
 getChanContents :: RingChan a -> IO [a]
