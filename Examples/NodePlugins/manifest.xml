@@ -1,0 +1,15 @@
+<package>
+  <description brief="NodePlugins">
+
+     NodePlugins
+
+  </description>
+  <author>Anthony Cowley</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/NodePlugins</url>
+  <depend package="sensor_msgs"/>
+
+</package>
+
+

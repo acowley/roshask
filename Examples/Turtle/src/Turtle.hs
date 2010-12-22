@@ -45,7 +45,7 @@ navigate (goal, pos) = Velocity (min 2 (magnitude v)) angVel
 main = runNode "HaskellBTurtle" $
        do enableLogging (Just Warn)
           poses <- subscribe "/turtle1/pose"
-          traj <- liftIO . share . interruptible $ getTraj
-          let goals = gate traj (cons () (arrivalTrigger traj poses))
+          (t1,t2) <- liftIO . tee . interruptible $ getTraj
+          let goals = gate t1 (cons () (arrivalTrigger t2 poses))
           advertise "/turtle1/command_velocity" $
                     fmap navigate (everyNew goals poses)

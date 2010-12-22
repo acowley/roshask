@@ -1,0 +1,52 @@
+Name:              ROS-NodePlugins
+Version:           0.0
+Synopsis:          I am code
+Cabal-version:     >=1.6
+Category:          Robotics
+Build-type:        Custom
+Description: A demonstration of composing two Node values in order to
+             avoid copying values between processes. All image data is
+             kept in process, and pushed over the Topic connecting
+             senseUFO and detectUFO with a pointer copy.
+
+Executable NodePlugins
+  Build-Depends:   base >= 4.2 && < 5,
+                   vector == 0.7.*,
+                   time == 1.1.*,
+                   roshask == 0.1.*,
+                   mtl,
+                   ROS-roslib-msgs,
+                   ROS-sensor-msgs
+  GHC-Options:     -Odph
+  GHC-Prof-Options:-prof -auto-all -caf-all
+  Hs-Source-Dirs:  src
+  Main-Is:         Main.hs
+  Other-Modules:   SenseUFO DetectUFO
+
+Executable sense
+  Build-Depends:   base >= 4.2 && < 5,
+                   vector == 0.7.*,
+                   time == 1.1.*,
+                   roshask == 0.1.*,
+                   mtl,
+                   ROS-roslib-msgs,
+                   ROS-sensor-msgs
+  GHC-Options:     -Odph
+  GHC-Prof-Options:-prof -auto-all -caf-all
+  Hs-Source-Dirs:  src
+  Main-Is:         JustSense.hs
+  Other-Modules:   SenseUFO
+
+Executable detect
+  Build-Depends:   base >= 4.2 && < 5,
+                   vector == 0.7.*,
+                   time == 1.1.*,
+                   roshask == 0.1.*,
+                   mtl,
+                   ROS-roslib-msgs,
+                   ROS-sensor-msgs
+  GHC-Options:     -Odph
+  GHC-Prof-Options:-prof -auto-all -caf-all
+  Hs-Source-Dirs:  src
+  Main-Is:         JustDetect.hs
+  Other-Modules:   DetectUFO

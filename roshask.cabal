@@ -44,6 +44,20 @@ Extra-source-files:  Examples/PubSub/CMakeLists.txt
                      Examples/PubSub/manifest.xml
                      Examples/PubSub/src/Talker.hs
                      Examples/PubSub/src/Listener.hs
+                     Examples/Turtle/CMakeLists.txt
+                     Examples/Turtle/Makefile
+                     Examples/Turtle/Turtle.cabal
+                     Examples/Turtle/Setup.hs
+                     Examples/Turtle/mainpage.dox
+                     Examples/Turtle/manifest.xml
+                     Examples/Turtle/src/Turtle.hs
+                     Examples/NodePlugins/Makefile
+                     Examples/NodePlugins/NodePlugins.cabal
+                     Examples/NodePlugins/Setup.hs
+                     Examples/NodePlugins/mainpage.dox
+                     Examples/NodePlugins/manifest.xml
+                     Examples/NodePlugins/src/*.hs
+
 
 Source-repository this
   type:     git

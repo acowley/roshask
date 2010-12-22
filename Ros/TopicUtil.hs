@@ -11,7 +11,7 @@ import Control.Monad.IO.Class
 import qualified Data.Foldable as F
 import Ros.Rate (rateLimiter)
 import Ros.Topic hiding (mapM)
-import qualified Ros.Util.RingChan as R
+--import qualified Ros.Util.RingChan as R
 
 -- |Produce an infinite list from a 'Topic'.
 toList :: Topic IO a -> IO [a]
@@ -91,12 +91,12 @@ fan n t = do cs <- replicateM n newTChanIO
 share :: Topic IO a -> IO (Topic IO a)
 share t = do cs <- newTVarIO [] -- A list for the individual client buffers
              -- Keep up to 10 items around for late-joining clients
-             buffer <- R.newRingChan 10 
+             --buffer <- R.newRingChan 10 
              signal <- newTVarIO True
-             let addClient = do oldItems <- R.getBuffered buffer
+             let addClient = do --oldItems <- R.getBuffered buffer
                                 atomically $ do cs0 <- readTVar cs
                                                 c <- newTChan
-                                                mapM_ (writeTChan c) oldItems
+                                                --mapM_ (writeTChan c) oldItems
                                                 writeTVar cs (c:cs0)
                                                 return c
                  feed c = do atomically $ do f <- isEmptyTChan c
@@ -104,7 +104,7 @@ share t = do cs <- newTVarIO [] -- A list for the individual client buffers
                              atomically $ readTChan c
                  produce t = do atomically $ readTVar signal >>= flip when retry
                                 (x,t') <- runTopic t
-                                R.writeChan buffer x -- Buffer item
+                                --R.writeChan buffer x -- Buffer item
                                 atomically $ do cs' <- readTVar cs
                                                 mapM_ (flip writeTChan x) cs'
                                                 writeTVar signal True
