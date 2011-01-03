@@ -1,6 +1,6 @@
--- |A node that advertises a video feed from a sensor for tracking
--- UFOs.
-module SenseUFO (senseUFO) where
+-- |A node that advertises a video feed from a telescope sensor for
+-- tracking UFOs.
+module Telescope (telescope) where
 import Ros.Node
 import Ros.Topic (repeatM)
 import Ros.TopicMT (runTopicState')
@@ -39,5 +39,5 @@ images = repeatM (mkImage `fmap` orbitPt width height)
         fi = fromIntegral
         mkImage = Image header (fi width) (fi height) "mono8" 0 (fi width)
 
-senseUFO :: Node ()
-senseUFO = advertise "video" $ (topicRate 60 (runTopicState' images 0))
+telescope :: Node ()
+telescope = advertise "video" $ (topicRate 60 (runTopicState' images 0))

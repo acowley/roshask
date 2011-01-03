@@ -1,4 +1,4 @@
-Name:              ROS-NodePlugins
+Name:              ROS-NodeCompose
 Version:           0.0
 Synopsis:          I am code
 Cabal-version:     >=1.6
@@ -7,7 +7,7 @@ Build-type:        Custom
 Description: A demonstration of composing two Node values in order to
              avoid copying values between processes. All image data is
              kept in process, and pushed over the Topic connecting
-             senseUFO and detectUFO with a pointer copy.
+             telescope and detectUFO with a pointer copy.
 
 Executable NodePlugins
   Build-Depends:   base >= 4.2 && < 5,
@@ -21,9 +21,9 @@ Executable NodePlugins
   GHC-Prof-Options:-prof -auto-all -caf-all
   Hs-Source-Dirs:  src
   Main-Is:         Main.hs
-  Other-Modules:   SenseUFO DetectUFO
+  Other-Modules:   Telescope DetectUFO
 
-Executable sense
+Executable scope
   Build-Depends:   base >= 4.2 && < 5,
                    vector == 0.7.*,
                    time == 1.1.*,
@@ -34,8 +34,8 @@ Executable sense
   GHC-Options:     -Odph
   GHC-Prof-Options:-prof -auto-all -caf-all
   Hs-Source-Dirs:  src
-  Main-Is:         JustSense.hs
-  Other-Modules:   SenseUFO
+  Main-Is:         JustScope.hs
+  Other-Modules:   Telescope
 
 Executable detect
   Build-Depends:   base >= 4.2 && < 5,
