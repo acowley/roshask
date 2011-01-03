@@ -11,7 +11,6 @@ import Control.Monad.IO.Class
 import qualified Data.Foldable as F
 import Ros.Rate (rateLimiter)
 import Ros.Topic hiding (mapM)
---import qualified Ros.Util.RingChan as R
 
 -- |Produce an infinite list from a 'Topic'.
 toList :: Topic IO a -> IO [a]
@@ -28,33 +27,22 @@ fromList (x:xs) = Topic $ return (x, fromList xs)
 fromList [] = error "Ran out of list elements"
 
 -- |Tee a 'Topic' into two duplicate 'Topic's. Each returned 'Topic'
--- will receive all the values of the original 'Topic', while any
--- side-effect produced by each step of the original 'Topic' will
--- occur only once. This version of @tee@ eagerly pulls data from the
--- original 'Topic' as soon as it is available. This behavior is
--- undesirable when lazily consuming the data stream is preferred. For
--- instance, using 'interruptible' with 'teeEager' will likely not
--- work well. However, 'teeEager' may have slightly better performance
--- than 'tee'.
-teeEager :: Topic IO a -> IO (Topic IO a, Topic IO a)
-teeEager t = do c1 <- newChan
-                c2 <- newChan
-                let feed c = do x <- readChan c
-                                return (x, Topic $ feed c)
-                _ <- forkIO . forever . join $
-                     (\x -> writeChan c1 x >> writeChan c2 x) <$> t
-                return (Topic $ feed c1, Topic $ feed c2)
-
--- |Tee a 'Topic' into two duplicate 'Topic's. Each returned 'Topic'
 -- will receive all the values of the original 'Topic' while any
 -- side-effect produced by each step of the original 'Topic' will
--- occur only once. This version of @tee@ lazily pulls data from the
--- original 'Topic' when it is first required by a consumer of either
--- of the returned 'Topic's. This behavior is crucial when lazily
--- consuming the data stream is preferred. For instance, using
--- 'interruptible' with 'tee' will allow for a chunk of data to be
--- abandoned before being fully consumed as long as neither consumer
--- has forced its way too far down the stream.
+-- occur only once.
+-- 
+-- This version of @tee@ lazily pulls data from the original 'Topic'
+-- when it is first required by a consumer of either of the returned
+-- 'Topic's. This behavior is crucial when lazily consuming the data
+-- stream is preferred. For instance, using 'interruptible' with 'tee'
+-- will allow for a chunk of data to be abandoned before being fully
+-- consumed as long as neither consumer has forced its way too far
+-- down the stream.
+--
+-- This function is useful when two consumers must see all the same
+-- elements from a 'Topic'. If the 'Topic' was instead 'share'd, then
+-- one consumer might get the first value from the 'Topic' before the
+-- second consumer's buffer is created since buffer creation is lazy.
 tee :: Topic IO a -> IO (Topic IO a, Topic IO a)
 tee t = do c1 <- newTChanIO
            c2 <- newTChanIO
@@ -71,9 +59,26 @@ tee t = do c1 <- newTChanIO
            _ <- forkIO $ produce t
            return (repeatM (feed c1), repeatM (feed c2))
 
+-- |This version of @tee@ eagerly pulls data from the
+-- original 'Topic' as soon as it is available. This behavior is
+-- undesirable when lazily consuming the data stream is preferred. For
+-- instance, using 'interruptible' with 'teeEager' will likely not
+-- work well. However, 'teeEager' may have slightly better performance
+-- than 'tee'.
+teeEager :: Topic IO a -> IO (Topic IO a, Topic IO a)
+teeEager t = do c1 <- newChan
+                c2 <- newChan
+                let feed c = do x <- readChan c
+                                return (x, Topic $ feed c)
+                _ <- forkIO . forever . join $
+                     (\x -> writeChan c1 x >> writeChan c2 x) <$> t
+                return (Topic $ feed c1, Topic $ feed c2)
+
 -- |Fan out one 'Topic' out to a number of duplicate 'Topic's, each of
 -- which will produce the same values. Side effects caused by the
--- original 'Topic''s production will occur only once.
+-- original 'Topic''s production will occur only once. This is useful
+-- when a known number of consumers must see exactly all the same
+-- elements.
 fan :: Int -> Topic IO a -> IO [Topic IO a]
 fan n t = do cs <- replicateM n newTChanIO
              signal <- newTVarIO True
@@ -88,23 +93,26 @@ fan n t = do cs <- replicateM n newTChanIO
              _ <- forkIO $ produce t
              return $ map (repeatM . feed) cs
 
+-- |Make a 'Topic' shareable among multiple consumers. Each consumer
+-- of a Topic gets its own read buffer automatically as soon as it
+-- starts pulling items from the Topic. Without calling one of
+-- 'share', 'tee', or 'fan' on a Topic, the Topic's values will be
+-- split among all consumers (e.g. consumer /A/ gets half the values
+-- produced by the 'Topic', while consumer /B/ gets the other half
+-- with some unpredictable interleaving). Note that Topics returned by
+-- the @Ros.Node.subscribe@ are already shared.
 share :: Topic IO a -> IO (Topic IO a)
 share t = do cs <- newTVarIO [] -- A list for the individual client buffers
-             -- Keep up to 10 items around for late-joining clients
-             --buffer <- R.newRingChan 10 
              signal <- newTVarIO True
-             let addClient = do --oldItems <- R.getBuffered buffer
-                                atomically $ do cs0 <- readTVar cs
-                                                c <- newTChan
-                                                --mapM_ (writeTChan c) oldItems
-                                                writeTVar cs (c:cs0)
-                                                return c
+             let addClient = atomically $ do cs0 <- readTVar cs
+                                             c <- newTChan
+                                             writeTVar cs (c:cs0)
+                                             return c
                  feed c = do atomically $ do f <- isEmptyTChan c
                                              when f (writeTVar signal False)
                              atomically $ readTChan c
                  produce t = do atomically $ readTVar signal >>= flip when retry
                                 (x,t') <- runTopic t
-                                --R.writeChan buffer x -- Buffer item
                                 atomically $ do cs' <- readTVar cs
                                                 mapM_ (flip writeTChan x) cs'
                                                 writeTVar signal True

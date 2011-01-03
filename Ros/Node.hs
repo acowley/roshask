@@ -79,8 +79,7 @@ mkPubAux trep t runServer' bufferSize =
        cleanup' <- configured cleanup
        return $ Publication known trep port cleanup' (toDyn t) stats
 
--- |Subscribe to the given Topic. Returns the @Stream@ of values
--- received on over the Topic.
+-- |Subscribe to the given Topic. Returns a 'Ros.TopicUtil.share'd 'Topic'.
 subscribe :: (RosBinary a, MsgInfo a, Typeable a) => 
              TopicName -> Node (Topic IO a)
 subscribe name = do n <- get
