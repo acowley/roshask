@@ -9,7 +9,7 @@ Description: A demonstration of composing two Node values in order to
              kept in process, and pushed over the Topic connecting
              telescope and detectUFO with a pointer copy.
 
-Executable NodePlugins
+Executable composition
   Build-Depends:   base >= 4.2 && < 5,
                    vector == 0.7.*,
                    time == 1.1.*,
