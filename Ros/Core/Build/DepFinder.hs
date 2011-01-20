@@ -1,6 +1,7 @@
 -- Use a package's manifest.xml file to find paths to the packages on
 -- which this package is dependent.
 module Ros.Core.Build.DepFinder (findPackageDeps, findPackageDepNames, 
+                                 findPackageDepsTrans,
                                  findMessages, findMessage, findMessagesInPkg,
                                  findDepsWithMessages, hasMsgs) where
 import Control.Applicative ((<$>))
@@ -42,9 +43,9 @@ dir :: FilePath -> IO [FilePath]
 dir p = getDirectoryContents p >>= return . map (p </>) . filter notDot
     where notDot s = s /= "." && s /= ".."
 
--- Each given path is a possible package path root, as are all of its
+-- The given path is a possible package path root, as are all of its
 -- subdirectories that are stacks (indicated by the presence of a
--- stack.xml file).
+-- stack.xml file). Returns a list of of package root directories.
 packagePaths :: FilePath -> IO [FilePath]
 packagePaths path = (path :) <$> (filterM isStack =<< dir path)
     where isStack = doesFileExist . (</> "stack.xml")
@@ -128,6 +129,28 @@ findPackageDeps pkgRoot =
                              ", dependencies of"++pkgRoot) >>
                    error ("Couldn't find path to package " ++ (pkgs !! i))
          Nothing -> return $ map fromJust pkgPaths
+
+-- |Transitive closure of 'findPackageDeps'. Find the paths to the
+-- packages this package depends on as indicated by the manifest.xml
+-- file in this package's root directories and the manifests in the
+-- root directories of the dependencies, and so on.
+findPackageDepsTrans :: FilePath -> IO [FilePath]
+findPackageDepsTrans pkgRoot =
+  do searchPaths <- getRosPaths
+     let getDeps pkg = 
+           do pkgDeps <- findPackageDepNames pkg
+              pkgPaths <- mapM (findPackagePath searchPaths) pkgDeps
+              case findIndex isNothing pkgPaths of
+                Just i -> putStrLn ("Looking for "++show pkgDeps++
+                                    ", dependencies of "++pkgRoot) >>
+                          error ("Couldn't find path to package " ++ 
+                                 (pkgDeps !! i))
+                Nothing -> return $ map fromJust pkgPaths
+         recurse p = do deps <- getDeps p
+                        nub . (++[p]) . concat <$> mapM recurse deps
+     init <$> recurse pkgRoot
+     
+
 
 -- |Return the full path to every .msg file in the given package
 -- directory.

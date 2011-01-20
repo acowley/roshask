@@ -14,7 +14,7 @@ import Ros.Core.Msg.Parse
 import Ros.Core.Msg.Gen
 import Ros.Core.Msg.MD5
 import Ros.Core.Msg.PkgBuilder (buildPkgMsgs)
-import Ros.Core.Build.DepFinder (findPackageDeps)
+import Ros.Core.Build.DepFinder (findPackageDeps, findPackageDepsTrans)
 import Ros.Core.Build.Init (initPkg)
 
 -- Ensure that the first character in a String is capitalized.
@@ -87,7 +87,7 @@ main = do args <- getArgs
                             generate >>= putStrLn . snd
             ("create":pkgName:deps) -> initPkg pkgName deps
             ["dep"] -> do d <- getCurrentDirectory 
-                          deps <- findPackageDeps d
+                          deps <- findPackageDepsTrans d
                           buildDepMsgs (deps++[d])
             ["dep",name] -> findPackageDeps name >>= (buildDepMsgs . (++[name]))
             _ -> do mapM_ putStrLn help
