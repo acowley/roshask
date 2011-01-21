@@ -26,8 +26,7 @@ hGetAll h n = go n []
                                             reverse (bs:acc)
 
 -- |The function that does the work of streaming members of the
--- 'RosBinary' class in from a 'Handle'. The first parameter specifies
--- the maximum number of items that will be buffered.
+-- 'RosBinary' class in from a 'Handle'.
 streamIn :: RosBinary a => Handle -> Topic IO a
 streamIn h = Topic go 
   where go = do item <- runMaybeT $ do len <- runGet getInt <$> hGetAll h 4
