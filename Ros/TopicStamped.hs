@@ -32,16 +32,12 @@ everyNew t1 t2 = let fused = T.everyNew t1 t2
   where go ((px,py), (x,y))
           | getSequence px == getSequence x = (x, pickNearest py y x)
           | otherwise = (pickNearest px x y, y)
-
-{-
-everyNew t1 t2 = iterateTopic startup $ T.everyNew t1 t2
-  where startup (x,y) = (Nothing, go x y)
-        go px py (x,y)
-          | getSequence px == getSequence x = 
-            (Just (x, pickNearest py y x), go x y)
-          | otherwise = 
-            (Just (pickNearest px x y), go x y)
--}
+-- NOTE: This is not the intended semantics. What we want is that
+-- every new element from either topic gets paired with the nearest
+-- element of the other topic. If X is coming in slowly, then between
+-- Xi and Xj we may have several Ym values, each of which should be
+-- paired with the closest corresponding value from X. This means we
+-- want to bracket each element of X /and/ bracket each element of Y.
 
 -- |Given two consecutive values, pick the one with the closest time
 -- stamp to another value.
@@ -102,9 +98,10 @@ removeDupPairs = iterateTopic startup
 ts :: (HasHeader a, HasHeader b) => (a,b) -> ROSTime
 ts (x,y) = max (getStamp x) (getStamp y)
 
--- |Update frequency is like 'bothNew', but elements of the first
+-- |Update frequency is like 'everyNew', but elements of the first
 -- 'Topic' are interpolated using the supplied interpolation function
 -- before being paired with each elemenet of the second 'Topic'.
 interp :: (HasHeader a, HasHeader b) => 
           (Double -> a -> a -> a) -> Topic IO a -> Topic IO b -> Topic IO (a,b)
 interp t1 t2 = undefined
+-- NOTE: Find a bracket for each element of the second Topic.
