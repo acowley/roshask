@@ -75,6 +75,7 @@ Library
                        Ros.TopicUtil
                        Ros.TopicPID
                        Ros.TopicMT
+                       Ros.TopicStamped
                        Ros.Rate
                        Ros.Core.Msg.MsgInfo
                        Ros.Core.Msg.HeaderSupport 
@@ -123,9 +124,9 @@ Library
   Other-modules:      Ros.MasterAPI Ros.SlaveAPI Ros.ParameterServerAPI
                       Ros.NodeType Ros.RunNode
                       Ros.RosTcp Ros.ConnectionHeader Ros.TopicStats 
-                      Ros.BinaryIter Ros.Util.RingChan Ros.Util.ArgRemapping 
-                      Ros.Core.Build.DepFinder Ros.Core.RosTime Ros.Util.PID
-                      Ros.Util.AppConfig
+                      Ros.BinaryIter Ros.Core.Util.RingChan 
+                      Ros.Core.Util.ArgRemapping Ros.Core.Build.DepFinder 
+                      Ros.Core.RosTime Ros.Util.PID Ros.Core.Util.AppConfig
 
 -- The ROS .msg definition parser and Haskell code generation utility.
 Executable roshask

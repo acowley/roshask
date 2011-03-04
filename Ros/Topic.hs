@@ -130,6 +130,35 @@ unfold :: Functor m => (b -> m (a,b)) -> b -> Topic m a
 unfold f z0 = go z0
   where go z = Topic $ second go <$> f z
 
+-- |A pair of an optional value and a continuation for producing more
+-- such pairs. This type is used by 'iterateTopic' to implement a kind
+-- of @foldMap@.
+newtype IterCont a b = IterCont (Maybe b, a -> IterCont a b)
+
+-- |A pair of an optional value and a continuation with effects for
+-- producing more such pairs. This type is used by 'iterateTopicM' to
+-- implement a kind of @foldMapM@.
+newtype IterContM m a b = IterContM (Maybe b, a -> m (IterContM m a b))
+
+-- |A kind of left @foldMap@ down a 'Topic'. The supplied function
+-- produces a optional value and a continuation when applied to an
+-- element of the first 'Topic'. The value is returned by the new
+-- 'Topic' if it is not 'Nothing', and the continuation is used to
+-- produce the rest of the returned 'Topic'.
+iterateTopic :: Monad m => (a -> IterCont a b) -> Topic m a -> Topic m b
+iterateTopic f t = Topic $ do (x,t') <- runTopic t
+                              let IterCont (x', f') = f x
+                              case x' of
+                                Nothing -> runTopic $ iterateTopic f' t'
+                                Just x'' -> return (x'', iterateTopic f' t')
+
+iterateTopicM :: Monad m => (a -> m (IterContM m a b)) -> Topic m a -> Topic m b
+iterateTopicM f t = Topic $ do (x,t') <- runTopic t
+                               IterContM (x', f') <- f x
+                               case x' of
+                                 Nothing -> runTopic $ iterateTopicM f' t'
+                                 Just x'' -> return (x'', iterateTopicM f' t')
+
 -- |Removes one level of monadic structure, projecting the values
 -- produced by a 'Topic' into the monad encapsulating each step the
 -- 'Topic' takes.
