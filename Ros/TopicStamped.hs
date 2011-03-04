@@ -11,33 +11,67 @@
 -- common use case is calling the 'bothNew' function with a 'Topic'
 -- that produces very quickly (faster than the minimum required update
 -- rate), and another 'Topic' that imposes a rate limit.
-module Ros.TopicStamped (everyNew, bothNew, interp) where
-import Control.Applicative
+module Ros.TopicStamped (everyNew, interpolate) where
+import Control.Arrow (second)
 import qualified Ros.Topic as T
-import Ros.Topic (Topic, IterCont(..), IterContM(..), iterateTopic, iterateTopicM)
+import Ros.Topic (Topic, IterCont(..), IterContM(..), metamorph, metamorphM)
 import qualified Ros.TopicUtil as T
 import Ros.TopicUtil ((<+>))
 import Ros.Core.Msg.HeaderSupport
 import Ros.Core.RosTime
 
--- |Returns a 'Topic' that produces a new pair every time either of
--- the component 'Topic's produces a new value. The value of the other
--- element of the pair will be the element from the other 'Topic' with
--- the nearest time stamp. The resulting 'Topic' will produce a new
--- value at the rate of the faster component 'Topic'.
+-- |Returns a 'Topic' that produces a new pair for every value
+-- produced by either of the component 'Topic's. The value of the
+-- other element of the pair will be the element from the other
+-- 'Topic' with the nearest time stamp. The resulting 'Topic' will
+-- produce a new value at the rate of the faster component 'Topic'.
 everyNew :: (HasHeader a, HasHeader b) => 
             Topic IO a -> Topic IO b -> Topic IO (a,b)
-everyNew t1 t2 = let fused = T.everyNew t1 t2
-                 in go <$> ((,) <$> fused <*> T.tail fused)
-  where go ((px,py), (x,y))
-          | getSequence px == getSequence x = (x, pickNearest py y x)
-          | otherwise = (pickNearest px x y, y)
--- NOTE: This is not the intended semantics. What we want is that
--- every new element from either topic gets paired with the nearest
--- element of the other topic. If X is coming in slowly, then between
--- Xi and Xj we may have several Ym values, each of which should be
--- paired with the closest corresponding value from X. This means we
--- want to bracket each element of X /and/ bracket each element of Y.
+everyNew t1 t2 = T.concats $ metamorph init (t1 <+> t2)
+  where init :: (HasHeader a, HasHeader b) => 
+                Either a b -> IterCont (Either a b) [(a,b)]
+        init (Left x) = IterCont (Nothing, accY x [])
+        init (Right y) = IterCont (Nothing, accX y [])
+        bracket :: (HasHeader a, HasHeader b) => a -> a -> [b] -> [a]
+        bracket = (map .) . pickNearest
+        accX :: (HasHeader a, HasHeader b) => 
+                b -> [a] -> Either a b -> IterCont (Either a b) [(a,b)]
+        accX y xs (Left x) = IterCont (Nothing, accX y (x:xs))
+        accX _ [] (Right y') = IterCont (Nothing, accX y' [])
+        accX y xss@(x:_) (Right y')
+          | getStamp x < getStamp y' = let xs = reverse xss
+                                           pts = zip xs $ bracket y y' xs
+                                       in IterCont $ (Just pts, accX y' [])
+          | otherwise = let (post, pre) = break ((> getStamp y') . getStamp) xss
+                            xs = reverse pre
+                            pts = zip xs $ bracket y y' xs
+                        in IterCont $ (Just pts, accX y' post)
+        accY :: (HasHeader a, HasHeader b) => 
+                a -> [b] -> Either a b -> IterCont (Either a b) [(a,b)]
+        accY x ys (Right y) = IterCont (Nothing, accY x (y:ys))
+        accY _ [] (Left x') = IterCont (Nothing, accY x' [])
+        accY x yss@(y:_) (Left x')
+          | getStamp y < getStamp x' = let ys = reverse yss
+                                           pts = zip (bracket x x' ys) ys
+                                       in IterCont $ (Just pts, accY x' [])
+          | otherwise = let (post,pre) = break ((> getStamp x') . getStamp) yss
+                            ys = reverse pre
+                            pts = zip (bracket x x' ys) ys
+                        in IterCont (Just pts, accY x' post)
+
+{- 
+NOTE: There are at least two major aspects of unsatisfying duplication
+in 'everyNew'. The need for both accX and accY functions is
+unfortunate, but keeping the order of the returned tuples straight is
+important. The other is in the interesting clause of each, the guards
+are not strictly necessary: the second ("otherwise") branch is
+sufficient. The inclusion of the check for the simple case is just an
+optimization.
+
+The whole thing could be implemented by walking down each topic twice:
+once with that topic as the bracketing topic, the other as it being
+the provider of intervening values.
+-}
 
 -- |Given two consecutive values, pick the one with the closest time
 -- stamp to another value.
@@ -53,55 +87,25 @@ pickNearest x1 x2 y
         d1 = diffROSTime ty t1
         d2 = diffROSTime t2 ty
 
--- |Given two pairs, if the first elements of the pairs bracket the
--- duplicated second element, then return a pair of the nearest first
--- element and the second element. If the second elements bracket the
--- duplicated element, return the first element and the nearest second
--- element. If there is not well-defined bracket, return 'Nothing'.
-findBracket :: (HasHeader a, HasHeader b) => (a,b) -> (a,b) -> Maybe (a,b)
-findBracket (sx,sy) (fx,fy)
-  | qx1 == qx2 && qy1 /= qy2 = Just (sx, pickNearest sy fy sx)
-  | qx1 /= qx2 && qy1 == qy2 = Just (pickNearest sx fx sy, sy)
-  | otherwise = Nothing
-  where qx1 = getSequence sx
-        qx2 = getSequence fx
-        qy1 = getSequence sy
-        qy2 = getSequence fy
-
--- |Returns a 'Topic' that produces a new pair every time both
--- component 'Topic's have produced a new value. The composite 'Topic'
--- will produce pairs at the rate of the slower component 'Topic'
--- consisting of the most recent value from the slow 'Topic' with the
--- value from the faster 'Topic' nearest in time.
-bothNew :: (HasHeader a, HasHeader b) => 
-           Topic IO a -> Topic IO b -> Topic IO (a,b)
-bothNew t1 t2 = iterateTopicM (go (T.everyNew t1 t2)) (T.bothNew t1 t2)
-  where go fast p = let tsp = ts p
-                        fast' = T.dropWhile ((<= tsp) . ts) fast
-                    in do (h, fast'') <- T.uncons fast'
-                          return $ IterContM (findBracket p h, go fast'')
-
--- |Remove consecutive duplicate pairs from a 'Topic'. Duplicates are
--- determined by the constituent messages' sequence identifiers.
-removeDupPairs :: (Monad m, HasHeader a, HasHeader b) => 
-                  Topic m (a,b) -> Topic m (a,b)
-removeDupPairs = iterateTopic startup
-  where pairSeq (a,b) = (getSequence a, getSequence b)
-        startup = IterCont . (Nothing, ) . go . pairSeq
-        go prevSeq curr
-          | prevSeq == currSeq = IterCont (Nothing, go currSeq)
-          | otherwise = IterCont (Just curr, go currSeq)
-          where currSeq = pairSeq curr
-
--- |Return the newer timestamp from among the timestamps from each
--- element of a pair.
-ts :: (HasHeader a, HasHeader b) => (a,b) -> ROSTime
-ts (x,y) = max (getStamp x) (getStamp y)
-
--- |Update frequency is like 'everyNew', but elements of the first
--- 'Topic' are interpolated using the supplied interpolation function
--- before being paired with each elemenet of the second 'Topic'.
-interp :: (HasHeader a, HasHeader b) => 
-          (Double -> a -> a -> a) -> Topic IO a -> Topic IO b -> Topic IO (a,b)
-interp t1 t2 = undefined
--- NOTE: Find a bracket for each element of the second Topic.
+-- |The application @interp t1 t2@ produces a new 'Topic' that pairs
+-- every element of @t2@ with an interpolation of two temporally
+-- bracketing values from @t1@. The interpolation is effected with the
+-- supplied function that is given the two values to interpolate and
+-- the linear ratio to find between them. This ratio is determined by
+-- the time stamp of the intervening element of @t2@.
+interpolate :: (HasHeader a, HasHeader b) => 
+               (a -> a -> Double -> a) -> Topic IO a -> Topic IO b -> Topic IO (a,b)
+interpolate f t1 t2 = T.concats $ metamorph startup (t1 <+> t2)
+  where startup (Left x) = IterCont (Nothing, go x)
+        startup (Right _) = IterCont (Nothing, startup)
+        go x (Left x') = IterCont (Nothing, go x')
+        go x (Right y) = IterCont (Nothing, acc x [y])
+        acc x ys (Right y) = IterCont (Nothing, acc x (y:ys))
+        acc x ys (Left x') = 
+          let start = getStamp x
+              stop = getStamp x'
+              dt = diffSecs stop start
+              (post,pre) = second reverse $ break ((> stop) . getStamp) ys
+              dts = map ((/ dt) . (`diffSecs` start) . getStamp) pre
+          in IterCont (Just $ zip (map (f x x') dts) pre, acc x' post)
+        diffSecs t1 t2 = fromROSTime $ diffROSTime t1 t2

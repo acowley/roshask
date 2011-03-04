@@ -131,33 +131,37 @@ unfold f z0 = go z0
   where go z = Topic $ second go <$> f z
 
 -- |A pair of an optional value and a continuation for producing more
--- such pairs. This type is used by 'iterateTopic' to implement a kind
--- of @foldMap@.
+-- such pairs. This type is used by 'metamorph' to implement a
+-- streaming @unfold . fold@ composition.
 newtype IterCont a b = IterCont (Maybe b, a -> IterCont a b)
 
 -- |A pair of an optional value and a continuation with effects for
--- producing more such pairs. This type is used by 'iterateTopicM' to
--- implement a kind of @foldMapM@.
+-- producing more such pairs. This type is used by 'metamorphM' to
+-- implement a streaming @unfold . fold@ composition.
 newtype IterContM m a b = IterContM (Maybe b, a -> m (IterContM m a b))
 
--- |A kind of left @foldMap@ down a 'Topic'. The supplied function
--- produces a optional value and a continuation when applied to an
--- element of the first 'Topic'. The value is returned by the new
--- 'Topic' if it is not 'Nothing', and the continuation is used to
--- produce the rest of the returned 'Topic'.
-iterateTopic :: Monad m => (a -> IterCont a b) -> Topic m a -> Topic m b
-iterateTopic f t = Topic $ do (x,t') <- runTopic t
-                              let IterCont (x', f') = f x
-                              case x' of
-                                Nothing -> runTopic $ iterateTopic f' t'
-                                Just x'' -> return (x'', iterateTopic f' t')
+-- |A metamorphism (cf. Jeremy Gibbons) on 'Topic's. This is an
+-- /unfold/ following a /fold/ (i.e. @unfoldr . foldl@), with the
+-- expectation that partial results of the /unfold/ may be returned
+-- before the /fold/ is completed. The supplied function produces a
+-- optional value and a continuation when applied to an element of the
+-- first 'Topic'. The value is returned by the new 'Topic' if it is
+-- not 'Nothing', and the continuation is used to produce the rest of
+-- the returned 'Topic'.
+metamorph :: Monad m => (a -> IterCont a b) -> Topic m a -> Topic m b
+metamorph f t = Topic $ do (x,t') <- runTopic t
+                           let IterCont (x', f') = f x
+                           case x' of
+                             Nothing -> runTopic $ metamorph f' t'
+                             Just x'' -> return (x'', metamorph f' t')
 
-iterateTopicM :: Monad m => (a -> m (IterContM m a b)) -> Topic m a -> Topic m b
-iterateTopicM f t = Topic $ do (x,t') <- runTopic t
-                               IterContM (x', f') <- f x
-                               case x' of
-                                 Nothing -> runTopic $ iterateTopicM f' t'
-                                 Just x'' -> return (x'', iterateTopicM f' t')
+-- |Similar to 'metamorph', but the metamorphism may have effects.
+metamorphM :: Monad m => (a -> m (IterContM m a b)) -> Topic m a -> Topic m b
+metamorphM f t = Topic $ do (x,t') <- runTopic t
+                            IterContM (x', f') <- f x
+                            case x' of
+                              Nothing -> runTopic $ metamorphM f' t'
+                              Just x'' -> return (x'', metamorphM f' t')
 
 -- |Removes one level of monadic structure, projecting the values
 -- produced by a 'Topic' into the monad encapsulating each step the
