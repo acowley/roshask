@@ -1,5 +1,6 @@
 -- |Utilities for working with ROS time values.
-module Ros.Core.RosTime where
+module Ros.Core.RosTime (ROSTime, ROSDuration, toROSTime, fromROSTime, 
+                         diffROSTime, getROSTime) where
 import Data.Time.Clock (UTCTime)
 import Data.Time.Clock.POSIX
 import Ros.Core.RosTypes
