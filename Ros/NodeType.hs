@@ -15,8 +15,8 @@ import Control.Concurrent (ThreadId)
 import Ros.Core.RosTypes (URI)
 import Ros.SlaveAPI (RosSlave(..))
 import Ros.TopicStats
-import Ros.Util.ArgRemapping (ParamVal)
-import Ros.Util.AppConfig (ConfigOptions)
+import Ros.Core.Util.ArgRemapping (ParamVal)
+import Ros.Core.Util.AppConfig (ConfigOptions)
 
 data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , addPub    :: URI -> IO ThreadId

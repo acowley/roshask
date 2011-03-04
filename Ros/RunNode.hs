@@ -6,7 +6,7 @@ import System.Posix.Signals (installHandler, Handler(..), sigINT)
 import Ros.Core.RosTypes
 import Ros.MasterAPI
 import Ros.SlaveAPI
-import Ros.Util.AppConfig (Config, debug)
+import Ros.Core.Util.AppConfig (Config, debug)
 
 -- Inform the master that we are publishing a particular topic.
 registerPublication :: RosSlave n => 

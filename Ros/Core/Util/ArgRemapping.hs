@@ -2,7 +2,8 @@
 -- |Parses the ROS argument remapping syntax. This is the language used
 -- to remap names and assign private parameter values from a command
 -- line invocation of a Node.
-module Ros.Util.ArgRemapping (parseRemappings, FromParam(..), ParamVal) where
+module Ros.Core.Util.ArgRemapping (parseRemappings, FromParam(..), 
+                                   ParamVal) where
 import Control.Applicative ((<$>))
 import Control.Monad.Identity (Identity)
 import Data.Either (partitionEithers, lefts, rights)

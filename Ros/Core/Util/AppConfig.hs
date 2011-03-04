@@ -1,5 +1,5 @@
 -- |Support for read-only executable application configurations.
-module Ros.Util.AppConfig where
+module Ros.Core.Util.AppConfig where
 import Control.Monad.Reader
 import Control.Concurrent
 

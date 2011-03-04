@@ -1,5 +1,5 @@
-module Ros.Util.RingChan (RingChan, newRingChan, writeChan, 
-                          readChan, getChanContents, getBuffered) where
+module Ros.Core.Util.RingChan (RingChan, newRingChan, writeChan, 
+                               readChan, getChanContents, getBuffered) where
 import Control.Monad (join)
 import Control.Concurrent.MVar
 import Control.Concurrent.QSem

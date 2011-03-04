@@ -23,8 +23,8 @@ import Ros.Core.RosBinary
 import Ros.ConnectionHeader
 import Ros.Core.Msg.MsgInfo
 import Ros.SlaveAPI (requestTopicClient)
-import Ros.Util.RingChan
-import Ros.Util.AppConfig (Config, debug, forkConfig)
+import Ros.Core.Util.RingChan
+import Ros.Core.Util.AppConfig (Config, debug, forkConfig)
 
 -- |Push each item from this client's buffer over the connected
 -- socket.

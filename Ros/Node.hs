@@ -28,8 +28,8 @@ import Ros.Core.RosTypes
 import Ros.RosTcp (subStream, runServer)
 import qualified Ros.RunNode as RN
 import Ros.TopicStats (recvMessageStat, sendMessageStat)
-import Ros.Util.AppConfig (Config, parseAppConfig, forkConfig, configured)
-import Ros.Util.ArgRemapping
+import Ros.Core.Util.AppConfig (Config, parseAppConfig, forkConfig, configured)
+import Ros.Core.Util.ArgRemapping
 import Ros.Topic
 import Ros.TopicUtil (topicRate, share)
 import Ros.Core.RosTime
