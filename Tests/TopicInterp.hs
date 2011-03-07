@@ -7,7 +7,6 @@ import Ros.Core.Header
 import qualified Ros.Core.Header as H
 import Ros.Core.Msg.HeaderSupport
 import Ros.Core.RosTime
-import Debug.Trace
 
 newtype CharMsg = CharMsg {unCM :: (Char, Header)}
 
@@ -25,6 +24,13 @@ instance HasHeader FloatMsg where
   getFrame = undefined
   setSequence = undefined
 
+-- The idea behind this test is that we have an agent moving along a
+-- linear arrangement of the alphabet. The agent moves at 10
+-- characters-per-second, but its position is only updated at 1Hz. We
+-- must therefore interpolate its linear position to associate each
+-- sensed character with its position.
+
+-- A Topic that produces a new character at 10Hz
 alphabet :: Topic IO CharMsg
 alphabet = go 'A' 0
   where go c i = Topic $ do threadDelay (truncate 1e5)
@@ -32,24 +38,33 @@ alphabet = go 'A' 0
                             let msg = CharMsg (c, Header i now "")
                             return (msg, go (succ c) (i+1))
 
+-- A Topic that produces a new "position" at 1Hz. The position is
+-- incremented by 10 at each step to indicate a subsampling of true
+-- position.
 positions :: Topic IO FloatMsg
-positions = cons f0 $ go 1 1
+positions = go 10 1
   where go p i = Topic $ do threadDelay (truncate 1e6)
                             now <- getROSTime
                             let msg = FloatMsg (p, Header i now "")
                             return (msg, go (p+10) (i+1))
-        f0 = FloatMsg (0, Header 0 (0,0) "")
 
+-- We prepend the initial position on the 'positions' Topic to ensure
+-- that its time stamp preceeds any value produced by the 'alphabet'
+-- Topic.
 test :: IO ()
-test = do t1 <- runTopicThread positions
+test = do now <- getROSTime
+          let f0 = FloatMsg (0, Header 0 now "")
+          t1 <- runTopicThread (cons f0 positions)
           t2 <- runTopicThread alphabet
           forever . showTopic . fmap (getf *** getc) $ interpolate f t1 t2
   where f (FloatMsg (x,h)) (FloatMsg (y,_)) alpha =
-          trace ("Interpolate "++show x++" -> "++show y++" @ "++show alpha) $
           FloatMsg ((y - x) * realToFrac alpha + x, h)
         getf (FloatMsg (f,_)) = f
         getc (CharMsg (c,_)) = c
 
+-- Pull elements from a Topic in a separate thread. This allows IO
+-- Topics to run at different rates even if they are consumed by a
+-- single thread.
 runTopicThread :: Topic IO a -> IO (Topic IO a)
 runTopicThread t = do c <- newChan
                       forkIO . forever . join $ fmap (writeChan c) t
