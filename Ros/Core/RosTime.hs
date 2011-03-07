@@ -1,8 +1,9 @@
 -- |Utilities for working with ROS time values.
 module Ros.Core.RosTime (ROSTime, ROSDuration, toROSTime, fromROSTime, 
-                         diffROSTime, getROSTime) where
+                         diffROSTime, getROSTime, diffSeconds) where
 import Data.Time.Clock (UTCTime, NominalDiffTime)
 import Data.Time.Clock.POSIX
+import Data.Word (Word32)
 import Ros.Core.RosTypes
 
 toROSTime :: UTCTime -> ROSTime
@@ -26,12 +27,22 @@ instance FromROSTime Double where
 -- |@timeDiff t1 t2@ computes the difference @t1 - t2@.
 diffROSTime :: ROSTime -> ROSTime -> ROSDuration
 diffROSTime (s1,ns1) (s2,ns2)
-  | dns >= 0 = (ds, dns)
-  | otherwise = (ds - 1, 1000000 - dns)
-  where dns = ns1 - ns2
-        ds = s1 - s2
+  | dns >= 0 = (fi ds, fi dns)
+  | otherwise = (fi $ ds - 1, fi $ 1000000 + dns)
+  where dns = fw ns1 - fw ns2
+        ds = fw s1 - fw s2
+        fw :: Word32 -> Int
+        fw = fromIntegral
+        fi :: Int -> Word32
+        fi = fromIntegral
 
 -- |Get the current POSIX time.
 getROSTime :: IO ROSTime
 getROSTime = fmap (aux . properFraction) getPOSIXTime
   where aux (s,f) = (s, truncate $ f * 1000000)
+
+-- |Compute the difference in seconds between two 'ROSTime'
+-- values. The application @diffSeconds tStop tStart@ computes the
+-- time interval @tStop - tStart@.
+diffSeconds :: ROSTime -> ROSTime -> Double
+diffSeconds t1 t2 = fromROSTime $ diffROSTime t1 t2
