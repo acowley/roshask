@@ -163,9 +163,8 @@ metamorphM f t = Topic $ do (x,t') <- runTopic t
                               Nothing -> runTopic $ metamorphM f' t'
                               Just x'' -> return (x'', metamorphM f' t')
 
--- |Removes one level of monadic structure, projecting the values
--- produced by a 'Topic' into the monad encapsulating each step the
--- 'Topic' takes.
+-- |Removes one level of monadic structure from the values a 'Topic'
+-- produces.
 join :: (Functor m, Monad m) => Topic m (m a) -> Topic m a
 join t = Topic $ do (x, t') <- runTopic t
                     x' <- x
