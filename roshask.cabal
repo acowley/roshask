@@ -117,7 +117,7 @@ Library
     Build-depends: unix
 
 
-  GHC-Options:         -Odph -Wall -fno-warn-name-shadowing
+  GHC-Options:         -Odph -Wall -fno-warn-name-shadowing -fno-warn-duplicate-exports
   Hs-Source-Dirs:      .
   
   -- Modules not exported by this package.
@@ -143,7 +143,7 @@ Executable roshask
                   xml >= 1.3.5 && < 1.4,
                   pureMD5 == 2.1.*
 
-  GHC-Options:    -Odph -Wall -fno-warn-name-shadowing
+  GHC-Options:    -Odph -Wall -fno-warn-name-shadowing -fno-warn-duplicate-exports
   Main-Is:        Ros/Core/Msg/Main.hs
   Other-modules:  Ros.Core.Msg.Parse Ros.Core.Msg.Gen Ros.Core.Msg.Analysis 
                   Ros.Core.Msg.ResolutionTypes Ros.Core.Msg.MD5
