@@ -12,11 +12,9 @@
 -- that produces very quickly (faster than the minimum required update
 -- rate), and another 'Topic' that imposes a rate limit.
 module Ros.TopicStamped (everyNew, interpolate) where
-import Control.Arrow (second)
 import qualified Ros.Topic as T
-import Ros.Topic (Topic, IterCont(..), IterContM(..), metamorph, metamorphM)
+import Ros.Topic (Topic, IterContM(..), metamorphM)
 import qualified Ros.TopicUtil as T
-import Ros.TopicUtil ((<+>))
 import Ros.Core.Msg.HeaderSupport
 import Ros.Core.RosTime
 
