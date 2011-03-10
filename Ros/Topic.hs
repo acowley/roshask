@@ -7,8 +7,8 @@
 -- T@), an explicit import list, or a @hiding@ clause.
 module Ros.Topic where
 import Control.Applicative
-import Control.Arrow
-import Control.Monad ((<=<))
+import Control.Arrow ((***), (&&&), second)
+import Control.Monad ((<=<), (>=>))
 import Control.Monad.IO.Class
 import Data.Typeable
 
@@ -38,6 +38,10 @@ head = fmap fst . runTopic
 uncons :: Topic m a -> m (a, Topic m a)
 uncons = runTopic
 
+-- |Force evaluation of a tupic until it produces a value.
+force :: Monad m => Topic m a -> m (Topic m a)
+force = uncons >=> return . Topic . return
+
 -- |Prepend a single item to the front of a 'Topic'.
 cons :: Monad m => a -> Topic m a -> Topic m a
 cons x t = Topic $ return (x, t)
@@ -46,6 +50,11 @@ cons x t = Topic $ return (x, t)
 -- after the first.
 tail :: Monad m => Topic m a -> Topic m a
 tail = Topic . (runTopic . snd <=< runTopic)
+
+-- |Return a 'Topic' of all the suffixes of a 'Topic'.
+tails :: Monad m => Topic m a -> Topic m (Topic m a)
+tails t = Topic $ do (x,t') <- runTopic t
+                     return (Topic $ return (x,t'), tails t')
 
 -- |Returns a 'Topic' containing only those elements of the supplied
 -- 'Topic' for which the given predicate returns 'True'.
@@ -140,6 +149,26 @@ newtype IterCont a b = IterCont (Maybe b, a -> IterCont a b)
 -- implement a streaming @unfold . fold@ composition.
 newtype IterContM m a b = IterContM (Maybe b, a -> m (IterContM m a b))
 
+-- |Yield a value and a continuation in a metamorphism (used with
+-- 'metamorph').
+yield :: b -> (a -> IterCont a b) -> IterCont a b
+yield = curry IterCont . Just
+
+-- |Do not yield a value, but provide a continuation in a metamorphism
+-- (used with 'metamorph').
+skip :: (a -> IterCont a b) -> IterCont a b
+skip = curry IterCont Nothing
+
+-- |Yield a value and a continuation in a monad as part of a monadic
+-- metamorphism (used with 'metamorphM').
+yieldM :: Monad m => b -> (a -> m (IterContM m a b)) -> m (IterContM m a b)
+yieldM = (return .) . curry IterContM . Just
+
+-- |Do not yield a value, but provide a continuation in a metamorphism
+-- (used with 'metamorphM').
+skipM :: Monad m => (a -> m (IterContM m a b)) -> m (IterContM m a b)
+skipM = return . curry IterContM Nothing
+
 -- |A metamorphism (cf. Jeremy Gibbons) on 'Topic's. This is an
 -- /unfold/ following a /fold/ (i.e. @unfoldr . foldl@), with the
 -- expectation that partial results of the /unfold/ may be returned
@@ -183,3 +212,17 @@ mapM = (join .) . fmap
 -- |Print all the values produced by a 'Topic'.
 showTopic :: (MonadIO m, Functor m, Show a) => Topic m a -> Topic m ()
 showTopic = join . fmap (liftIO . putStrLn . show)
+
+-- |A way of pushing functions on 'Topic's whose elements are
+-- components of elements of another 'Topic'. The application @topicOn
+-- proj inj trans t@ applies the @trans@ function on 'Topic's to the
+-- field of every value of 'Topic' @t@ projected out by the @proj@
+-- function. The @inj@ function is used to combine the original value
+-- with the transformed field to produce values for the output
+-- 'Topic'.
+topicOn :: (Applicative m, Monad m) =>
+           (a -> b) -> (a -> c -> d) -> (Topic m b -> Topic m c) -> 
+           Topic m a -> Topic m d
+topicOn proj inj trans = uncurry (<*>) . split . prep
+  where prep = fmap (inj &&& proj)
+        split = fmap fst &&& trans . fmap snd
