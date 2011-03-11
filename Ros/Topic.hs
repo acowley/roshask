@@ -16,7 +16,7 @@ import Data.Typeable
 -- in a 'Monad'.
 newtype Topic m a = Topic { runTopic :: m (a, Topic m a) }
 
-instance (Functor m, Monad m) => Functor (Topic m) where
+instance Functor m => Functor (Topic m) where
   fmap f (Topic ma) = Topic $ fmap (f *** fmap f) ma
 
 instance (Applicative m, Monad m) => Applicative (Topic m) where
