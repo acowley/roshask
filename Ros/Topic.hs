@@ -7,7 +7,7 @@
 -- T@), an explicit import list, or a @hiding@ clause.
 module Ros.Topic where
 import Control.Applicative
-import Control.Arrow ((***), (&&&), second)
+import Control.Arrow ((***), second)
 import Control.Monad ((<=<), (>=>))
 import Control.Monad.IO.Class
 import Data.Typeable
@@ -19,11 +19,10 @@ newtype Topic m a = Topic { runTopic :: m (a, Topic m a) }
 instance Functor m => Functor (Topic m) where
   fmap f (Topic ma) = Topic $ fmap (f *** fmap f) ma
 
-instance (Applicative m, Monad m) => Applicative (Topic m) where
+instance Applicative m => Applicative (Topic m) where
   pure x = let t = Topic $ pure (x, t) in t
-  Topic ma <*> Topic mb = Topic $ do (f,t1) <- ma
-                                     (x,t2) <- mb
-                                     return (f x, t1 <*> t2)
+  Topic ma <*> Topic mb = Topic $ uncurry (***) . (($) *** (<*>)) <$> ma <*> mb
+
 
 instance (Typeable1 m, Typeable a) => Typeable (Topic m a) where
   typeOf _ = mkTyConApp (mkTyCon "Topic") 
@@ -212,17 +211,3 @@ mapM = (join .) . fmap
 -- |Print all the values produced by a 'Topic'.
 showTopic :: (MonadIO m, Functor m, Show a) => Topic m a -> Topic m ()
 showTopic = join . fmap (liftIO . putStrLn . show)
-
--- |A way of pushing functions on 'Topic's whose elements are
--- components of elements of another 'Topic'. The application @topicOn
--- proj inj trans t@ applies the @trans@ function on 'Topic's to the
--- field of every value of 'Topic' @t@ projected out by the @proj@
--- function. The @inj@ function is used to combine the original value
--- with the transformed field to produce values for the output
--- 'Topic'.
-topicOn :: (Applicative m, Monad m) =>
-           (a -> b) -> (a -> c -> d) -> (Topic m b -> Topic m c) -> 
-           Topic m a -> Topic m d
-topicOn proj inj trans = uncurry (<*>) . split . prep
-  where prep = fmap (inj &&& proj)
-        split = fmap fst &&& trans . fmap snd
