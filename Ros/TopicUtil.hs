@@ -4,10 +4,14 @@ module Ros.TopicUtil where
 import Prelude hiding (dropWhile, filter, splitAt)
 import Control.Applicative
 import Control.Arrow ((***), second)
-import Control.Concurrent
+import Control.Concurrent hiding (yield)
 import Control.Concurrent.STM
 import Control.Monad ((<=<), when, replicateM)
 import Control.Monad.IO.Class
+import Data.AdditiveGroup (AdditiveGroup, (^+^), (^-^), Sum(..))
+import Data.Monoid (Monoid)
+import Data.Sequence ((|>), viewl, ViewL(..))
+import qualified Data.Sequence as S
 import qualified Data.Foldable as F
 import Ros.Rate (rateLimiter)
 import Ros.Topic hiding (mapM)
@@ -304,3 +308,59 @@ interruptible s = Topic $
                        return (x, Topic getAll)
        _ <- forkIO $ watchForItems s
        getAll
+
+-- |Pull elements from a 'Topic' in a new thread. This allows 'IO'
+-- 'Topic's to run at different rates even if they are consumed by a
+-- single thread.
+forkTopic :: Topic IO a -> IO (Topic IO a)
+forkTopic t = do c <- newChan
+                 _ <- forkIO . forever . join $ fmap (writeChan c) t
+                 let feed = Topic $ (\x -> (x,feed)) <$> readChan c
+                 return feed
+
+-- |Sliding window over a 'Monoid'. @slidingWindow n t@ slides a
+-- window of width @n@ along 'Topic' @t@. As soon as at least @n@
+-- elements have been produced by @t@, the output 'Topic' starts
+-- producing the 'mconcat' of the elements in the window.
+slidingWindow :: (Monad m, Monoid a) => Int -> Topic m a -> Topic m a
+slidingWindow n = metamorph (fill S.empty)
+  where fill w x
+          | S.length w < n - 1 = skip . fill $ w |> x
+          | otherwise = let w' = w |> x
+                        in yield (F.fold w') (go w')
+        go w x = let w' = dropOldest w |> x
+                 in yield (F.fold w') (go w')
+        dropOldest w = case viewl w of
+                         EmptyL -> S.empty
+                         _ :< w' -> w'
+
+-- |Sliding window over an 'AdditiveGroup'. @slidingWindowG n t@
+-- slides a window of width @n@ along 'Topic' @t@. As soon as at least
+-- @n@ elements have been produced by @t@, the output 'Topic' starts
+-- producing the total sum of the elements of the window. This
+-- function is more efficient than 'slidingWindow' because the group
+-- inverse operation is used to remove elements falling behind the
+-- window from the running sum.
+slidingWindowG :: (Monad m, AdditiveGroup a) => Int -> Topic m a -> Topic m a
+slidingWindowG n = metamorph (fill S.empty)
+  where fill w x
+          | S.length w < n - 1 = skip . fill $ w |> x
+          | otherwise = let w' = w |> x
+                            s = getSum . F.fold . fmap Sum $ w'
+                        in yield s (go s w')
+        go s w x = case viewl w of
+                     EmptyL -> yield x $ go x (S.singleton x)
+                     y :< w' -> let s' = s ^+^ x ^-^ y
+                                in yield s' $ go s' (w' |> x)
+
+-- |A way of pushing functions on 'Topic's whose elements are
+-- components of elements of another 'Topic'. The application @topicOn
+-- proj inj trans t@ applies the @trans@ function on 'Topic's to the
+-- field of every value of 'Topic' @t@ projected out by the @proj@
+-- function. The @inj@ function is used to combine the original value
+-- with the transformed field to produce values for the output
+-- 'Topic'.
+topicOn :: (a -> b) -> (a -> c -> d) -> (Topic IO b -> Topic IO c) -> 
+           Topic IO a -> IO (Topic IO d)
+topicOn proj inj trans = fmap adjust . tee
+  where adjust = uncurry (<*>) . (fmap inj *** trans . fmap proj)
