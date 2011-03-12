@@ -17,7 +17,7 @@ Executable composition
                    mtl,
                    ROS-roslib-msgs,
                    ROS-sensor-msgs
-  GHC-Options:     -Odph
+  GHC-Options:     -Odph -threaded
   GHC-Prof-Options:-prof -auto-all -caf-all
   Hs-Source-Dirs:  src
   Main-Is:         Main.hs
@@ -31,11 +31,10 @@ Executable scope
                    mtl,
                    ROS-roslib-msgs,
                    ROS-sensor-msgs
-  GHC-Options:     -Odph
+  GHC-Options:     -Odph -threaded -main-is Telescope
   GHC-Prof-Options:-prof -auto-all -caf-all
   Hs-Source-Dirs:  src
-  Main-Is:         JustScope.hs
-  Other-Modules:   Telescope
+  Main-Is:         Telescope.hs
 
 Executable detect
   Build-Depends:   base >= 4.2 && < 5,
@@ -45,8 +44,7 @@ Executable detect
                    mtl,
                    ROS-roslib-msgs,
                    ROS-sensor-msgs
-  GHC-Options:     -Odph
+  GHC-Options:     -Odph -threaded -main-is DetectUFO
   GHC-Prof-Options:-prof -auto-all -caf-all
   Hs-Source-Dirs:  src
-  Main-Is:         JustDetect.hs
-  Other-Modules:   DetectUFO
+  Main-Is:         DetectUFO.hs

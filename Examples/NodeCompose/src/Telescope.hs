@@ -1,6 +1,6 @@
 -- |A node that advertises a video feed from a telescope sensor for
 -- tracking UFOs.
-module Telescope (telescope) where
+module Telescope (telescope, main) where
 import Ros.Node
 import Ros.Topic (repeatM)
 import Ros.TopicMT (runTopicState')
@@ -41,3 +41,5 @@ images = repeatM (mkImage `fmap` orbitPt width height)
 
 telescope :: Node ()
 telescope = advertise "video" $ (topicRate 60 (runTopicState' images 0))
+
+main = runNode "Scope" telescope

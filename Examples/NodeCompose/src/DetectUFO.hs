@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 -- |A Node that detects UFOs (white pixels on a black sky background)
 -- in a video feed from a sensor.
-module DetectUFO (detectUFO) where
+module DetectUFO (detectUFO, main) where
 import Ros.Node
 import qualified Data.Vector.Storable as V
 import Data.Word (Word8)
@@ -21,3 +21,5 @@ findPt (Image {width, height, encoding, _data})
 
 detectUFO :: Node ()
 detectUFO = subscribe "video" >>= runHandler findPt >> return ()
+
+main = runNode "Detect" detectUFO
