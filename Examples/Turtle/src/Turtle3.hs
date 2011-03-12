@@ -1,18 +1,20 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Turtle3 (main) where
-import Prelude hiding (dropWhile)
+import Prelude hiding (dropWhile, mapM)
 import Control.Applicative
 import Control.Arrow
 import System.IO (hFlush, stdout)
 import Data.VectorSpace
 import Ros.Logging
 import Ros.Node
-import Ros.Topic (repeatM, force, dropWhile, metamorphM, yieldM, topicOn)
-import Ros.TopicUtil (everyNew, interruptible)
+import Ros.Topic (repeatM, force, dropWhile, metamorphM, yieldM, mapM)
+import Ros.TopicUtil (everyNew, interruptible, forkTopic, topicOn)
 import Ros.TopicPID (pidTimed)
 import AngleNum
 import Ros.Turtlesim.Pose
 import Ros.Turtlesim.Velocity
+
+import Debug.Trace
 
 -- A type synonym for a 2D point.
 type Point = (Float,Float)
@@ -21,7 +23,7 @@ type Point = (Float,Float)
 getTraj :: Topic IO [Point]
 getTraj = repeatM (do putStr "Enter waypoints: " >> hFlush stdout
                       $(logInfo "Waiting for new traj")
-                      read `fmap` getLine)
+                      read <$> getLine)
 
 -- Produce a new goal 'Point' every time a 'Pose' topic reaches the
 -- vicinity of the previous goal.
@@ -41,10 +43,10 @@ toGoal (pos,goal) = (magnitude v, thetaErr)
         thetaErr = toDegrees $ thetaDesired - angle (theta pos)
 
 -- Run a PID loop on angular velocity to converge to a bearing for the goal.
-steering :: Topic IO (Float,Float) -> Topic IO Velocity
+steering :: Topic IO (Float,Float) -> IO (Topic IO Velocity)
 steering = topicOn snd (Velocity . fst) (pidTimed 1 0 0 0)
-
-navigate :: Topic IO (Pose,Point) -> Topic IO Velocity
+           
+navigate :: Topic IO (Pose,Point) -> IO (Topic IO Velocity)
 navigate = steering . fmap ((clamp***clamp) . toGoal)
   where clamp = min 2
 
@@ -52,4 +54,5 @@ main = runNode "HaskellBTurtle" $
        do enableLogging (Just Warn)
           poses <- subscribe "/turtle1/pose"
           let goals = destinations (interruptible getTraj) poses
-          advertise "/turtle1/command_velocity" . navigate $ everyNew poses goals
+          commands <- liftIO . navigate $ everyNew poses goals
+          advertise "/turtle1/command_velocity" commands

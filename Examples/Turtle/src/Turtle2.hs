@@ -7,7 +7,7 @@ import Data.VectorSpace
 import AngleNum
 import Ros.Node
 import Ros.Topic (repeatM, force, dropWhile, metamorphM, yieldM)
-import Ros.TopicUtil (filterBy, everyNew, interruptible)
+import Ros.TopicUtil (everyNew, interruptible)
 import Ros.Turtlesim.Pose
 import Ros.Turtlesim.Velocity
 import Ros.Logging
@@ -22,14 +22,13 @@ getTraj = repeatM (do putStr "Enter waypoints: " >> hFlush stdout
                       $(logInfo "Waiting for new traj")
                       read <$> getLine)
 
--- Produce a new goal 'Point' every time a 'Pose' topic reaches the
--- vicinity of the previous goal.
+-- Produce a new goal 'Point' every time a goal is reached.
 destinations :: (Functor m, Monad m) => 
                 Topic m Point -> Topic m Pose -> Topic m Point
 destinations goals poses = metamorphM (start (p2v <$> poses)) goals
   where start t g = yieldM g (go g t)
-        go g t g' = let keepGoing x = magnitude (g ^-^ x) > 1.5
-                    in force (dropWhile keepGoing t) >>= yieldM g' . go g'
+        go g t g' = force (dropWhile (keepGoing g) t) >>= yieldM g' . go g'
+        keepGoing goal pose = magnitude (goal ^-^ pose) > 1.5
         p2v (Pose x y _ _ _) = (x, y)
 
 -- Compute linear distance to goal and bearing to goal
@@ -50,4 +49,5 @@ main = runNode "HaskellBTurtle" $
        do enableLogging (Just Warn)
           poses <- subscribe "/turtle1/pose"
           let goals = destinations (interruptible getTraj) poses
-          advertise "/turtle1/command_velocity" $ navigate <$> everyNew poses goals
+          advertise "/turtle1/command_velocity" 
+                    (navigate <$> everyNew poses goals)

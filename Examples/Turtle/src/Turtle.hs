@@ -3,7 +3,7 @@ module Turtle (main) where
 import Data.VectorSpace
 import Ros.Node
 import Ros.Topic (cons, repeatM)
-import Ros.TopicUtil (filterBy, everyNew, interruptible, gate, share)
+import Ros.TopicUtil (tee, filterBy, everyNew, interruptible, gate, share)
 import Ros.Turtlesim.Pose
 import Ros.Turtlesim.Velocity
 import Ros.Logging
