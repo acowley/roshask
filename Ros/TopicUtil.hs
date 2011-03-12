@@ -1,7 +1,8 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 -- |Utility functions for working with 'Topic's. These functions are
 -- primarily combinators for fusing two 'Topic's in various ways.
 module Ros.TopicUtil where
-import Prelude hiding (dropWhile, filter, splitAt)
+import Prelude hiding (dropWhile, filter, splitAt, mapM)
 import Control.Applicative
 import Control.Arrow ((***), second)
 import Control.Concurrent hiding (yield)
@@ -14,7 +15,7 @@ import Data.Sequence ((|>), viewl, ViewL(..))
 import qualified Data.Sequence as S
 import qualified Data.Foldable as F
 import Ros.Rate (rateLimiter)
-import Ros.Topic hiding (mapM)
+import Ros.Topic
 
 -- |Produce an infinite list from a 'Topic'.
 toList :: Topic IO a -> IO [a]
@@ -297,14 +298,19 @@ interruptible :: F.Foldable t => Topic IO (t a) -> Topic IO a
 interruptible s = Topic $
     do feeder <- newEmptyMVar         -- Active feeder thread
        latestItem <- newEmptyMVar     -- Next available item
+       signal <- newEmptyMVar         -- Demand signal
        let feedItems ys = do ft <- tryTakeMVar feeder
                              maybe (return ()) killThread ft
-                             t <- forkIO $ F.traverse_ (putMVar latestItem) ys
+                             t <- forkIO $ 
+                                  F.traverse_ (\y -> takeMVar signal >> 
+                                                     putMVar latestItem y) 
+                                              ys
                              putMVar feeder t 
            watchForItems t = do (x,t') <- runTopic t
                                 feedItems x 
                                 watchForItems t'
-           getAll = do x <- takeMVar latestItem
+           getAll = do putMVar signal ()
+                       x <- takeMVar latestItem
                        return (x, Topic getAll)
        _ <- forkIO $ watchForItems s
        getAll
@@ -361,6 +367,24 @@ slidingWindowG n = metamorph (fill S.empty)
 -- with the transformed field to produce values for the output
 -- 'Topic'.
 topicOn :: (a -> b) -> (a -> c -> d) -> (Topic IO b -> Topic IO c) -> 
-           Topic IO a -> IO (Topic IO d)
+            Topic IO a -> IO (Topic IO d)
 topicOn proj inj trans = fmap adjust . tee
   where adjust = uncurry (<*>) . (fmap inj *** trans . fmap proj)
+              
+-- This doesn't work! What must be understood is that as soon as two
+-- topics are fused into one, then the elements of the fusion topic
+-- are /actions/ that produce fused elements. One can not simply split
+-- those fused elements into two distinct Topics unless one has a way
+-- of explicitly duplicating the result of the action. The 'IO' monad
+-- provides this with, for example, 'Chan'.
+{-
+topicOn2 :: forall a b c d m.
+            (Applicative m, Monad m) =>
+            (a -> b) -> (a -> c -> d) -> (Topic m b -> Topic m c) -> 
+            Topic m a -> Topic m d
+topicOn2 proj inj trans = uncurry (<*>) . split . mapM prep
+  where prep :: a -> m (c -> d, b)
+        prep x = return (inj x, proj x)
+        split :: Topic m (c -> d, b) -> (Topic m (c -> d), Topic m c)
+        split = fmap fst &&& trans . fmap snd
+-}
