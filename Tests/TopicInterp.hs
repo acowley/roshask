@@ -2,6 +2,7 @@ module Tests.TopicInterp where
 import Control.Arrow
 import Control.Concurrent
 import Ros.Topic
+import Ros.TopicUtil (forkTopic)
 import Ros.TopicStamped
 import Ros.Core.Header
 import qualified Ros.Core.Header as H
@@ -54,21 +55,11 @@ positions = go 10 1
 test :: IO ()
 test = do now <- getROSTime
           let f0 = FloatMsg (0, Header 0 now "")
-          t1 <- runTopicThread (cons f0 positions)
-          t2 <- runTopicThread alphabet
+          t1 <- forkTopic (cons f0 positions)
+          t2 <- forkTopic alphabet
           forever . showTopic . fmap (getf *** getc) $ interpolate f t1 t2
   where f (FloatMsg (x,h)) (FloatMsg (y,_)) alpha =
           FloatMsg ((y - x) * realToFrac alpha + x, h)
         getf (FloatMsg (f,_)) = f
         getc (CharMsg (c,_)) = c
 
--- Pull elements from a Topic in a separate thread. This allows IO
--- Topics to run at different rates even if they are consumed by a
--- single thread.
-runTopicThread :: Topic IO a -> IO (Topic IO a)
-runTopicThread t = do c <- newChan
-                      forkIO . forever . join $ fmap (writeChan c) t
-                      let feed = Topic $ 
-                                 do x <- readChan c
-                                    return (x, feed)
-                      return feed

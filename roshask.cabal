@@ -81,6 +81,7 @@ Library
                        Ros.Core.Msg.HeaderSupport 
                        Ros.Core.Util.BytesToVector
                        Ros.Core.Util.StorableMonad
+                       Ros.Core.RosTime
                        Ros.Core.RosTypes
                        Ros.Core.RosBinary
                        Ros.Core.Build.SetupUtil
@@ -111,7 +112,8 @@ Library
                        transformers == 0.2.*,
                        haxr >= 3000.8.1 && < 3001,
                        utf8-string >= 0.3.6 && < 4,
-                       uri >= 0.1.5 && < 0.2
+                       uri >= 0.1.5 && < 0.2,
+                       vector-space
 
   if !os(windows)
     Build-depends: unix
@@ -126,7 +128,7 @@ Library
                       Ros.RosTcp Ros.ConnectionHeader Ros.TopicStats 
                       Ros.BinaryIter Ros.Core.Util.RingChan 
                       Ros.Core.Util.ArgRemapping Ros.Core.Build.DepFinder 
-                      Ros.Core.RosTime Ros.Util.PID Ros.Core.Util.AppConfig
+                      Ros.Util.PID Ros.Core.Util.AppConfig
 
 -- The ROS .msg definition parser and Haskell code generation utility.
 Executable roshask
