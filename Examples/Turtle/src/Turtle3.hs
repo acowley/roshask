@@ -1,13 +1,13 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Turtle3 (main) where
-import Prelude hiding (dropWhile, mapM)
+import Prelude hiding (dropWhile)
 import Control.Applicative
 import Control.Arrow
 import System.IO (hFlush, stdout)
 import Data.VectorSpace
 import Ros.Logging
 import Ros.Node
-import Ros.Topic (repeatM, force, dropWhile, metamorphM, yieldM, mapM)
+import Ros.Topic (repeatM, force, dropWhile, metamorphM, yieldM)
 import Ros.TopicUtil (everyNew, interruptible, forkTopic, topicOn)
 import Ros.TopicPID (pidTimed)
 import AngleNum
