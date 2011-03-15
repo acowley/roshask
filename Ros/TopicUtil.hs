@@ -359,32 +359,17 @@ slidingWindowG n = metamorph (fill S.empty)
                      y :< w' -> let s' = s ^+^ x ^-^ y
                                 in yield s' $ go s' (w' |> x)
 
--- |A way of pushing functions on 'Topic's whose elements are
--- components of elements of another 'Topic'. The application @topicOn
--- proj inj trans t@ applies the @trans@ function on 'Topic's to the
--- field of every value of 'Topic' @t@ projected out by the @proj@
--- function. The @inj@ function is used to combine the original value
--- with the transformed field to produce values for the output
--- 'Topic'.
-topicOn :: (a -> b) -> (a -> c -> d) -> (Topic IO b -> Topic IO c) -> 
-            Topic IO a -> IO (Topic IO d)
-topicOn proj inj trans = fmap adjust . tee
-  where adjust = uncurry (<*>) . (fmap inj *** trans . fmap proj)
-              
--- This doesn't work! What must be understood is that as soon as two
--- topics are fused into one, then the elements of the fusion topic
--- are /actions/ that produce fused elements. One can not simply split
--- those fused elements into two distinct Topics unless one has a way
--- of explicitly duplicating the result of the action. The 'IO' monad
--- provides this with, for example, 'Chan'.
-{-
-topicOn2 :: forall a b c d m.
-            (Applicative m, Monad m) =>
-            (a -> b) -> (a -> c -> d) -> (Topic m b -> Topic m c) -> 
-            Topic m a -> Topic m d
-topicOn2 proj inj trans = uncurry (<*>) . split . mapM prep
-  where prep :: a -> m (c -> d, b)
-        prep x = return (inj x, proj x)
-        split :: Topic m (c -> d, b) -> (Topic m (c -> d), Topic m c)
-        split = fmap fst &&& trans . fmap snd
--}
+-- |A way of pushing a monadic action into and along a 'Topic'. The
+-- application @topicOn proj inj trans t@ extracts a function from
+-- @trans@ that is then applied to the result of applying @proj@ to
+-- each value of 'Topic' @t@. The result of that application is
+-- supplied to the result of applying @inj@ to the same values from
+-- @t@ to produce a value for the output 'Topic'. A typical use case
+-- is projecting out a field from the original 'Topic' @t@ using
+-- @proj@ so that it may be modified by @trans@ and then injected back
+-- into the original structure using @inj@.
+topicOn :: (Applicative m, Monad m) =>
+           (a -> b) -> (a -> c -> d) -> m (b -> m c) -> Topic m a -> Topic m d
+topicOn proj inj trans t = 
+  Topic $ do f <- trans
+             runTopic $ mapM (\x -> inj x `fmap` f (proj x)) t
