@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Turtle (main) where
-import Data.VectorSpace
+import Data.Complex
 import Ros.Node
 import Ros.Topic (cons, repeatM)
 import Ros.TopicUtil (tee, filterBy, everyNew, interruptible, gate, share)
@@ -10,13 +10,13 @@ import Ros.Logging
 import System.IO (hFlush, stdout)
 
 -- A type synonym for a 2D point.
-type Point = (Float,Float)
+type Point = Complex Float
 
 -- A Topic of user-supplied waypoint trajectories.
 getTraj :: Topic IO [Point]
 getTraj = repeatM (do putStr "Enter waypoints: " >> hFlush stdout
                       $(logInfo "Waiting for new traj")
-                      read `fmap` getLine)
+                      (map (uncurry (:+)) . read) `fmap` getLine)
 
 wrapAngle theta 
   | theta < 0    = theta + 2 * pi
@@ -31,16 +31,15 @@ angleDiff x y = wrapAngle (x' + pi - y') - pi
 arrivalTrigger :: Topic IO Point -> Topic IO Pose -> Topic IO ()
 arrivalTrigger goals poses = fmap (const ()) $
                              filterBy (fmap arrived goals) (fmap p2v poses)
-  where arrived goal pose = magnitude (goal ^-^ pose) < 1.5
-        p2v (Pose x y _ _ _) = (x, y)
+  where arrived goal pose = magnitude (goal - pose) < 1.5
+        p2v (Pose x y _ _ _) = x :+ y
 
 -- Navigate to a goal given a current pose estimate.
 navigate :: (Point, Pose) -> Velocity
 navigate (goal, pos) = Velocity (min 2 (magnitude v)) angVel
-  where v@(vx, vy)   = goal ^-^ (x pos, y pos)
-        thetaDesired = atan2 vy vx
-        thetaErr     = (angleDiff thetaDesired (theta pos)) * (180 / pi)
-        angVel       = signum thetaErr * (min 2 (abs thetaErr))
+  where v        = goal - (x pos :+ y pos)
+        thetaErr = (angleDiff (phase v) (theta pos)) * (180 / pi)
+        angVel   = signum thetaErr * (min 2 (abs thetaErr))
 
 main = runNode "HaskellBTurtle" $
        do enableLogging (Just Warn)

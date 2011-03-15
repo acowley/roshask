@@ -3,7 +3,7 @@ module Turtle2 (main) where
 import Prelude hiding (dropWhile)
 import Control.Applicative
 import Control.Arrow
-import Data.VectorSpace
+import Data.Complex
 import AngleNum
 import Ros.Node
 import Ros.Topic (repeatM, force, dropWhile, metamorphM, yieldM)
@@ -14,13 +14,13 @@ import Ros.Logging
 import System.IO (hFlush, stdout)
 
 -- A type synonym for a 2D point.
-type Point = (Float,Float)
+type Point = Complex Float
 
 -- A Topic of user-supplied waypoint trajectories.
 getTraj :: Topic IO [Point]
 getTraj = repeatM (do putStr "Enter waypoints: " >> hFlush stdout
                       $(logInfo "Waiting for new traj")
-                      read <$> getLine)
+                      map (uncurry (:+)) . read <$> getLine)
 
 -- Produce a new goal 'Point' every time a goal is reached.
 destinations :: (Functor m, Monad m) => 
@@ -28,13 +28,13 @@ destinations :: (Functor m, Monad m) =>
 destinations goals poses = metamorphM (start (p2v <$> poses)) goals
   where start t g = yieldM g (go g t)
         go g t g' = force (dropWhile (keepGoing g) t) >>= yieldM g' . go g'
-        keepGoing goal pose = magnitude (goal ^-^ pose) > 1.5
-        p2v (Pose x y _ _ _) = (x, y)
+        keepGoing goal pose = magnitude (goal - pose) > 1.5
+        p2v (Pose x y _ _ _) = x :+ y
 
 -- Compute linear distance to goal and bearing to goal
 toGoal :: (Pose,Point) -> (Float, Angle Float)
-toGoal (pos,goal) = (magnitude v, angle $ atan2 vy vx)
-  where v@(vx,vy) = goal ^-^ (x pos, y pos)
+toGoal (pos,goal) = (magnitude v, angle $ phase v)
+  where v = goal - (x pos :+ y pos)
 
 -- Steer based on a current pose estimate and distance from goal
 steering :: Pose -> (Float, Angle Float) -> Velocity

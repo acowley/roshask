@@ -9,7 +9,6 @@ Executable Turtle
   Build-Depends:  base >= 4.2 && < 5,
                   vector == 0.7.*,
                   time == 1.1.*,
-                  vector-space,
                   roshask == 0.1.*,
                   ROS-turtlesim-msgs
   GHC-Options:    -Odph -main-is Turtle
@@ -20,20 +19,22 @@ Executable Turtle2
   Build-Depends:  base >= 4.2 && < 5,
                   vector == 0.7.*,
                   time == 1.1.*,
-                  vector-space,
                   roshask == 0.1.*,
+                  vector-space,
                   ROS-turtlesim-msgs
   GHC-Options:    -Odph -main-is Turtle2
   Main-Is:        Turtle2.hs
+  Other-Modules:  AngleNum
   Hs-Source-Dirs: src
 
 Executable Turtle3
   Build-Depends:  base >= 4.2 && < 5,
                   vector == 0.7.*,
                   time == 1.1.*,
-                  vector-space,
                   roshask == 0.1.*,
+                  vector-space,
                   ROS-turtlesim-msgs
   GHC-Options:    -Odph -main-is Turtle3
   Main-Is:        Turtle3.hs
+  Other-Modules:  AngleNum
   Hs-Source-Dirs: src
