@@ -9,12 +9,10 @@ import Ros.Logging
 import Ros.Node
 import Ros.Topic (repeatM, force, dropWhile, metamorphM, yieldM)
 import Ros.TopicUtil (everyNew, interruptible, forkTopic, topicOn)
-import Ros.TopicPID (pidTimed)
+import Ros.Util.PID (pidTimedIO)
 import AngleNum
 import Ros.Turtlesim.Pose
 import Ros.Turtlesim.Velocity
-
-import Debug.Trace
 
 -- A type synonym for a 2D point.
 type Point = (Float,Float)
@@ -43,10 +41,10 @@ toGoal (pos,goal) = (magnitude v, thetaErr)
         thetaErr = toDegrees $ thetaDesired - angle (theta pos)
 
 -- Run a PID loop on angular velocity to converge to a bearing for the goal.
-steering :: Topic IO (Float,Float) -> IO (Topic IO Velocity)
-steering = topicOn snd (Velocity . fst) (pidTimed 1 0 0 0)
+steering :: Topic IO (Float,Float) -> Topic IO Velocity
+steering = topicOn snd (Velocity . fst) (($ 0) <$> pidTimedIO 1 0 0)
            
-navigate :: Topic IO (Pose,Point) -> IO (Topic IO Velocity)
+navigate :: Topic IO (Pose,Point) -> Topic IO Velocity
 navigate = steering . fmap ((clamp***clamp) . toGoal)
   where clamp = min 2
 
@@ -54,5 +52,5 @@ main = runNode "HaskellBTurtle" $
        do enableLogging (Just Warn)
           poses <- subscribe "/turtle1/pose"
           let goals = destinations (interruptible getTraj) poses
-          commands <- liftIO . navigate $ everyNew poses goals
+              commands =  navigate $ everyNew poses goals
           advertise "/turtle1/command_velocity" commands
