@@ -24,3 +24,9 @@ test1 = forever . showTopic . fmap ((`div` 10) . getSum) $
 -- Int is an additive group
 test2 = forever . showTopic . fmap (`div` 10) $
         slidingWindowG 10 (addNoise 3 currentMinute)
+
+addNoiseF :: Float -> Topic IO Int -> Topic IO Float
+addNoiseF m = mapM ((<$> getStdRandom (randomR (-m,m))) . (+) . fromIntegral)
+
+test3 = forever . showTopic . fmap (/ 10) $
+        slidingWindowG 10 (addNoiseF 3 currentMinute)
