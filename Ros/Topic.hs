@@ -58,10 +58,13 @@ tails t = Topic $ do (x,t') <- runTopic t
 -- |Returns a 'Topic' containing only those elements of the supplied
 -- 'Topic' for which the given predicate returns 'True'.
 filter :: Monad m => (a -> Bool) -> Topic m a -> Topic m a
-filter p = go 
-  where go = Topic . (aux <=< runTopic)
-        aux (x, t') | p x       = return (x, go t')
-                    | otherwise = runTopic $ go t'
+filter p = metamorph go
+  where go x | p x = yield x go
+             | otherwise = skip go
+-- filter p = go 
+--   where go = Topic . (aux <=< runTopic)
+--         aux (x, t') | p x       = return (x, go t')
+--                     | otherwise = runTopic $ go t'
 
 -- |@take n t@ returns the prefix of @t@ of length @n@.
 take :: Monad m => Int -> Topic m a -> m [a]
@@ -121,9 +124,11 @@ splitAt n = go n []
 -- |Returns a 'Topic' that includes only the 'Just' values from the
 -- given 'Topic'.
 catMaybes :: Monad m => Topic m (Maybe a) -> Topic m a
-catMaybes (Topic ma) = Topic $ ma >>= aux
-  where aux (Nothing, t') = runTopic $ catMaybes t'
-        aux (Just x, t')  = return (x, catMaybes t')
+catMaybes = metamorph go
+  where go = maybe (skip go) (flip yield go)
+-- catMaybes (Topic ma) = Topic $ ma >>= aux
+--   where aux (Nothing, t') = runTopic $ catMaybes t'
+--         aux (Just x, t')  = return (x, catMaybes t')
 
 -- |Repeatedly execute a monadic action feeding the values into a
 -- 'Topic'.
@@ -208,6 +213,13 @@ forever = forever . snd <=< runTopic
 mapM :: (Functor m, Monad m) => (a -> m b) -> Topic m a -> Topic m b
 mapM = (join .) . fmap
 
+-- |A left-associative scan of a 'Topic' is a fold whose every
+-- intermediate value is produced as a value of a new 'Topic'.
+scan :: Monad m => (a -> b -> a) -> a -> Topic m b -> Topic m a
+scan f z = metamorph (go z)
+  where go acc x = let x' = f acc x in yield x' (go x')
+
 -- |Print all the values produced by a 'Topic'.
 showTopic :: (MonadIO m, Functor m, Show a) => Topic m a -> Topic m ()
 showTopic = join . fmap (liftIO . putStrLn . show)
+
