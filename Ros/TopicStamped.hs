@@ -13,7 +13,7 @@
 -- rate), and another 'Topic' that imposes a rate limit.
 module Ros.TopicStamped (everyNew, interpolate) where
 import qualified Ros.Topic as T
-import Ros.Topic (Topic, IterContM(..), metamorphM)
+import Ros.Topic (Topic, metamorphM, yieldM)
 import qualified Ros.TopicUtil as T
 import Ros.Core.Msg.HeaderSupport
 import Ros.Core.RosTime
@@ -44,7 +44,7 @@ findBrackets t1 t2 = T.concats . metamorphM (go t2) $ T.consecutive t1
                      in do (items, rest) <- T.break ((< stop) . getStamp) $
                                             T.dropWhile ((< start) . getStamp) t
                            let items' = map (bracket,) items
-                           return $ IterContM (Just items', go rest)
+                           yieldM items' (go rest)
 
 -- |Remove an element from a 'Topic' if the next element from that
 -- 'Topic' is composed of elements bearing the exact same sequence
