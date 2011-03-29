@@ -143,10 +143,13 @@ partition p = fmap (filter p *** filter (not . p)) . tee
 -- |Returns a 'Topic' whose values are consecutive values from the
 -- original 'Topic'.
 consecutive :: Monad m => Topic m a -> Topic m (a,a)
-consecutive t = Topic $ do (x, t') <- runTopic t
-                           runTopic $ go x t'
-  where go x t' = Topic$ do (y, t'') <- runTopic t'
-                            return ((x,y), go y t'')
+consecutive = metamorph startup
+  where startup x = skip (go x)
+        go x y    = yield (x,y) (go y)
+-- consecutive t = Topic $ do (x, t') <- runTopic t
+--                            runTopic $ go x t'
+--   where go x t' = Topic$ do (y, t'') <- runTopic t'
+--                             return ((x,y), go y t'')
 
 -- |Interleave two 'Topic's. Items from each component 'Topic' will be
 -- tagged with an 'Either' constructor and added to the combined
