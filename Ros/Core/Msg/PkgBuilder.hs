@@ -101,7 +101,7 @@ path2MsgModule = intercalate "." . map cap . reverse . take 3 .
 getHaskellMsgFiles :: FilePath -> String -> IO [FilePath]
 getHaskellMsgFiles pkgPath pkgName = 
   map (dir </>) . filter ((== ".hs") . takeExtension) <$> getDirectoryContents dir
-  where dir = pkgPath </> "msg" </> "haskell" </> "Ros" </> pkgName
+  where dir = pkgPath </> "msg" </> "haskell" </> "Ros" </> cap pkgName
 
 -- Generate a .cabal file to build this ROS package's messages.
 genMsgCabal :: FilePath -> String -> IO FilePath
