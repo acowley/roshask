@@ -196,6 +196,37 @@ metamorphM f t = Topic $ do (x,t') <- runTopic t
                               Nothing -> runTopic $ metamorphM f' t'
                               Just x'' -> return (x'', metamorphM f' t')
 
+-- |Fold two functions along a 'Topic' collecting and tagging their
+-- productions in a new 'Topic'.
+bimetamorph :: Monad m => 
+               (a -> IterCont a b) -> (a -> IterCont a c) ->
+               Topic m a -> Topic m (Either b c)
+bimetamorph f g t = Topic $ do (x,t') <- runTopic t
+                               let IterCont (y, f') = f x
+                               let IterCont (z, g') = g x
+                               aux (Left <$> y) (Right <$> z) 
+                                   (bimetamorph f' g' t')
+  where aux (Just y) (Just z) k = return (y, Topic $ return (z, k))
+        aux (Just y) Nothing  k = return (y, k)
+        aux _        (Just z) k = return (z, k)
+        aux Nothing  Nothing  k = runTopic k
+
+-- |Fold two monadic actions along a 'Topic' collecting and tagging
+-- their productions in a new 'Topic'.
+bimetamorphM :: Monad m => 
+               (a -> m (IterContM m a b)) -> (a -> m (IterContM m a c)) ->
+               Topic m a -> Topic m (Either b c)
+bimetamorphM f g t = Topic $ do (x,t') <- runTopic t
+                                IterContM (y, f') <- f x
+                                IterContM (z, g') <- g x
+                                aux (Left <$> y) (Right <$> z) 
+                                    (bimetamorphM f' g' t')
+  where aux (Just y) (Just z) k = return (y, Topic $ return (z, k))
+        aux (Just y) Nothing  k = return (y, k)
+        aux _        (Just z) k = return (z, k)
+        aux Nothing  Nothing  k = runTopic k
+
+
 -- |Removes one level of monadic structure from the values a 'Topic'
 -- produces.
 join :: (Functor m, Monad m) => Topic m (m a) -> Topic m a

@@ -73,8 +73,6 @@ everyNew t1 t2 =
   where pickLeft ((x1,x2,_), y) = (pickNearest x1 x2 y, y)
         pickRight ((y1,y2,_), x) = (x, pickNearest y1 y2 x)
 
-
-
 -- |The application @interpolate t1 t2@ produces a new 'Topic' that
 -- pairs every element of @t2@ with an interpolation of two temporally
 -- bracketing values from @t1@. The interpolation is effected with the
