@@ -45,7 +45,7 @@ typeDependency p m (RFixedArray _ t)    = S.union vectorDeps $
 typeDependency p m (RVarArray t)        = S.union vectorDeps $
                                        typeDependency p m t
 typeDependency _ _ (RUserType "Header") = 
-    S.fromList ["qualified Ros.Roslib.Header as Header", 
+    S.fromList ["qualified Ros.Std_msgs.Header as Header", 
                 "Ros.Core.Msg.HeaderSupport"]
 typeDependency p m (RUserType ut)       = if elem ut m
                                           then singleton $ 

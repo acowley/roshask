@@ -33,7 +33,7 @@ instance HasHeader Log where
 
 instance MsgInfo Log where
   sourceMD5 _ = "acffd30cd6b6de30f120938c17c593fb"
-  msgTypeName _ = "roslib/Log"
+  msgTypeName _ = "rosgraph_msgs/Log"
 
 dEBUG :: Word.Word8
 dEBUG = 1
