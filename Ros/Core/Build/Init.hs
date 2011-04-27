@@ -54,7 +54,7 @@ prepCabal pkgName rosDeps = B.writeFile (pkgName</>(pkgName++".cabal")) $
                    , "  Build-Depends:   base >= 4.2 && < 5,"
                    , "                   vector == 0.7.*,"
                    , "                   time == 1.1.*,"
-                   , "                   ROS-roslib-msgs,"
+                   , "                   ROS-rosgraph-msgs,"
                    , B.append "                   roshask == 0.1.*" moreDeps
                    , rosDeps
                    , "  GHC-Options:     -Odph"

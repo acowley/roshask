@@ -12,7 +12,7 @@ import System.Directory (doesFileExist, doesDirectoryExist,
                          getDirectoryContents)
 import System.Environment (getEnvironment)
 import System.FilePath ((</>), splitSearchPath, takeExtension, 
-                        dropExtension, takeFileName, splitDirectories)
+                        dropExtension, takeFileName)
 import Text.XML.Light
 
 type Package = String
@@ -79,12 +79,9 @@ findPackageDepNames pkgRoot =
         when (not exists)
              (error $ "Couldn't find "++man)
         txt <- readFile man
-        let pkgs = case getPackages txt of
-                     Nothing -> error $ "Couldn't parse " ++ man
-                     Just ps -> filter (not . (`elem` ignoredPackages)) ps
-        case last (splitDirectories pkgRoot) of
-          "roslib" -> return $ nub pkgs
-          _ -> return . nub $ "roslib":pkgs
+        case getPackages txt of
+          Nothing -> error $ "Couldn't parse " ++ man
+          Just ps -> return . nub $ filter (not . (`elem` ignoredPackages)) ps
 
 -- |Returns 'True' if the ROS package at the given 'FilePath' defines
 -- any messages.
@@ -119,10 +116,6 @@ findPackageDeps :: FilePath -> IO [FilePath]
 findPackageDeps pkgRoot = 
     do pkgs <- findPackageDepNames pkgRoot
        searchPaths <- getRosPaths
-       -- Add an implicit dependency on the "roslib" package.
-       -- let pkgs' = case last (splitDirectories pkgRoot) of
-       --               "roslib" -> nub pkgs
-       --               _ -> nub $ "roslib":pkgs
        pkgPaths <- mapM (findPackagePath searchPaths) pkgs
        case findIndex isNothing pkgPaths of
          Just i -> putStrLn ("Looking for "++show pkgs++
@@ -180,14 +173,11 @@ findMessagesInPkg pkgName = do searchPaths <- getRosPaths
 -- search paths indicated in the current environment (ROS_PACKAGE_PATH
 -- and ROS_ROOT).
 findMessage :: String -> String -> IO (Maybe FilePath)
-findMessage msgPkg msgType = 
+findMessage pkg msgType = 
     do searchPaths <- getRosPaths
-       -- Add an implicit dependency on the "roslib" package.
-       let pkgs = [ msgPkg, "roslib" ]
-       pkgPaths <- mapM (findPackagePath searchPaths) pkgs
-       case findIndex isNothing pkgPaths of
-         Just i -> putStrLn ("Looking for "++msgPkg++"."++msgType) >>
-                   error ("Couldn't find path to package " ++ (pkgs !! i))
-         Nothing -> find isMsg . concat <$> 
-                    mapM (findMessages . fromJust) pkgPaths
+       pkgPath <- findPackagePath searchPaths pkg
+       case pkgPath of
+         Just p -> find isMsg <$> findMessages p
+         Nothing -> putStrLn ("Looking for "++pkg++"."++msgType) >>
+                    error ("Couldn't find path to package " ++ pkg)
     where isMsg = (== msgType) . dropExtension . takeFileName

@@ -19,4 +19,4 @@ instance RosBinary Header where
 
 instance MsgInfo Header where
   sourceMD5 _ = "2176decaecbce78abc3b96ef049fabed"
-  msgTypeName _ = "roslib/Header"
+  msgTypeName _ = "std_msgs/Header"

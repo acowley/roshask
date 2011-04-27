@@ -133,32 +133,14 @@ genName f = let parts = splitDirectories f
                 [pkg,_,msgFile] = drop (length parts - 3) parts
             in pkg ++ "/" ++ dropExtension msgFile
 
-{-
-addHash :: IO String -> Msg -> Msg
-addHash hash msg = msg { md5sum = hash }
-
--- Use roslib/scripts/gendeps to compute the MD5 ROS uses to uniquely
--- identify versions of msg files.
-genRosMD5 :: FilePath -> IO String
-genRosMD5 fname = 
-    do env <- getEnvironment
-       let ros_root = case lookup "ROS_ROOT" env of
-                        Just s -> s
-                        Nothing -> error "Environment variable ROS_ROOT not set"
-           gendeps = ros_root</>"core"</>"roslib"</>"scripts"</>"gendeps"
-       init <$> readProcess gendeps ["-m", fname] "" 
--}
-
 parseMsg :: FilePath -> IO (Either String Msg)
 parseMsg fname = do msgFile <- B.readFile fname
                     let shortName = dropExtension . takeFileName $ fname
                         longName = genName fname
                         parser = mkParser shortName longName msgFile
-                    -- let hash = genRosMD5 fname
                     case feed (parse parser msgFile) "" of
                       Done leftOver msg
-                          | B.null leftOver -> return . Right $ -- . addHash hash $ 
-                                               msg
+                          | B.null leftOver -> return $ Right msg
                           | otherwise -> return $ Left $ "Couldn't parse " ++ 
                                                          unpack leftOver
                       Fail _ _ctxt err -> return $ Left err

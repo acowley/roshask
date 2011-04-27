@@ -21,7 +21,7 @@ type SerialMsg = (SerialInfo, Msg)
 
 -- Front-end to run analyses.
 runAnalysis :: MsgInfo a -> IO a
-runAnalysis m = evalStateT (cachePackage "roslib" >> m) 
+runAnalysis m = evalStateT (cachePackage "rosgraph_msgs" >> m) 
                            (MsgContext "" M.empty)
 
 -- All the .msg files in a package are cached for quick lookup on
@@ -56,7 +56,7 @@ getMsgFromPkg pkgName msgName = getPackage pkgName >>= lookupMsg . msgCache
 getMsg :: ByteString -> MsgInfo SerialMsg
 getMsg msgName = check <$>
                  if B.null msgType
-                 then getMsgFromPkg "roslib" msgName >>= checkLocal
+                 then getMsgFromPkg "rosgraph_msgs" msgName >>= checkLocal
                  else getMsgFromPkg msgPkg (B.tail msgType)
     where (msgPkg, msgType) = B.span (/= '/') msgName
           check :: Maybe SerialMsg -> SerialMsg
