@@ -148,10 +148,16 @@ unfold f z0 = go z0
 -- streaming @unfold . fold@ composition.
 newtype IterCont a b = IterCont (Maybe b, a -> IterCont a b)
 
+instance Functor (IterCont a) where
+  fmap f (IterCont (x, k)) = IterCont (fmap f x, fmap f . k)
+
 -- |A pair of an optional value and a continuation with effects for
 -- producing more such pairs. This type is used by 'metamorphM' to
 -- implement a streaming @unfold . fold@ composition.
 newtype IterContM m a b = IterContM (Maybe b, a -> m (IterContM m a b))
+
+instance Monad m => Functor (IterContM m a) where
+  fmap f (IterContM (x, k)) = IterContM (fmap f x,  return . fmap f <=< k)
 
 -- |Yield a value and a continuation in a metamorphism (used with
 -- 'metamorph').
@@ -196,36 +202,42 @@ metamorphM f t = Topic $ do (x,t') <- runTopic t
                               Nothing -> runTopic $ metamorphM f' t'
                               Just x'' -> return (x'', metamorphM f' t')
 
--- |Fold two functions along a 'Topic' collecting and tagging their
--- productions in a new 'Topic'.
-bimetamorph :: Monad m => 
-               (a -> IterCont a b) -> (a -> IterCont a c) ->
-               Topic m a -> Topic m (Either b c)
+-- |Fold two functions along a 'Topic' collecting their productions in
+-- a new 'Topic'.
+bimetamorph :: Monad m =>
+               (a -> IterCont a b) -> (a -> IterCont a b) ->
+               Topic m a -> Topic m b
 bimetamorph f g t = Topic $ do (x,t') <- runTopic t
                                let IterCont (y, f') = f x
-                               let IterCont (z, g') = g x
-                               aux (Left <$> y) (Right <$> z) 
-                                   (bimetamorph f' g' t')
-  where aux (Just y) (Just z) k = return (y, Topic $ return (z, k))
-        aux (Just y) Nothing  k = return (y, k)
-        aux _        (Just z) k = return (z, k)
-        aux Nothing  Nothing  k = runTopic k
+                                   IterCont (z, g') = g x
+                               aux y . aux z . runTopic $ bimetamorph f' g' t'
+  where aux = maybe id (\x y -> return (x, Topic y))
 
--- |Fold two monadic actions along a 'Topic' collecting and tagging
--- their productions in a new 'Topic'.
-bimetamorphM :: Monad m => 
-               (a -> m (IterContM m a b)) -> (a -> m (IterContM m a c)) ->
-               Topic m a -> Topic m (Either b c)
+-- |Fold two monadic functions along a 'Topic' collecting their
+-- productions in a new 'Topic'.
+bimetamorphM :: Monad m =>
+                (a -> m (IterContM m a b)) -> (a -> m (IterContM m a b)) ->
+                Topic m a -> Topic m b
 bimetamorphM f g t = Topic $ do (x,t') <- runTopic t
                                 IterContM (y, f') <- f x
                                 IterContM (z, g') <- g x
-                                aux (Left <$> y) (Right <$> z) 
-                                    (bimetamorphM f' g' t')
-  where aux (Just y) (Just z) k = return (y, Topic $ return (z, k))
-        aux (Just y) Nothing  k = return (y, k)
-        aux _        (Just z) k = return (z, k)
-        aux Nothing  Nothing  k = runTopic k
+                                aux y . aux z . runTopic $ bimetamorphM f' g' t'
+  where aux = maybe id (\x y -> return (x, Topic y))
 
+-- |Fold two functions along a 'Topic' collecting and tagging their
+-- productions in a new 'Topic'.
+bimetamorphE :: Monad m => 
+               (a -> IterCont a b) -> (a -> IterCont a c) ->
+               Topic m a -> Topic m (Either b c)
+bimetamorphE f g t = bimetamorph (fmap Left . f) (fmap Right . g) t
+
+-- |Fold two monadic functions along a 'Topic' collecting and tagging
+-- their productions in a new 'Topic'.
+bimetamorphME :: Monad m => 
+               (a -> m (IterContM m a b)) -> (a -> m (IterContM m a c)) ->
+               Topic m a -> Topic m (Either b c)
+bimetamorphME f g t = 
+  bimetamorphM (return . fmap Left <=< f) (return . fmap Right <=< g) t
 
 -- |Removes one level of monadic structure from the values a 'Topic'
 -- produces.
