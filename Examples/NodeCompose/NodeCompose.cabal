@@ -15,7 +15,7 @@ Executable composition
                    time == 1.1.*,
                    roshask == 0.1.*,
                    mtl,
-                   ROS-roslib-msgs,
+                   ROS-std-msgs,
                    ROS-sensor-msgs
   GHC-Options:     -Odph -threaded
   GHC-Prof-Options:-prof -auto-all -caf-all
@@ -29,7 +29,7 @@ Executable scope
                    time == 1.1.*,
                    roshask == 0.1.*,
                    mtl,
-                   ROS-roslib-msgs,
+                   ROS-std-msgs,
                    ROS-sensor-msgs
   GHC-Options:     -Odph -threaded -main-is Telescope
   GHC-Prof-Options:-prof -auto-all -caf-all
@@ -42,7 +42,7 @@ Executable detect
                    time == 1.1.*,
                    roshask == 0.1.*,
                    mtl,
-                   ROS-roslib-msgs,
+                   ROS-std-msgs,
                    ROS-sensor-msgs
   GHC-Options:     -Odph -threaded -main-is DetectUFO
   GHC-Prof-Options:-prof -auto-all -caf-all
