@@ -12,18 +12,19 @@ import System.Directory (doesFileExist, doesDirectoryExist,
                          getDirectoryContents)
 import System.Environment (getEnvironment)
 import System.FilePath ((</>), splitSearchPath, takeExtension, 
-                        dropExtension, takeFileName)
+                        dropExtension, takeFileName, splitPath)
 import Text.XML.Light
 
 type Package = String
 
 -- Find the path to a package based on the given search paths.
-findPackagePath :: [FilePath] -> Package -> IO (Maybe FilePath)
-findPackagePath search pkg = go search
-    where go [] = return Nothing
-          go (p:ps) = let pkgPath = p </> pkg
-                      in do e <- doesDirectoryExist pkgPath
-                            if e then return (Just pkgPath) else go ps
+findPackagePath :: [FilePath] -> Package -> Maybe FilePath
+findPackagePath search pkg = find ((== pkg) . last . splitPath) search
+-- findPackagePath search pkg = go search
+--     where go [] = return Nothing
+--           go (p:ps) = let pkgPath = p </> pkg
+--                       in do e <- doesDirectoryExist pkgPath
+--                             if e then return (Just pkgPath) else go ps
 
 -- Get the packages listed as dependencies in an XML manifest.  NOTE:
 -- In version 1.3.7, the xml package gained the ability to work with
@@ -45,10 +46,30 @@ dir p = getDirectoryContents p >>= return . map (p </>) . filter notDot
 
 -- The given path is a possible package path root, as are all of its
 -- subdirectories that are stacks (indicated by the presence of a
--- stack.xml file). Returns a list of of package root directories.
+-- stack.xml file). Returns a list of package directories.
 packagePaths :: FilePath -> IO [FilePath]
-packagePaths path = (path :) <$> (filterM isStack =<< dir path)
-    where isStack = doesFileExist . (</> "stack.xml")
+packagePaths path = do p <- isPkg path
+                       if p then return [path]
+                         else do s <- isStack path
+                                 if s 
+                                  then concat <$>
+                                       (mapM stackPackages =<< dir path)
+                                  else concat <$>
+                                       (mapM stackPackages =<<
+                                        filterM isStack =<<
+                                        dir path)
+  where isPkg = doesFileExist . (</> "manifest.xml")
+        isStack = doesFileExist . (</> "stack.xml")
+        stackPackages p = do isDir <- doesDirectoryExist p
+                             if isDir
+                               then do isp <- isPkg p
+                                       if isp 
+                                         then return [p]
+                                         else concat <$>
+                                              (mapM stackPackages
+                                               =<< filterM doesDirectoryExist 
+                                               =<< dir p)
+                               else return []
 
 -- Get every package directory on the ROS search path.
 getRosPaths :: IO [FilePath]
@@ -57,17 +78,17 @@ getRosPaths =
        let pPaths = case lookup "ROS_PACKAGE_PATH" env of
                       Just s -> s
                       Nothing -> error "ROS_PACKAGE_PATH not set in environment"
-           rPath = case lookup "ROS_ROOT" env of
-                     Just s -> s
-                     Nothing -> error "ROS_ROOT not set in environment"
-           allPaths = rPath : (rPath</>"core") : splitSearchPath pPaths
+           -- rPath = case lookup "ROS_ROOT" env of
+           --           Just s -> s
+           --           Nothing -> error "ROS_ROOT not set in environment"
+           allPaths = splitSearchPath pPaths
        concat <$> (mapM packagePaths =<< filterM doesDirectoryExist allPaths)
 
 -- Packages that we will ignore for tracking down message definition
 -- dependencies.
 ignoredPackages :: [String]
 ignoredPackages = ["genmsg_cpp", "rospack", "rosconsole", "rosbagmigration", 
-                   "roscpp", "rospy", "roslisp", "std_srvs"]
+                   "roscpp", "rospy", "roslisp", "std_srvs", "roslib"]
 
 -- |Find the names of the ROS packages this package depends on as
 -- indicated by the manifest.xml file in this package's root
@@ -105,7 +126,7 @@ findDepsWithMessages :: FilePath -> IO [String]
 findDepsWithMessages pkgRoot = 
   do names <- findPackageDepNames pkgRoot
      searchPaths <- getRosPaths
-     pkgPaths <- mapM (findPackagePath searchPaths) names
+     let pkgPaths = map (findPackagePath searchPaths) names
      map fst <$> filterM (maybe (return False) hasMsgs . snd) 
                          (zip names pkgPaths)
 
@@ -116,7 +137,7 @@ findPackageDeps :: FilePath -> IO [FilePath]
 findPackageDeps pkgRoot = 
     do pkgs <- findPackageDepNames pkgRoot
        searchPaths <- getRosPaths
-       pkgPaths <- mapM (findPackagePath searchPaths) pkgs
+       let pkgPaths = map (findPackagePath searchPaths) pkgs
        case findIndex isNothing pkgPaths of
          Just i -> putStrLn ("Looking for "++show pkgs++
                              ", dependencies of"++pkgRoot) >>
@@ -132,7 +153,7 @@ findPackageDepsTrans pkgRoot =
   do searchPaths <- getRosPaths
      let getDeps pkg = 
            do pkgDeps <- findPackageDepNames pkg
-              pkgPaths <- mapM (findPackagePath searchPaths) pkgDeps
+              let pkgPaths = map (findPackagePath searchPaths) pkgDeps
               case findIndex isNothing pkgPaths of
                 Just i -> putStrLn ("Looking for "++show pkgDeps++
                                     ", dependencies of "++pkgRoot) >>
@@ -159,8 +180,8 @@ findMessages path = aux =<< doesDirectoryExist msgPath
 -- definition in the package.
 findMessagesInPkg :: String -> IO (FilePath, [FilePath])
 findMessagesInPkg pkgName = do searchPaths <- getRosPaths
-                               pkgPath <- maybe err id <$> 
-                                          findPackagePath searchPaths pkgName
+                               let pkgPath = maybe err id $ 
+                                             findPackagePath searchPaths pkgName
                                msgs <- findMessages pkgPath
                                return (pkgPath, msgs)
     where err = error $ "Couldn't find path to package " ++ pkgName
@@ -175,7 +196,7 @@ findMessagesInPkg pkgName = do searchPaths <- getRosPaths
 findMessage :: String -> String -> IO (Maybe FilePath)
 findMessage pkg msgType = 
     do searchPaths <- getRosPaths
-       pkgPath <- findPackagePath searchPaths pkg
+       let pkgPath = findPackagePath searchPaths pkg
        case pkgPath of
          Just p -> find isMsg <$> findMessages p
          Nothing -> putStrLn ("Looking for "++pkg++"."++msgType) >>
