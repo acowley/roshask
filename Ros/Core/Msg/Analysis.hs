@@ -56,7 +56,9 @@ getMsgFromPkg pkgName msgName = getPackage pkgName >>= lookupMsg . msgCache
 getMsg :: ByteString -> MsgInfo SerialMsg
 getMsg msgName = check <$>
                  if B.null msgType
-                 then getMsgFromPkg "rosgraph_msgs" msgName >>= checkLocal
+                 then getMsgFromPkg "rosgraph_msgs" msgName <||>
+                      getMsgFromPkg "std_msgs" msgName <||>
+                      (flip getMsgFromPkg msgName . homePkg =<< get)
                  else getMsgFromPkg msgPkg (B.tail msgType)
     where (msgPkg, msgType) = B.span (/= '/') msgName
           check :: Maybe SerialMsg -> SerialMsg
@@ -66,6 +68,8 @@ getMsg msgName = check <$>
           checkLocal Nothing = do home <- homePkg <$> get
                                   getMsgFromPkg home msgName
           checkLocal info    = return info
+          (<||>) :: (Applicative f, Alternative g) => f (g a) -> f (g a) -> f (g a)
+          (<||>) = liftA2 (<|>)
 
 isFlat :: Msg -> MsgInfo Bool
 isFlat = fmap (all isStorable) . mapM (getTypeInfo . fieldType) . fields
