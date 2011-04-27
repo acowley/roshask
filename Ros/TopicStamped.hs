@@ -52,7 +52,7 @@ findBrackets t1 t2 = T.concats . metamorphM (go t2) $ T.consecutive t1
 removeDups :: (Functor m, Monad m, HasHeader a, HasHeader b) =>
               Topic m (a,b) -> Topic m (a,b)
 removeDups = T.catMaybes . fmap check . T.consecutive
-  where check (x@(x1,y1), (x2,y2))
+  where check ((x1,y1), x@(x2,y2))
           | getSequence x1 == getSequence x2 && 
             getSequence y1 == getSequence y2 = Nothing
           | otherwise = Just x
@@ -63,12 +63,17 @@ removeDups = T.catMaybes . fmap check . T.consecutive
 -- 'Topic' with the nearest time stamp. The resulting 'Topic' will
 -- produce a new value at the rate of the faster component 'Topic'.
 everyNew :: (HasHeader a, HasHeader b) => 
-            Topic IO a -> Topic IO b -> Topic IO (a,b)
-everyNew t1 t2 = removeDups $ bracketLeft `T.merge` bracketRight
-  where bracketLeft = pickLeft `fmap` findBrackets t1 t2
-        pickLeft ((x1,x2,_), y) = (pickNearest x1 x2 y, y)
-        bracketRight = pickRight `fmap` findBrackets t2 t1
+            Topic IO a -> Topic IO b -> IO (Topic IO (a,b))
+everyNew t1 t2 = 
+  do (t1a, t1b) <- T.tee t1
+     (t2a, t2b) <- T.tee t2
+     let bracketLeft = pickLeft `fmap` findBrackets t1a t2a
+         bracketRight = pickRight `fmap` findBrackets t2b t1b
+     return . removeDups $ bracketLeft `T.merge` bracketRight
+  where pickLeft ((x1,x2,_), y) = (pickNearest x1 x2 y, y)
         pickRight ((y1,y2,_), x) = (x, pickNearest y1 y2 x)
+
+
 
 -- |The application @interpolate t1 t2@ produces a new 'Topic' that
 -- pairs every element of @t2@ with an interpolation of two temporally
