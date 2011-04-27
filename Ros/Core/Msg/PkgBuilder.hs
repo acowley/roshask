@@ -6,7 +6,7 @@ import Control.Monad (when)
 import qualified Data.ByteString.Char8 as B
 import Data.Char (toUpper)
 import Data.Either (rights)
-import Data.List (findIndex, intercalate, isSuffixOf)
+import Data.List (findIndex, intercalate, isSuffixOf, nub)
 import System.Directory (createDirectoryIfMissing, getDirectoryContents,
                          doesDirectoryExist, removeFile)
 import System.FilePath
@@ -106,8 +106,11 @@ getHaskellMsgFiles pkgPath pkgName =
 -- Generate a .cabal file to build this ROS package's messages.
 genMsgCabal :: FilePath -> String -> IO FilePath
 genMsgCabal pkgPath pkgName = 
-  do deps <- map (B.pack . rosPkg2CabalPkg) <$> 
-             findDepsWithMessages pkgPath
+  do deps' <- map (B.pack . rosPkg2CabalPkg) <$> 
+              findDepsWithMessages pkgPath
+     let deps
+           | pkgName == "std_msgs" = deps'
+           | otherwise = nub ("ROS-std-msgs":deps')
      msgFiles <- getHaskellMsgFiles pkgPath pkgName
      let msgModules = map (B.pack . path2MsgModule) msgFiles
          target = B.intercalate "\n" $
