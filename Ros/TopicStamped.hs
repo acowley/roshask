@@ -12,11 +12,13 @@
 -- that produces very quickly (faster than the minimum required update
 -- rate), and another 'Topic' that imposes a rate limit.
 module Ros.TopicStamped (everyNew, interpolate) where
+import Data.Time.Clock (getCurrentTime, diffUTCTime)
 import qualified Ros.Topic as T
-import Ros.Topic (Topic, metamorphM, yieldM)
+import Ros.Topic (Topic(..), metamorphM, yieldM)
 import qualified Ros.TopicUtil as T
 import Ros.Core.Msg.HeaderSupport
 import Ros.Core.RosTime
+import System.Timeout
 
 -- |Given two consecutive values, pick the one with the closest time
 -- stamp to another value.
@@ -73,15 +75,42 @@ everyNew t1 t2 =
   where pickLeft ((x1,x2,_), y) = (pickNearest x1 x2 y, y)
         pickRight ((y1,y2,_), x) = (x, pickNearest y1 y2 x)
 
--- |The application @interpolate t1 t2@ produces a new 'Topic' that
+-- |The application @interpolate f t1 t2@ produces a new 'Topic' that
 -- pairs every element of @t2@ with an interpolation of two temporally
 -- bracketing values from @t1@. The interpolation is effected with the
--- supplied function that is given the two values to interpolate and
--- the linear ratio to find between them. This ratio is determined by
--- the time stamp of the intervening element of @t2@.
+-- supplied function, @f@, that is given the two values to interpolate
+-- and the linear ratio to find between them. This ratio is determined
+-- by the time stamp of the intervening element of @t2@.
 interpolate :: (HasHeader a, HasHeader b) => 
-               (a -> a -> Double -> a) -> Topic IO a -> Topic IO b -> Topic IO (a,b)
+               (a -> a -> Double -> a) -> Topic IO a -> Topic IO b -> 
+               Topic IO (a,b)
 interpolate f t1 t2 = interp `fmap` findBrackets t1 t2
   where interp ((x1,x2,dt),y) = let t1 = getStamp x1
                                     ty = getStamp y
                                 in (f x1 x2 (diffSeconds ty t1 / dt), y)
+
+-- |Batch 'Topic' values that arrive within the given time window
+-- (expressed in seconds). When a value arrives, the window opens and
+-- all values received within that window are returned in a list, then
+-- the next value is awaited before opening the window again. Intended
+-- usage is to gather approximately simultaneous events into
+-- batches. Note that the times used to batch messages are arrival
+-- times rather than time stamps. This is what lets us close the
+-- window, rather than having to admit any message that every arrives
+-- with a compatible time stamp.
+batch :: Double -> Topic IO a -> Topic IO [a]
+batch timeWindow t = 
+  Topic $ do (x,t') <- runTopic t
+             start <- getCurrentTime
+             let go acc t = do now <- getCurrentTime
+                               let dt = fromRational . toRational $
+                                        diffUTCTime now start
+                                   dMs = floor $ (timeWindow - dt) * 1000000
+                               if dMs == 0
+                                 then return (reverse acc, k t)
+                                 else do r <- timeout dMs $ runTopic t
+                                         case r of
+                                           Just (x,t') -> go (x:acc) t'
+                                           Nothing -> return (reverse acc, k t)
+             go [x] t'
+    where k = batch timeWindow

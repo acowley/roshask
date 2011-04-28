@@ -227,15 +227,15 @@ bimetamorphM f g t = Topic $ do (x,t') <- runTopic t
 -- |Fold two functions along a 'Topic' collecting and tagging their
 -- productions in a new 'Topic'.
 bimetamorphE :: Monad m => 
-               (a -> IterCont a b) -> (a -> IterCont a c) ->
-               Topic m a -> Topic m (Either b c)
+                (a -> IterCont a b) -> (a -> IterCont a c) ->
+                Topic m a -> Topic m (Either b c)
 bimetamorphE f g t = bimetamorph (fmap Left . f) (fmap Right . g) t
 
 -- |Fold two monadic functions along a 'Topic' collecting and tagging
 -- their productions in a new 'Topic'.
 bimetamorphME :: Monad m => 
-               (a -> m (IterContM m a b)) -> (a -> m (IterContM m a c)) ->
-               Topic m a -> Topic m (Either b c)
+                 (a -> m (IterContM m a b)) -> (a -> m (IterContM m a c)) ->
+                 Topic m a -> Topic m (Either b c)
 bimetamorphME f g t = 
   bimetamorphM (return . fmap Left <=< f) (return . fmap Right <=< g) t
 
