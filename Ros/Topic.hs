@@ -256,6 +256,12 @@ forever = forever . snd <=< runTopic
 mapM :: (Functor m, Monad m) => (a -> m b) -> Topic m a -> Topic m b
 mapM = (join .) . fmap
 
+-- |Map a monadic action of a 'Topic' purely for its side
+-- effects. This function will never return.
+mapM_ :: Monad m => (a -> m ()) -> Topic m a -> m ()
+mapM_ f = go
+  where go = uncurry (>>) . (f *** go) <=< runTopic
+
 -- |A left-associative scan of a 'Topic' is a fold whose every
 -- intermediate value is produced as a value of a new 'Topic'.
 scan :: Monad m => (a -> b -> a) -> a -> Topic m b -> Topic m a

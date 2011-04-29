@@ -15,7 +15,7 @@ import Data.Sequence ((|>), viewl, ViewL(..))
 import qualified Data.Sequence as S
 import qualified Data.Foldable as F
 import Ros.Rate (rateLimiter)
-import Ros.Topic
+import Ros.Topic hiding (mapM_)
 
 -- |Produce an infinite list from a 'Topic'.
 toList :: Topic IO a -> IO [a]
