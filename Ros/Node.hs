@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, ExistentialQuantification #-}
 -- |The primary entrypoint to the ROS client library portion of
 -- roshask. This module defines the actions used to configure a ROS
 -- Node.
@@ -128,6 +128,15 @@ advertiseBuffered bufferSize name s = advertiseAux (mkPub s) bufferSize name
 advertise :: (RosBinary a, MsgInfo a, Typeable a) => 
              TopicName -> Topic IO a -> Node ()
 advertise = advertiseBuffered 1
+
+-- |Existentially quantified message type that roshask can
+-- serialize. This type provides a way to work with collections of
+-- differently typed 'Topic's.
+data SomeMsg = forall a. (RosBinary a, MsgInfo a, Typeable a) => SomeMsg a
+
+-- |Advertise projections of a 'Topic' as discrete 'Topic's.
+advertiseSplit :: [(TopicName, a -> SomeMsg)] -> Topic IO a -> Node ()
+advertiseSplit = undefined
 
 -- |Get an action that will shutdown this Node.
 getShutdownAction :: Node (IO ())
