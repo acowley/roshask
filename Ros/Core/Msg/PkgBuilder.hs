@@ -4,7 +4,6 @@ module Ros.Core.Msg.PkgBuilder where
 import Control.Applicative
 import Control.Monad (when)
 import qualified Data.ByteString.Char8 as B
-import Data.Char (toUpper)
 import Data.Either (rights)
 import Data.List (findIndex, intercalate, isSuffixOf, nub)
 import System.Directory (createDirectoryIfMissing, getDirectoryContents,
@@ -16,7 +15,7 @@ import Ros.Core.Build.DepFinder (findMessages, findDepsWithMessages, hasMsgs)
 import Ros.Core.Msg.Analysis
 import Ros.Core.Msg.Gen (generateMsgType)
 import Ros.Core.Msg.Parse (parseMsg)
-import Ros.Core.PathUtil (codeGenDir)
+import Ros.Core.PathUtil (codeGenDir, cap)
 import Data.ByteString.Char8 (ByteString)
 import Paths_roshask (version)
 import Data.Version (versionBranch)
@@ -84,16 +83,12 @@ rosPkg2CabalPkg = ("ROS-"++) . addSuffix . map sanitize
 
 removeOldCabal :: FilePath -> IO ()
 removeOldCabal pkgPath = 
-  do f <- doesDirectoryExist msgPath
+  do msgPath <- codeGenDir pkgPath
+     f <- doesDirectoryExist msgPath
      when f (getDirectoryContents msgPath >>=
              mapM_ (removeFile . (msgPath </>)) . 
                    filter ((== ".cabal") . takeExtension))
-  where msgPath = pkgPath </> "msg" </> "haskell"
-
--- Capitalize the first letter in a string.
-cap :: String -> String
-cap [] = []
-cap (h:t) = toUpper h : t
+  --where msgPath = pkgPath </> "msg" </> "haskell"
 
 -- Extract a Msg module name from a Path
 path2MsgModule :: FilePath -> String
@@ -101,16 +96,20 @@ path2MsgModule = intercalate "." . map cap . reverse . take 3 .
                  reverse . splitDirectories . dropExtension
 
 getHaskellMsgFiles :: FilePath -> String -> IO [FilePath]
-getHaskellMsgFiles pkgPath pkgName = 
-  map (dir </>) . filter ((== ".hs") . takeExtension) <$> getDirectoryContents dir
-  where dir = pkgPath </> "msg" </> "haskell" </> "Ros" </> cap pkgName
+getHaskellMsgFiles pkgPath _pkgName = do
+  d <- codeGenDir pkgPath
+  map (d </>) . filter ((== ".hs") . takeExtension) <$> getDirectoryContents d
+  -- map (dir </>) . filter ((== ".hs") . takeExtension) <$> getDirectoryContents dir
+  -- where dir = pkgPath </> "msg" </> "haskell" </> "Ros" </> cap pkgName
 
 -- Generate a .cabal file to build this ROS package's messages.
 genMsgCabal :: FilePath -> String -> IO FilePath
 genMsgCabal pkgPath pkgName = 
   do deps' <- map (B.pack . rosPkg2CabalPkg) <$> 
               findDepsWithMessages pkgPath
-     cabalFilePath <- (</>cabalPkg) . init . init <$> codeGenDir pkgPath
+     cabalFilePath <- (</>cabalPkg++".cabal") . 
+                      joinPath . init . init . splitPath <$> 
+                      codeGenDir pkgPath
      let deps
            | pkgName == "std_msgs" = deps'
            | otherwise = nub ("ROS-std-msgs":deps')
@@ -128,7 +127,7 @@ genMsgCabal pkgPath pkgName =
                   , ""
                   , "  Build-Depends:   base >= 4.2 && < 6,"
                   , "                   vector == 0.7.*,"
-                  , "                   time == 1.1.*,"
+                  , "                   time >= 1.1,"
                   , B.concat [ "                   roshask == "
                              , roshaskMajorMinor
                              , if null deps then ""  else "," ]
@@ -139,7 +138,7 @@ genMsgCabal pkgPath pkgName =
          --cabalFilePath = pkgPath</>"msg"</>"haskell"</>cabalPkg++".cabal"
      B.writeFile cabalFilePath pkgDesc
      return cabalFilePath
-  where cabalPkg = rosPkg2CabalPkg pkgName ++ ".cabal"
+  where cabalPkg = rosPkg2CabalPkg pkgName
         preamble = format [ ("Name", B.pack cabalPkg)
                           , ("Version", roshaskVersion)
                           , ("Synopsis", B.append "ROS Messages from " 
