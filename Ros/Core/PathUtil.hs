@@ -20,7 +20,8 @@ isStack = doesFileExist . (</> "stack.xml")
 
 -- |Identify the name of the package defining a msg.
 pathToPkgName :: FilePath -> String
-pathToPkgName = cap . last . init . splitPath
+pathToPkgName p | hasExtension p = cap . last . init . splitPath $ p
+                | otherwise = cap . last . splitPath $ p
 
 -- |Identify the name of the stack in which a msg is defined. If the
 -- package definining the message does not live in a stack, the result
