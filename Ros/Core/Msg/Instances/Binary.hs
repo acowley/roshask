@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- |Generate a Binary instance for ROS msg types.
-module Ros.Core.Msg.BinaryInstance (genBinaryInstance) where
+module Ros.Core.Msg.Instances.Binary (genBinaryInstance) where
 import Control.Monad ((>=>))
 import Data.ByteString.Char8 (ByteString, pack)
 import qualified Data.ByteString.Char8 as B

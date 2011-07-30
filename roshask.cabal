@@ -107,11 +107,11 @@ Library
                        BoundedChan >= 1.0.0.2,
                        parsec >= 3.1,
                        process >= 1.0.1.3,
-                       snap-core == 0.4.*,
-                       snap-server == 0.4.*,
+                       snap-core == 0.5.*,
+                       snap-server == 0.5.*,
                        storable-tuple >= 0.0.2,
                        transformers >= 0.2,
-                       haxr >= 3000.8.1,
+                       haxr >= 3000.8.2,
                        utf8-string >= 0.3.6,
                        uri >= 0.1.5,
                        vector-space
@@ -151,6 +151,6 @@ Executable roshask
   Other-modules:  Ros.Core.Msg.Parse Ros.Core.Msg.Gen Ros.Core.Msg.Analysis 
                   Ros.Core.Msg.ResolutionTypes Ros.Core.Msg.MD5
                   Ros.Core.Build.Init Ros.Core.Build.SetupUtil
-                  Ros.Core.Msg.BinaryInstance Ros.Core.Msg.StorableInstance
-                  Ros.Core.Msg.FieldImports Ros.Core.Msg.NFDataInstance
+                  Ros.Core.Msg.Instances.Binary Ros.Core.Msg.Instances.Storable
+                  Ros.Core.Msg.FieldImports Ros.Core.Msg.Instances.NFData
   Hs-Source-Dirs: .

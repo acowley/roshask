@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- |Generate an NFData instance for ROS msg types.
-module Ros.Core.Msg.NFDataInstance where
+module Ros.Core.Msg.Instances.NFData where
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Ros.Core.Msg.Types

@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- |Generate a Storable instance for ROS msg types.
-module Ros.Core.Msg.StorableInstance (genStorableInstance) where
+module Ros.Core.Msg.Instances.Storable (genStorableInstance) where
 import Control.Monad ((>=>))
 import Data.ByteString.Char8 (ByteString, pack)
 import qualified Data.ByteString.Char8 as B
