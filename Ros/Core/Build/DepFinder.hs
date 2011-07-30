@@ -3,7 +3,8 @@
 module Ros.Core.Build.DepFinder (findPackageDeps, findPackageDepNames, 
                                  findPackageDepsTrans,
                                  findMessages, findMessage, findMessagesInPkg,
-                                 findDepsWithMessages, hasMsgs) where
+                                 findDepsWithMessages, hasMsgs
+                                ) where
 import Control.Applicative ((<$>))
 import Control.Monad (when, filterM)
 import Data.Maybe (mapMaybe, isNothing, fromJust)
@@ -14,6 +15,8 @@ import System.Environment (getEnvironment)
 import System.FilePath ((</>), splitSearchPath, takeExtension, 
                         dropExtension, takeFileName, splitPath)
 import Text.XML.Light
+
+import Ros.Core.PathUtil (isPkg, isStack)
 
 type Package = String
 
@@ -58,9 +61,7 @@ packagePaths path = do p <- isPkg path
                                        (mapM stackPackages =<<
                                         filterM isStack =<<
                                         dir path)
-  where isPkg = doesFileExist . (</> "manifest.xml")
-        isStack = doesFileExist . (</> "stack.xml")
-        stackPackages p = do isDir <- doesDirectoryExist p
+  where stackPackages p = do isDir <- doesDirectoryExist p
                              if isDir
                                then do isp <- isPkg p
                                        if isp 

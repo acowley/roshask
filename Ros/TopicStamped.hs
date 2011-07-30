@@ -11,7 +11,7 @@
 -- common use case is calling the 'bothNew' function with a 'Topic'
 -- that produces very quickly (faster than the minimum required update
 -- rate), and another 'Topic' that imposes a rate limit.
-module Ros.TopicStamped (everyNew, interpolate) where
+module Ros.TopicStamped (everyNew, interpolate, batch) where
 import Data.Time.Clock (getCurrentTime, diffUTCTime)
 import qualified Ros.Topic as T
 import Ros.Topic (Topic(..), metamorphM, yieldM)
@@ -96,7 +96,7 @@ interpolate f t1 t2 = interp `fmap` findBrackets t1 t2
 -- usage is to gather approximately simultaneous events into
 -- batches. Note that the times used to batch messages are arrival
 -- times rather than time stamps. This is what lets us close the
--- window, rather than having to admit any message that every arrives
+-- window, rather than having to admit any message that ever arrives
 -- with a compatible time stamp.
 batch :: Double -> Topic IO a -> Topic IO [a]
 batch timeWindow t = 

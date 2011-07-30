@@ -64,10 +64,10 @@ getMsg msgName = check <$>
           check :: Maybe SerialMsg -> SerialMsg
           check Nothing = error $ "Couldn't resolve type " ++ unpack msgName
           check (Just m) = m
-          checkLocal :: Maybe SerialMsg -> MsgInfo (Maybe SerialMsg)
-          checkLocal Nothing = do home <- homePkg <$> get
-                                  getMsgFromPkg home msgName
-          checkLocal info    = return info
+          -- checkLocal :: Maybe SerialMsg -> MsgInfo (Maybe SerialMsg)
+          -- checkLocal Nothing = do home <- homePkg <$> get
+          --                         getMsgFromPkg home msgName
+          -- checkLocal info    = return info
           (<||>) :: (Applicative f, Alternative g) => f (g a) -> f (g a) -> f (g a)
           (<||>) = liftA2 (<|>)
 

@@ -7,10 +7,10 @@ import qualified Data.ByteString.Char8 as B
 import Data.Char (toUpper)
 import Ros.Core.Msg.Analysis (MsgInfo, SerialInfo(..), withMsg, getTypeInfo)
 import Ros.Core.Msg.Types
-import Ros.Core.Msg.BinaryInstance
 import Ros.Core.Msg.FieldImports
-import Ros.Core.Msg.StorableInstance
---import Ros.Core.Msg.NFDataInstance
+import Ros.Core.Msg.Instances.Binary
+import Ros.Core.Msg.Instances.Storable
+--import Ros.Core.Msg.Instances.NFData
 import Ros.Core.Msg.MD5
 
 generateMsgType :: ByteString -> [ByteString] -> Msg -> MsgInfo ByteString

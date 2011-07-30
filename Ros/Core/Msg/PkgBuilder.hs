@@ -16,6 +16,7 @@ import Ros.Core.Build.DepFinder (findMessages, findDepsWithMessages, hasMsgs)
 import Ros.Core.Msg.Analysis
 import Ros.Core.Msg.Gen (generateMsgType)
 import Ros.Core.Msg.Parse (parseMsg)
+import Ros.Core.PathUtil (codeGenDir)
 import Data.ByteString.Char8 (ByteString)
 import Paths_roshask (version)
 import Data.Version (versionBranch)
@@ -34,6 +35,7 @@ roshaskMajorMinor = B.pack . intercalate "." $
 -- Build all messages defined by a package.
 buildPkgMsgs :: FilePath -> MsgInfo ()
 buildPkgMsgs fname = do liftIO . putStrLn $ "Generating package " ++ fname
+                        destDir <- liftIO $ codeGenDir fname
                         liftIO $ createDirectoryIfMissing True destDir
                         pkgMsgs <- liftIO $ findMessages fname
                         let pkgMsgs' = map (B.pack . cap . 
@@ -55,7 +57,7 @@ buildPkgMsgs fname = do liftIO . putStrLn $ "Generating package " ++ fname
                                     when f (removeOldCabal fname >> compileMsgs)
                           
     where err pkg = error $ "Couldn't parse message " ++ pkg
-          destDir = fname </> "msg" </> "haskell" </> "Ros" </> cap pkgName
+          --destDir = fname </> "msg" </> "haskell" </> "Ros" </> cap pkgName
           pkgName = last . splitDirectories $ fname
           pkgHier = B.pack $ "Ros." ++ cap pkgName ++ "."
           isLeft (Left _) = True
@@ -108,6 +110,7 @@ genMsgCabal :: FilePath -> String -> IO FilePath
 genMsgCabal pkgPath pkgName = 
   do deps' <- map (B.pack . rosPkg2CabalPkg) <$> 
               findDepsWithMessages pkgPath
+     cabalFilePath <- (</>cabalPkg) . init . init <$> codeGenDir pkgPath
      let deps
            | pkgName == "std_msgs" = deps'
            | otherwise = nub ("ROS-std-msgs":deps')
@@ -133,10 +136,10 @@ genMsgCabal pkgPath pkgName =
                     map (B.append "                   ") deps
                   , "  GHC-Options:     -Odph" ]
          pkgDesc = B.concat [preamble, "\n", target]
-         cabalFilePath = pkgPath</>"msg"</>"haskell"</>cabalPkg++".cabal"
+         --cabalFilePath = pkgPath</>"msg"</>"haskell"</>cabalPkg++".cabal"
      B.writeFile cabalFilePath pkgDesc
      return cabalFilePath
-  where cabalPkg = rosPkg2CabalPkg pkgName
+  where cabalPkg = rosPkg2CabalPkg pkgName ++ ".cabal"
         preamble = format [ ("Name", B.pack cabalPkg)
                           , ("Version", roshaskVersion)
                           , ("Synopsis", B.append "ROS Messages from " 

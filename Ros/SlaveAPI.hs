@@ -9,8 +9,8 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.UTF8 ()
 import qualified Data.ByteString.Lazy.UTF8 as BLU
 import Snap.Http.Server (simpleHttpServe)
-import Snap.Http.Server.Config (defaultConfig, addListen, Config, 
-                                ConfigListen(..), setAccessLog, setErrorLog)
+import Snap.Http.Server.Config (defaultConfig, setPort, Config, 
+                                setAccessLog, setErrorLog)
 import Snap.Types (Snap, getRequestBody, writeLBS, 
                    getResponse, putResponse, setContentLength)
 import Network.Socket hiding (Stream)
@@ -164,7 +164,7 @@ simpleServe port handler = simpleHttpServe conf handler
   where conf :: Config Snap ()
         conf = setAccessLog Nothing .
                setErrorLog Nothing . 
-               addListen (ListenHttp "*" port) $ 
+               setPort port $
                defaultConfig
 
 -- Find a free port by opening a socket, getting its port, then
