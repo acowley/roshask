@@ -6,9 +6,9 @@ Category:            Robotics
 Build-type:          Custom
 
 Executable talker
-  Build-Depends:  base >= 4.2 && < 5,
+  Build-Depends:  base >= 4.2 && < 6,
                   vector == 0.7.*,
-                  time == 1.1.*,
+                  time >= 1.1,
                   roshask == 0.1.*,
                   ROS-std-msgs
   GHC-Options:    -Odph -main-is Talker
@@ -16,9 +16,9 @@ Executable talker
   Hs-Source-Dirs: src
 
 Executable listener
-  Build-Depends:  base >= 4.2 && < 5,
+  Build-Depends:  base >= 4.2 && < 6,
                   vector == 0.7.*,
-                  time == 1.1.*,
+                  time >= 1.1,
                   roshask == 0.1.*,
                   ROS-std-msgs
   GHC-Options:    -Odph -main-is Listener

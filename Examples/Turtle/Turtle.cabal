@@ -6,9 +6,9 @@ Category:            Robotics
 Build-type:          Custom
 
 Executable Turtle
-  Build-Depends:  base >= 4.2 && < 5,
+  Build-Depends:  base >= 4.2 && < 6,
                   vector == 0.7.*,
-                  time == 1.1.*,
+                  time >= 1.1,
                   roshask == 0.1.*,
                   ROS-turtlesim-msgs
   GHC-Options:    -Odph -main-is Turtle
@@ -16,9 +16,9 @@ Executable Turtle
   Hs-Source-Dirs: src
 
 Executable Turtle2
-  Build-Depends:  base >= 4.2 && < 5,
+  Build-Depends:  base >= 4.2 && < 6,
                   vector == 0.7.*,
-                  time == 1.1.*,
+                  time >= 1.1,
                   roshask == 0.1.*,
                   vector-space,
                   ROS-turtlesim-msgs
@@ -28,9 +28,9 @@ Executable Turtle2
   Hs-Source-Dirs: src
 
 Executable Turtle3
-  Build-Depends:  base >= 4.2 && < 5,
+  Build-Depends:  base >= 4.2 && < 6,
                   vector == 0.7.*,
-                  time == 1.1.*,
+                  time >= 1.1,
                   roshask == 0.1.*,
                   vector-space,
                   ROS-turtlesim-msgs
