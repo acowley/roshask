@@ -131,6 +131,7 @@ Library
                       Ros.BinaryIter Ros.Core.Util.RingChan 
                       Ros.Core.Util.ArgRemapping Ros.Core.Build.DepFinder 
                       Ros.Core.Util.AppConfig
+                      Paths_roshask
 
 -- The ROS .msg definition parser and Haskell code generation utility.
 Executable roshask
