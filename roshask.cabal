@@ -102,7 +102,7 @@ Library
                        containers,
                        network >= 2.3,
                        Cabal >= 1.8,
-                       stm,
+                       stm >= 2.1.2,
                        mtl >= 2.0,
                        time >= 1.1,
                        BoundedChan >= 1.0.0.2,
