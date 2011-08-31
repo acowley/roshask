@@ -1,10 +1,12 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 module Ros.RosTcp (subStream, runServer) where
+import Prelude hiding (catch)
 import Control.Applicative ((<$>))
 import Control.Arrow (first)
 import Control.Concurrent (forkIO, killThread, newEmptyMVar, takeMVar, putMVar)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar
+import Control.Exception (catch, SomeException)
 import Control.Monad.Reader
 import Data.Binary.Put (runPut, putWord32le)
 import Data.Binary.Get (runGet, getWord32le)
@@ -88,11 +90,11 @@ acceptClients sock clients negotiate mkBuffer = forever acceptClient
                                     do debug "Closing client socket"
                                        liftIO $ 
                                          shutdown client ShutdownBoth `catch`
-                                           \_ -> return ()
+                                           \(_::SomeException) -> return ()
                             r <- ask
                             t <- liftIO . forkIO $ 
                                  serviceClient chan client `catch` 
-                                   \_ -> runReaderT cleanup1 r
+                                   \(_::SomeException) -> runReaderT cleanup1 r
                             let cleanup2 = cleanup1 >>
                                            (liftIO $ killThread t)
                             liftIO . atomically $ 

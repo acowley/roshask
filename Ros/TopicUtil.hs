@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -- |Utility functions for working with 'Topic's. These functions are
 -- primarily combinators for fusing two 'Topic's in various ways.
 module Ros.TopicUtil where

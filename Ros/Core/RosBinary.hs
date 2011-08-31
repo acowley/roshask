@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, TypeSynonymInstances #-}
+{-# LANGUAGE ScopedTypeVariables, TypeSynonymInstances, FlexibleInstances #-}
 -- |Binary serialization deserialization utilities for types used in
 -- ROS messages. This module is used by generated code for .msg
 -- types.
