@@ -37,7 +37,7 @@ head = fmap fst . runTopic
 uncons :: Topic m a -> m (a, Topic m a)
 uncons = runTopic
 
--- |Force evaluation of a tupic until it produces a value.
+-- |Force evaluation of a topic until it produces a value.
 force :: Monad m => Topic m a -> m (Topic m a)
 force = uncons >=> return . Topic . return
 

@@ -68,10 +68,10 @@ printLog :: LogLevel -> Log -> IO ()
 printLog lvl = let code = 2 ^ fromEnum lvl
                in \msg -> when (level msg >= code) (putStrLn (show msg))
 
--- Log message levels. These allow for simple filtering of messages.
+-- |Log message levels. These allow for simple filtering of messages.
 data LogLevel = Debug | Info | Warn | Error | Fatal deriving (Eq, Enum)
 
--- Enable logging for this node. The argument indicates the level of
+-- |Enable logging for this node. The argument indicates the level of
 -- log messages that should be echoed to standard out. If 'Nothing',
 -- then no messages are printed; if 'Just lvl', then all messages of
 -- greater than or equal level are printed.
