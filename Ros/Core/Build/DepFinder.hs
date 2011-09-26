@@ -108,8 +108,13 @@ findPackageDepNames pkgRoot =
 -- |Returns 'True' if the ROS package at the given 'FilePath' defines
 -- any messages.
 hasMsgs :: FilePath -> IO Bool
-hasMsgs pkgPath = not . null . filter ((== ".msg") . takeExtension) <$> 
-                  getDirectoryContents (pkgPath </> "msg")
+hasMsgs pkgPath = 
+  do e <- doesDirectoryExist msgPath 
+     if e 
+       then not . null . filter ((== ".msg") . takeExtension) <$> 
+            getDirectoryContents msgPath
+       else return False
+  where msgPath = pkgPath </> "msg"
 
 {-
 -- |Returns 'True' if the ROS package at the given 'FilePath' is a
