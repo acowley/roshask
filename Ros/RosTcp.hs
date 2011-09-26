@@ -226,11 +226,11 @@ data MsgInfoRcd = MsgInfoRcd { md5, typeName :: String }
 
 -- |A 'Feeder' represents a 'Topic' fully prepared to accept
 -- subscribers.
-data Feeder = Feeder MsgInfoRcd -- ^Explicit MsgInfo dictionary
-                     Int -- ^Transmit buffer size
-                     (URI -> Int -> IO ()) -- ^Update topic stats
+data Feeder = Feeder MsgInfoRcd -- Explicit MsgInfo dictionary
+                     Int -- Transmit buffer size
+                     (URI -> Int -> IO ()) -- Update topic stats
                      (TVar [(Config (), RingChan ByteString)] -> Config ())
-                     -- ^'pubStream' partial application
+                     -- 'pubStream' partial application
 
 -- |Prepare an action for publishing messages. Arguments are a monadic
 -- function for updating topic statistics, and a transmit buffer
