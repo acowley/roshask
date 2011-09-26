@@ -376,3 +376,10 @@ topicOn :: (Applicative m, Monad m) =>
 topicOn proj inj trans t = 
   Topic $ do f <- trans
              runTopic $ mapM (\x -> inj x `fmap` f (proj x)) t
+
+-- |@subsample n t@ subsamples topic 't' by dropping 'n' elements for
+-- every element produced by the result topic.
+subsample :: Monad m => Int -> Topic m b -> Topic m b
+subsample n = metamorph $ go n
+  where go 0 x = yield x (go n)
+        go i _ = skip (go (i - 1))
