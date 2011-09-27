@@ -10,6 +10,7 @@ Executable Turtle
                   vector == 0.7.*,
                   time >= 1.1,
                   roshask == 0.1.*,
+                  ROS-std-msgs,
                   ROS-turtlesim-msgs
   GHC-Options:    -Odph -main-is Turtle
   Main-Is:        Turtle.hs
@@ -21,6 +22,7 @@ Executable Turtle2
                   time >= 1.1,
                   roshask == 0.1.*,
                   vector-space,
+                  ROS-std-msgs,
                   ROS-turtlesim-msgs
   GHC-Options:    -Odph -main-is Turtle2
   Main-Is:        Turtle2.hs
@@ -32,7 +34,7 @@ Executable Turtle3
                   vector == 0.7.*,
                   time >= 1.1,
                   roshask == 0.1.*,
-                  vector-space,
+                  ROS-std-msgs,
                   ROS-turtlesim-msgs
   GHC-Options:    -Odph -main-is Turtle3
   Main-Is:        Turtle3.hs
