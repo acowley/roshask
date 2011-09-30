@@ -1,7 +1,7 @@
 Tools for working with ROS in Haskell.
 
 [ROS](http://www.ros.org) is a software framework developed by [Willow
-Garage](http://http://www.willowgarage.com/) that aims to provide a
+Garage](http://www.willowgarage.com/) that aims to provide a
 standard software architecture for robotic systems. The main idea of
 the framework is to support the development and execution of loosely
 coupled /Node/s connected by typed /Topic/s. Each Node represents a
