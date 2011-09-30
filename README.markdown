@@ -1,7 +1,7 @@
 Tools for working with ROS in Haskell.
 
-ROS (<http://www.ros.org>) is a software framework developed by Willow
-Garage (<http://http://www.willowgarage.com/>) that aims to provide a
+[ROS](http://www.ros.org) is a software framework developed by [Willow
+Garage](http://http://www.willowgarage.com/) that aims to provide a
 standard software architecture for robotic systems. The main idea of
 the framework is to support the development and execution of loosely
 coupled /Node/s connected by typed /Topic/s. Each Node represents a
@@ -13,5 +13,5 @@ along with the `roshask` executable for creating new ROS packages and
 generating Haskell code from message definition files (see the ROS
 documentation for information on message types).
 
-See <http://github.com/acowley/roshask/wiki> for more information on
+See [the wiki](http://github.com/acowley/roshask/wiki) for more information on
 getting started.
