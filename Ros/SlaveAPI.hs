@@ -9,7 +9,7 @@ import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.UTF8 ()
 import qualified Data.ByteString.Lazy.UTF8 as BLU
 import Snap.Http.Server (simpleHttpServe)
-import Snap.Http.Server.Config (defaultConfig, setPort, Config, 
+import Snap.Http.Server.Config (defaultConfig, setPort, Config, ConfigLog(..),
                                 setVerbose, setAccessLog, setErrorLog)
 import Snap.Types (Snap, getRequestBody, writeLBS, 
                    getResponse, putResponse, setContentLength)
@@ -162,8 +162,8 @@ slaveRPC n = -- \q s -> putStrLn ("Slave call "++s)>>(handleCall (dispatch q) s)
 simpleServe :: Int -> Snap () -> IO ()
 simpleServe port handler = simpleHttpServe conf handler
   where conf :: Config Snap ()
-        conf = setAccessLog Nothing .
-               setErrorLog Nothing . 
+        conf = setAccessLog ConfigNoLog .
+               setErrorLog ConfigNoLog . 
                setVerbose False .
                setPort port $
                defaultConfig

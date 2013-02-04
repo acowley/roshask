@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, TupleSections #-}
 module Ros.Core.Msg.Parse (parseMsg, simpleFieldAssoc) where
 import Prelude hiding (takeWhile)
-import Control.Applicative hiding (many)
+import Control.Applicative
 import Control.Arrow ((***), (&&&))
 import Data.Attoparsec.Char8
 import Data.ByteString (ByteString)
