@@ -1,7 +1,6 @@
 module Ros.RunNode (runNode) where
-import Prelude hiding (catch)
 import Control.Concurrent (readMVar,forkIO, killThread)
-import Control.Concurrent.QSem (newQSem, signalQSem, waitQSem)
+import qualified Control.Concurrent.SSem as Sem
 import Control.Exception (catch, SomeException)
 import Control.Monad.IO.Class
 import System.Posix.Signals (installHandler, Handler(..), sigINT)
@@ -49,14 +48,14 @@ runNode :: RosSlave s => String -> s -> Config ()
 runNode name s = do (wait, _port) <- liftIO $ runSlave s
                     registerNode name s
                     debug "Spinning"
-                    allDone <- liftIO $ newQSem 0
+                    allDone <- liftIO $ Sem.new 0
                     let ignoreEx :: SomeException -> IO ()
                         ignoreEx _ = return ()
                         shutdown = do putStrLn "Shutting down"
                                       cleanupNode s `catch` ignoreEx
-                                      signalQSem allDone
+                                      Sem.signal allDone
                     liftIO $ setShutdownAction s shutdown
                     _ <- liftIO $ installHandler sigINT (CatchOnce shutdown) Nothing
-                    t <- liftIO . forkIO $ wait >> signalQSem allDone
-                    liftIO $ waitQSem allDone
+                    t <- liftIO . forkIO $ wait >> Sem.signal allDone
+                    liftIO $ Sem.wait allDone
                     liftIO $ killThread t `catch` ignoreEx

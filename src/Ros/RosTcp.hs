@@ -1,6 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
-module Ros.RosTcp (subStream, runServer) where
-import Prelude hiding (catch)
+module Ros.RosTcp (subStream, runServer, runServers) where
 import Control.Applicative ((<$>))
 import Control.Arrow (first)
 import Control.Concurrent (forkIO, killThread, newEmptyMVar, takeMVar, putMVar)
@@ -40,7 +39,7 @@ serviceClient c s = forever $ do bs <- readChan c
                                  sendMany s (BL.toChunks (BL.append len bs))
 
 recvAll :: Socket -> Int -> IO B.ByteString
-recvAll s len = go len []
+recvAll s = flip go []
     where go len acc = do bs <- recv s len
                           if B.length bs < len
                             then go (len - B.length bs) (bs:acc)
@@ -103,7 +102,7 @@ acceptClients sock clients negotiate mkBuffer = forever acceptClient
 
 -- |Publish each item obtained from a 'Topic' to each connected client.
 pubStream :: RosBinary a => Topic IO a -> TVar [(b, RingChan ByteString)] -> Config ()
-pubStream t clients = liftIO $ go 0 t
+pubStream t0 clients = liftIO $ go 0 t0
   where go !n t = do (x, t') <- runTopic t
                      let bytes = runPut $ putMsg n x
                      cs <- readTVarIO clients
@@ -173,7 +172,7 @@ subStream target tname _updateStats =
        return $ streamIn h
     where host = case parseURI target of
                    Just u -> case uriRegName u of
-                               Just host -> host
+                               Just host' -> host'
                                Nothing -> error $ "Couldn't parse hostname "++ 
                                                   "from "++target
                    Nothing -> error $ "Couldn't parse URI "++target
@@ -222,7 +221,7 @@ runServer stream = runServerAux (mkPubNegotiator (undefined::a))
 
 -- |The 'MsgInfo' type class dictionary made explicit to strip off the
 -- actual message type.
-data MsgInfoRcd = MsgInfoRcd { md5, typeName :: String }
+data MsgInfoRcd = MsgInfoRcd { _md5, _typeName :: String }
 
 -- |A 'Feeder' represents a 'Topic' fully prepared to accept
 -- subscribers.
@@ -251,6 +250,6 @@ feedTopic updateStats bufSize =
 -- the input 'Feeder's.
 runServers :: [Feeder] -> Config (Config (), [Int])
 runServers = return . first sequence_ . unzip <=< mapM feed
-  where feed (Feeder info bufSize stats push) = 
-          let pub = negotiatePub (typeName info) (md5 info)
+  where feed (Feeder (MsgInfoRcd md5 typeName) bufSize stats push) = 
+          let pub = negotiatePub typeName md5
           in runServerAux pub push stats bufSize

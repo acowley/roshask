@@ -2,7 +2,8 @@ module Ros.Core.Util.RingChan (RingChan, newRingChan, writeChan,
                                readChan, getChanContents, getBuffered) where
 import Control.Monad (join)
 import Control.Concurrent.MVar
-import Control.Concurrent.QSem
+import Control.Concurrent.SSem (SSem)
+import qualified Control.Concurrent.SSem as Sem
 import qualified Data.Foldable as F
 import Data.Sequence (Seq, (|>), viewl, ViewL(..))
 import qualified Data.Sequence as Seq
@@ -17,11 +18,11 @@ import System.IO.Unsafe (unsafeInterleaveIO)
 -- |A 'RingChan' is an 'MVar' containing a triple of maximum capacity, a
 -- semaphore used to indicate that the chan has gone from empty to
 -- non-empty, and a sequence of items.
-type RingChan a = (Int, QSem, MVar (Seq a))
+type RingChan a = (Int, SSem, MVar (Seq a))
 
 -- |Create a 'RingChan' with the specified maximum capacity.
 newRingChan :: Int -> IO (RingChan a)
-newRingChan n = do sem <- newQSem 0
+newRingChan n = do sem <- Sem.new 0
                    q <- newMVar Seq.empty
                    return (n,sem,q)
 
@@ -30,14 +31,14 @@ newRingChan n = do sem <- newQSem 0
 writeChan :: RingChan a -> a -> IO ()
 writeChan (n,sem,mv) x = 
     join $ modifyMVar mv (\q -> if Seq.length q < n
-                                then return (q |> x, signalQSem sem)
+                                then return (q |> x, Sem.signal sem)
                                 else let _ :< t = viewl q
                                      in return (t |> x, return ()))
                                 -- else return (q, return ()))
 
 -- |Read an item from the channel. Blocks until an item is available.
 readChan :: RingChan a -> IO a
-readChan (_,sem,mv) = do waitQSem sem
+readChan (_,sem,mv) = do Sem.wait sem
                          modifyMVar mv (\q -> let h :< t = viewl q
                                               in return (t,h))
 

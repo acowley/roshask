@@ -47,8 +47,8 @@ pidFixedIO kp ki kd dt =
      return $ \setpoint -> 
        let pid' = pidFixed kp ki kd setpoint dt
        in \x -> 
-         do init <- readIORef initialized
-            case init of
+         do init' <- readIORef initialized
+            case init' of
               0 -> do writeIORef e1 (x - setpoint)
                       writeIORef initialized 1
                       return 0
@@ -88,8 +88,8 @@ pidWithTimeIO kp ki kd =
      return $ \setpoint ->
        let pid' = pidTimed kp ki kd setpoint
        in \(t,x) ->
-         do init <- readIORef initialized
-            case init of
+         do init' <- readIORef initialized
+            case init' of
               0 -> do writeIORef e1 (t, x - setpoint)
                       writeIORef initialized 1
                       return 0

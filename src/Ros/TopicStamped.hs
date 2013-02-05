@@ -85,9 +85,9 @@ interpolate :: (HasHeader a, HasHeader b) =>
                (a -> a -> Double -> a) -> Topic IO a -> Topic IO b -> 
                Topic IO (a,b)
 interpolate f t1 t2 = interp `fmap` findBrackets t1 t2
-  where interp ((x1,x2,dt),y) = let t1 = getStamp x1
+  where interp ((x1,x2,dt),y) = let tx1 = getStamp x1
                                     ty = getStamp y
-                                in (f x1 x2 (diffSeconds ty t1 / dt), y)
+                                in (f x1 x2 (diffSeconds ty tx1 / dt), y)
 
 -- |Batch 'Topic' values that arrive within the given time window
 -- (expressed in seconds). When a value arrives, the window opens and
@@ -99,8 +99,8 @@ interpolate f t1 t2 = interp `fmap` findBrackets t1 t2
 -- window, rather than having to admit any message that ever arrives
 -- with a compatible time stamp.
 batch :: Double -> Topic IO a -> Topic IO [a]
-batch timeWindow t = 
-  Topic $ do (x,t') <- runTopic t
+batch timeWindow t0 = 
+  Topic $ do (x,t') <- runTopic t0
              start <- getCurrentTime
              let go acc t = do now <- getCurrentTime
                                let dt = fromRational . toRational $
@@ -110,7 +110,7 @@ batch timeWindow t =
                                  then return (reverse acc, k t)
                                  else do r <- timeout dMs $ runTopic t
                                          case r of
-                                           Just (x,t') -> go (x:acc) t'
+                                           Just (x',t'') -> go (x':acc) t''
                                            Nothing -> return (reverse acc, k t)
              go [x] t'
     where k = batch timeWindow

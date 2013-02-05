@@ -1,8 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables, TypeSynonymInstances, FlexibleInstances #-}
--- |Binary serialization deserialization utilities for types used in
--- ROS messages. This module is used by generated code for .msg
--- types.
-
+-- |Binary serialization/deserialization utilities for types used in
+-- ROS messages. This module is used by generated code for .msg types.
 -- NOTE: The native byte ordering of the host is used to support the
 -- common scenario of same-machine transport.
 module Ros.Core.RosBinary where

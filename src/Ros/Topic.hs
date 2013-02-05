@@ -25,7 +25,7 @@ instance Applicative m => Applicative (Topic m) where
 
 
 instance (Typeable1 m, Typeable a) => Typeable (Topic m a) where
-  typeOf _ = mkTyConApp (mkTyCon "Topic") 
+  typeOf _ = mkTyConApp (mkTyCon3 "roshask" "Ros.Topic" "Topic") 
                         [typeOf1 (undefined::m a), typeOf (undefined::a)]
 
 -- |Return the first value produced by a 'Topic'.
@@ -68,10 +68,10 @@ filter p = metamorph go
 
 -- |@take n t@ returns the prefix of @t@ of length @n@.
 take :: Monad m => Int -> Topic m a -> m [a]
-take n t = aux n t []
-  where aux 0 _ acc = return (reverse acc)
-        aux n t acc = do (x, t') <- runTopic t
-                         aux (n-1) t' (x:acc)
+take = aux []
+  where aux acc 0 _ = return (reverse acc)
+        aux acc n' t = do (x, t') <- runTopic t
+                          aux (x:acc) (n'-1) t'
 
 -- |Run a 'Topic' for the specified number of iterations, discarding
 -- the values it produces.
@@ -81,7 +81,7 @@ take_ n = take_ (n-1) . snd <=< runTopic
 
 -- |@drop n t@ returns the suffix of @t@ after the first @n@ elements.
 drop :: Monad m => Int -> Topic m a -> Topic m a
-drop n = Topic . aux n
+drop = (Topic .) . aux
   where aux 0 = runTopic
         aux n = aux (n-1) . snd <=< runTopic
 
@@ -116,10 +116,10 @@ break p = go []
 -- @t@ of length @n@, and whose second element is the remainder of the
 -- 'Topic'.
 splitAt :: Monad m => Int -> Topic m a -> m ([a], Topic m a)
-splitAt n = go n []
-  where go 0 acc t = return (reverse acc, t)
-        go n acc t = do (x,t') <- runTopic t
-                        go (n-1) (x:acc) t'
+splitAt = go []
+  where go acc 0 t = return (reverse acc, t)
+        go acc n t = do (x,t') <- runTopic t
+                        go (x:acc) (n-1) t'
 
 -- |Returns a 'Topic' that includes only the 'Just' values from the
 -- given 'Topic'.

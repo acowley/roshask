@@ -1,5 +1,5 @@
 Name:                roshask
-Version:             0.1.0
+Version:             0.1.1
 Synopsis:            Haskell support for the ROS robotics framework.
 License:             BSD3
 License-file:        LICENSE
@@ -108,6 +108,7 @@ Library
                        BoundedChan >= 1.0.0.2,
                        parsec >= 3.1,
                        process >= 1.0.1.3,
+                       SafeSemaphore,
                        snap-core >= 0.9,
                        snap-server >= 0.9,
                        storable-tuple >= 0.0.2,
@@ -121,8 +122,8 @@ Library
     Build-depends: unix
 
 
-  GHC-Options:         -Odph -Wall -fno-warn-name-shadowing -fno-warn-duplicate-exports
-  Hs-Source-Dirs:      .
+  GHC-Options:         -O2 -Wall
+  Hs-Source-Dirs:      src
   
   -- Modules not exported by this package.
   Other-modules:      Ros.MasterAPI Ros.SlaveAPI Ros.ParameterServerAPI
@@ -156,4 +157,4 @@ Executable roshask
                   Ros.Core.Msg.Instances.Binary Ros.Core.Msg.Instances.Storable
                   Ros.Core.Msg.FieldImports Ros.Core.Msg.Instances.NFData
                   Ros.Core.PathUtil Paths_roshask
-  Hs-Source-Dirs: .
+  Hs-Source-Dirs: src

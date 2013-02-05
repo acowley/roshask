@@ -83,11 +83,11 @@ instance RosSlave NodeState where
                     Nothing -> return (return ())
                     Just sub -> do let add = addPub sub >=> \_ -> return ()
                                    known <- readTVar (knownPubs sub) 
-                                   (act,known') <- foldM (connectToPub add)
-                                                         (return (), known)
-                                                         uris
+                                   (act',known') <- foldM (connectToPub add)
+                                                          (return (), known)
+                                                          uris
                                    writeTVar (knownPubs sub) known'
-                                   return act
+                                   return act'
         in act
     getTopicPortTCP = ((pubPort <$> ) .) . flip M.lookup . publications
     setShutdownAction ns a = putMVar (signalShutdown ns) a

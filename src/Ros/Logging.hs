@@ -9,7 +9,8 @@ import Control.Monad (when)
 import Data.IORef
 import System.IO.Unsafe
 import Data.Word (Word8)
-import Ros.Core.Log
+import Ros.Core.Log (Log(Log))
+import qualified Ros.Core.Log as Log
 import Ros.Core.Header
 import Ros.Node
 import Ros.TopicUtil (fromList)
@@ -31,11 +32,11 @@ mkLogMsg level msg = do Loc fname _ _ start _ <- location
 -- 
 -- > $(logDebug "This is my message to you")
 logDebug, logWarn, logInfo, logError, logFatal :: String -> Q Exp
-logDebug = mkLogMsg dEBUG
-logInfo  = mkLogMsg iNFO
-logWarn  = mkLogMsg wARN
-logError = mkLogMsg eRROR
-logFatal = mkLogMsg fATAL
+logDebug = mkLogMsg Log.dEBUG
+logInfo  = mkLogMsg Log.iNFO
+logWarn  = mkLogMsg Log.wARN
+logError = mkLogMsg Log.eRROR
+logFatal = mkLogMsg Log.fATAL
 
 -- The 'Chan' into which all log messages are funneled. This Chan's
 -- contents are fed into the /rosout 'Topic'.
@@ -58,7 +59,7 @@ nodeName = unsafePerformIO $ newIORef ""
 -- Publish a log message.
 sendMsg :: Log -> IO ()
 sendMsg msg = do n <- readIORef nodeName
-                 let msg' = msg { name = n }
+                 let msg' = msg { Log.name = n }
                  ($ msg') =<< readIORef showLevel
                  writeChan rosOutChan msg'
 
@@ -66,7 +67,7 @@ sendMsg msg = do n <- readIORef nodeName
 -- specified level.
 printLog :: LogLevel -> Log -> IO ()
 printLog lvl = let code = 2 ^ fromEnum lvl
-               in \msg -> when (level msg >= code) (putStrLn (show msg))
+               in \msg -> when (Log.level msg >= code) (putStrLn (show msg))
 
 -- |Log message levels. These allow for simple filtering of messages.
 data LogLevel = Debug | Info | Warn | Error | Fatal deriving (Eq, Enum)

@@ -129,14 +129,14 @@ advertise :: (RosBinary a, MsgInfo a, Typeable a) =>
              TopicName -> Topic IO a -> Node ()
 advertise = advertiseBuffered 1
 
--- |Existentially quantified message type that roshask can
--- serialize. This type provides a way to work with collections of
--- differently typed 'Topic's.
-data SomeMsg = forall a. (RosBinary a, MsgInfo a, Typeable a) => SomeMsg a
+-- -- |Existentially quantified message type that roshask can
+-- -- serialize. This type provides a way to work with collections of
+-- -- differently typed 'Topic's.
+-- data SomeMsg = forall a. (RosBinary a, MsgInfo a, Typeable a) => SomeMsg a
 
--- |Advertise projections of a 'Topic' as discrete 'Topic's.
-advertiseSplit :: [(TopicName, a -> SomeMsg)] -> Topic IO a -> Node ()
-advertiseSplit = undefined
+-- -- |Advertise projections of a 'Topic' as discrete 'Topic's.
+-- advertiseSplit :: [(TopicName, a -> SomeMsg)] -> Topic IO a -> Node ()
+-- advertiseSplit = undefined
 
 -- |Get an action that will shutdown this Node.
 getShutdownAction :: Node (IO ())
@@ -193,27 +193,27 @@ getNamespace = namespace <$> get
 
 -- |Run a ROS Node.
 runNode :: NodeName -> Node a -> IO ()
-runNode name (Node n) = 
+runNode name (Node nConf) = 
     do myURI <- newEmptyMVar
        sigStop <- newEmptyMVar
        env <- liftIO getEnvironment
        (conf, args) <- parseAppConfig <$> liftIO getArgs
        let getConfig' var def = maybe def id $ lookup var env
            getConfig = flip lookup env
-           master = getConfig' "ROS_MASTER_URI" "http://localhost:11311"
-           namespace = let ns = getConfig' "ROS_NAMESPACE" "/"
-                       in if last ns == '/' then ns else ns ++ "/"
+           masterConf = getConfig' "ROS_MASTER_URI" "http://localhost:11311"
+           namespaceConf = let ns = getConfig' "ROS_NAMESPACE" "/"
+                           in if last ns == '/' then ns else ns ++ "/"
            (nameMap, params) = parseRemappings args
            name' = case lookup "__name" params of
                      Just x -> fromParam x
                      Nothing -> case name of
                                   '/':_ -> name
-                                  _ -> namespace ++ name
+                                  _ -> namespaceConf ++ name
            -- Name remappings apply to exact strings and resolved names.
            resolve p@(('/':_),_) = [p]
            resolve (('_':n),v) = [(name'++"/"++n, v)]
            resolve (('~':n),v) = [(name'++"/"++ n, v)] --, ('_':n,v)]
-           resolve (n,v) = [(namespace ++ n,v), (n,v)]
+           resolve (n,v) = [(namespaceConf ++ n,v), (n,v)]
            nameMap' = concatMap resolve nameMap
            params' = concatMap resolve params
        when (not $ null nameMap')
@@ -225,8 +225,8 @@ runNode name (Node n) =
                       Nothing -> return ()
                       Just n -> putMVar myURI $! "http://"++n
          Just ip -> putMVar myURI $! "http://"++ip
-       let configuredNode = runReaderT n (NodeConfig params' nameMap' conf)
-           initialState = NodeState name' namespace master myURI sigStop 
-                                    M.empty M.empty
+       let configuredNode = runReaderT nConf (NodeConfig params' nameMap' conf)
+           initialState = NodeState name' namespaceConf masterConf myURI
+                                    sigStop M.empty M.empty
            statefulNode = execStateT configuredNode initialState
        statefulNode >>= flip runReaderT conf . RN.runNode name'

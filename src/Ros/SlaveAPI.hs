@@ -4,15 +4,18 @@ module Ros.SlaveAPI (RosSlave(..), runSlave, requestTopicClient,
 import Control.Applicative
 import Control.Concurrent (killThread, forkIO, threadDelay, MVar, putMVar,
                            isEmptyMVar, readMVar, modifyMVar_)
-import Control.Concurrent.QSem
+import Control.Concurrent.SSem (SSem)
+import qualified Control.Concurrent.SSem as Sem
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.ByteString.UTF8 ()
 import qualified Data.ByteString.Lazy.UTF8 as BLU
 import Snap.Http.Server (simpleHttpServe)
 import Snap.Http.Server.Config (defaultConfig, setPort, Config, ConfigLog(..),
                                 setVerbose, setAccessLog, setErrorLog)
-import Snap.Types (Snap, getRequestBody, writeLBS, 
-                   getResponse, putResponse, setContentLength)
+-- import Snap.Types (Snap, getRequestBody, writeLBS, 
+--                    getResponse, putResponse, setContentLength)
+import Snap.Core (Snap, readRequestBody, writeLBS, getResponse, putResponse, 
+                  setContentLength)
 import Network.Socket hiding (Stream)
 import qualified Network.Socket as Net
 import Network.XmlRpc.Internals (Value)
@@ -23,7 +26,7 @@ import System.Posix.Process (getProcessID)
 #endif
 import System.Process (readProcess)
 import Ros.Core.RosTypes
-import Ros.TopicStats
+import Ros.TopicStats (PubStats(PubStats), SubStats(SubStats))
 import Ros.MasterAPI
 
 class RosSlave a where
@@ -93,8 +96,8 @@ getBusInfo n _ = do
 getMaster' :: RosSlave a => a -> CallerID -> IO (Int, String, URI)
 getMaster' n _ = return (1, "", getMaster n)
 
-shutdown' :: RosSlave a => a -> QSem -> CallerID -> IO (Int, String, Bool)
-shutdown' n q _ = stopNode n >> signalQSem q >> return (1, "", True)
+shutdown' :: RosSlave a => a -> SSem -> CallerID -> IO (Int, String, Bool)
+shutdown' n q _ = stopNode n >> Sem.signal q >> return (1, "", True)
 
 -- This requires a dependency on the unix package and so is not cross
 -- platform.
@@ -103,13 +106,13 @@ getPid' _ = do pid <- getProcessID
                return (1, "", fromEnum pid)
 
 getSubscriptions' :: RosSlave a => a -> CallerID -> RpcResult [(String, String)]
-getSubscriptions' n _ = do 
-  subs <- map (\(n,t,_) -> (n,t)) <$> getSubscriptions n
+getSubscriptions' node _ = do 
+  subs <- map (\(n,t,_) -> (n,t)) <$> getSubscriptions node
   return (1, "", subs)
 
 getPublications' :: RosSlave a => a -> CallerID -> RpcResult [(String, String)]
-getPublications' n _ = do 
-  pubs <- map (\(n,t,_) -> (n,t)) <$> getPublications n
+getPublications' node _ = do 
+  pubs <- map (\(n,t,_) -> (n,t)) <$> getPublications node
   return (1, "", pubs)
 
 paramUpdate' :: RosSlave a => a -> CallerID -> String -> Value -> RpcResult Bool
@@ -143,7 +146,7 @@ requestTopicClient = flip remote "requestTopic"
 -- parameter is a value that provides the necessary reflective API as
 -- to ROS Node state. The second parameter is a semaphore indicating
 -- that the node should terminate.
-slaveRPC :: (RosSlave a) => a -> QSem -> String -> IO BLU.ByteString
+slaveRPC :: (RosSlave a) => a -> SSem -> String -> IO BLU.ByteString
 slaveRPC n = -- \q s -> putStrLn ("Slave call "++s)>>(handleCall (dispatch q) s)
     handleCall . dispatch
     where dispatch q = methods [ ("getBusStats", fun (getBusStats n))
@@ -180,7 +183,7 @@ findFreePort = do s <- socket AF_INET Net.Stream defaultProtocol
 -- |Run a ROS slave node. Returns an action that will wait for the
 -- node to shutdown along with the port the server is running on.
 runSlave :: RosSlave a => a -> IO (IO (), Int)
-runSlave n = do quitNow <- newQSem 0
+runSlave n = do quitNow <- Sem.new 0
                 port <- findFreePort
                 let myUri = getNodeURI n
                     myPort = ":" ++ show port
@@ -190,13 +193,13 @@ runSlave n = do quitNow <- newQSem 0
                           putMVar myUri $! "http://"++myIP++myPort
                   else modifyMVar_ myUri ((return $!) . (++myPort))
                 t <- forkIO $ simpleServe port (rpc (slaveRPC n quitNow))
-                let wait = do waitQSem quitNow
+                let wait = do Sem.wait quitNow
                               -- Wait a second for the response to flush
                               threadDelay 1000000 
                               stopNode n
                               killThread t
                 return (wait, port)
-    where rpc f = do body <- BLU.toString <$> getRequestBody
+    where rpc f = do body <- BLU.toString <$> readRequestBody 4096
                      response <- liftIO $ f body
                      writeLBS response
                      let len = fromIntegral $ BLU.length response

@@ -10,14 +10,14 @@ import Ros.Core.Msg.HeaderSupport
 import qualified Data.Word as Word
 import qualified Ros.Core.Header as Header
 
-data Log = Log { header :: Header.Header
-               , level :: Word.Word8
-               , name :: P.String
-               , msg :: P.String
-               , file :: P.String
+data Log = Log { header   :: Header.Header
+               , level    :: Word.Word8
+               , name     :: P.String
+               , msg      :: P.String
+               , file     :: P.String
                , function :: P.String
-               , line :: Word.Word32
-               , topics :: [P.String]
+               , line     :: Word.Word32
+               , topics   :: [P.String]
                } deriving (P.Show, P.Eq, P.Ord, T.Typeable)
 
 instance RosBinary Log where

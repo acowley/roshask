@@ -19,12 +19,12 @@ import Ros.Topic hiding (mapM_)
 
 -- |Produce an infinite list from a 'Topic'.
 toList :: Topic IO a -> IO [a]
-toList t = do c <- newChan
-              let feed t = do (x, t') <- runTopic t
-                              writeChan c x
-                              feed t'
-              _ <- forkIO $ feed t
-              getChanContents c
+toList t0 = do c <- newChan
+               let feed t = do (x, t') <- runTopic t
+                               writeChan c x
+                               feed t'
+               _ <- forkIO $ feed t0
+               getChanContents c
 
 -- |Produce a 'Topic' from an infinite list.
 fromList :: Monad m => [a] -> Topic m a
@@ -49,20 +49,20 @@ fromList [] = error "Ran out of list elements"
 -- one consumer might get the first value from the 'Topic' before the
 -- second consumer's buffer is created since buffer creation is lazy.
 tee :: Topic IO a -> IO (Topic IO a, Topic IO a)
-tee t = do c1 <- newTChanIO
-           c2 <- newTChanIO
-           signal <- newTVarIO True
-           let feed c = do atomically $ do f <- isEmptyTChan c
-                                           when f (writeTVar signal False)
-                           atomically $ readTChan c
-               produce t = do atomically $ readTVar signal >>= flip when retry
-                              (x,t') <- runTopic t
-                              atomically $ writeTChan c1 x >>
-                                           writeTChan c2 x >>
-                                           writeTVar signal True
-                              produce t'
-           _ <- forkIO $ produce t
-           return (repeatM (feed c1), repeatM (feed c2))
+tee t0 = do c1 <- newTChanIO
+            c2 <- newTChanIO
+            signal <- newTVarIO True
+            let feed c = do atomically $ do f <- isEmptyTChan c
+                                            when f (writeTVar signal False)
+                            atomically $ readTChan c
+                produce t = do atomically $ readTVar signal >>= flip when retry
+                               (x,t') <- runTopic t
+                               atomically $ writeTChan c1 x >>
+                                            writeTChan c2 x >>
+                                            writeTVar signal True
+                               produce t'
+            _ <- forkIO $ produce t0
+            return (repeatM (feed c1), repeatM (feed c2))
 
 -- |This version of @tee@ eagerly pulls data from the
 -- original 'Topic' as soon as it is available. This behavior is
@@ -85,18 +85,18 @@ teeEager t = do c1 <- newChan
 -- when a known number of consumers must see exactly all the same
 -- elements.
 fan :: Int -> Topic IO a -> IO [Topic IO a]
-fan n t = do cs <- replicateM n newTChanIO
-             signal <- newTVarIO True
-             let feed c = do atomically $ do f <- isEmptyTChan c
-                                             when f (writeTVar signal False)
-                             atomically $ readTChan c
-                 produce t = do atomically $ readTVar signal >>= flip when retry
-                                (x,t') <- runTopic t
-                                atomically $ mapM_ (flip writeTChan x) cs >>
-                                             writeTVar signal True
-                                produce t'
-             _ <- forkIO $ produce t
-             return $ map (repeatM . feed) cs
+fan n t0 = do cs <- replicateM n newTChanIO
+              signal <- newTVarIO True
+              let feed c = do atomically $ do f <- isEmptyTChan c
+                                              when f (writeTVar signal False)
+                              atomically $ readTChan c
+                  produce t = do atomically $ readTVar signal >>= flip when retry
+                                 (x,t') <- runTopic t
+                                 atomically $ mapM_ (flip writeTChan x) cs >>
+                                              writeTVar signal True
+                                 produce t'
+              _ <- forkIO $ produce t0
+              return $ map (repeatM . feed) cs
 
 -- |Make a 'Topic' shareable among multiple consumers. Each consumer
 -- of a Topic gets its own read buffer automatically as soon as it
@@ -107,23 +107,23 @@ fan n t = do cs <- replicateM n newTChanIO
 -- with some unpredictable interleaving). Note that Topics returned by
 -- the @Ros.Node.subscribe@ are already shared.
 share :: Topic IO a -> IO (Topic IO a)
-share t = do cs <- newTVarIO [] -- A list for the individual client buffers
-             signal <- newTVarIO True
-             let addClient = atomically $ do cs0 <- readTVar cs
-                                             c <- newTChan
-                                             writeTVar cs (c:cs0)
-                                             return c
-                 feed c = do atomically $ do f <- isEmptyTChan c
-                                             when f (writeTVar signal False)
-                             atomically $ readTChan c
-                 produce t = do atomically $ readTVar signal >>= flip when retry
-                                (x,t') <- runTopic t
-                                atomically $ do cs' <- readTVar cs
-                                                mapM_ (flip writeTChan x) cs'
-                                                writeTVar signal True
-                                produce t'
-             _ <- forkIO $ produce t
-             return . Topic $ addClient >>= runTopic . repeatM . feed
+share t0 = do cs <- newTVarIO [] -- A list for the individual client buffers
+              signal <- newTVarIO True
+              let addClient = atomically $ do cs0 <- readTVar cs
+                                              c <- newTChan
+                                              writeTVar cs (c:cs0)
+                                              return c
+                  feed c = do atomically $ do f <- isEmptyTChan c
+                                              when f (writeTVar signal False)
+                              atomically $ readTChan c
+                  produce t = do atomically $ readTVar signal >>= flip when retry
+                                 (x,t') <- runTopic t
+                                 atomically $ do cs' <- readTVar cs
+                                                 mapM_ (flip writeTChan x) cs'
+                                                 writeTVar signal True
+                                 produce t'
+              _ <- forkIO $ produce t0
+              return . Topic $ addClient >>= runTopic . repeatM . feed
 
 -- |The application @topicRate rate t@ runs 'Topic' @t@ no faster than
 -- @rate@ Hz.
@@ -234,8 +234,8 @@ weightedMeanNormalized alpha invAlpha plus scale normalize = Topic . warmup
 -- by a fractional number.
 simpsonsRule :: (Monad m, Fractional n) => 
                 (a -> a -> a) -> (n -> a -> a) -> Topic m a -> Topic m a
-simpsonsRule plus scale t = Topic $ do ([x,y], t') <- splitAt 2 t
-                                       go x y t'
+simpsonsRule plus scale t0 = Topic $ do ([x,y], t') <- splitAt 2 t0
+                                        go x y t'
   where go x y t = do (z,t') <- runTopic t
                       return (simpson x y z, Topic $ go y z t')
         simpson a mid b = scale c $ plus (plus a (scale 4 mid)) b
@@ -290,7 +290,7 @@ gate t1 t2 = const <$> t1 <*> t2
 -- element from each list in sequence.
 concats :: (Monad m, F.Foldable f) => Topic m (f a) -> Topic m a
 concats t = Topic $ do (x, t') <- runTopic t
-                       F.foldr (\x z -> return (x, Topic z)) 
+                       F.foldr (\x' z -> return (x', Topic z)) 
                                (runTopic $ concats t') 
                                x
 

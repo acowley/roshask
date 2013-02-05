@@ -42,6 +42,6 @@ codeGenDir f = do s <- stackName f
                   r <- getDataDir
                   let base = case s of
                                Nothing -> r 
-                               Just s -> r </> s
+                               Just s' -> r </> s'
                   return $ base </> pkg </> "Ros" </> pkg
   where pkg = pathToPkgName f
