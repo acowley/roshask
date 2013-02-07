@@ -5,7 +5,7 @@ import Control.Arrow (first)
 import Control.Concurrent (forkIO, killThread, newEmptyMVar, takeMVar, putMVar)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar
-import Control.Exception (catch, SomeException)
+import qualified Control.Exception as E
 import Control.Monad.Reader
 import Data.Binary.Put (runPut, putWord32le)
 import Data.Binary.Get (runGet, getWord32le)
@@ -88,12 +88,12 @@ acceptClients sock clients negotiate mkBuffer = forever acceptClient
                             let cleanup1 = 
                                     do debug "Closing client socket"
                                        liftIO $ 
-                                         shutdown client ShutdownBoth `catch`
-                                           \(_::SomeException) -> return ()
+                                         shutdown client ShutdownBoth `E.catch`
+                                           \(_::E.SomeException) -> return ()
                             r <- ask
                             t <- liftIO . forkIO $ 
-                                 serviceClient chan client `catch` 
-                                   \(_::SomeException) -> runReaderT cleanup1 r
+                                 serviceClient chan client `E.catch` 
+                                   \(_::E.SomeException) -> runReaderT cleanup1 r
                             let cleanup2 = cleanup1 >>
                                            (liftIO $ killThread t)
                             liftIO . atomically $ 
@@ -101,7 +101,8 @@ acceptClients sock clients negotiate mkBuffer = forever acceptClient
                               writeTVar clients . ((cleanup2,chan) :)
 
 -- |Publish each item obtained from a 'Topic' to each connected client.
-pubStream :: RosBinary a => Topic IO a -> TVar [(b, RingChan ByteString)] -> Config ()
+pubStream :: RosBinary a
+          => Topic IO a -> TVar [(b, RingChan ByteString)] -> Config ()
 pubStream t0 clients = liftIO $ go 0 t0
   where go !n t = do (x, t') <- runTopic t
                      let bytes = runPut $ putMsg n x
