@@ -42,7 +42,7 @@ toGoal (pos,goal) = (magnitude v, thetaErr)
 -- Run a PID loop on angular velocity to converge to a bearing for the
 -- goal.
 steering :: Topic IO (Float,Float) -> Topic IO Velocity
-steering = topicOn snd (Velocity . fst) (($ 0) <$> pidTimedIO 0.01 4.0 0)
+steering = topicOn snd (Velocity . fst) (($ 0) <$> pidTimedIO 0.01 0.5 0)
 
 -- Compute position and bearing error to goal, clamp linear and
 -- angular velocities, and generate a steering command.
