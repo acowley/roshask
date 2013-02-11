@@ -2,6 +2,7 @@
 module Ros.Core.RosTypes (ROSTime, ROSDuration, URI, CallerID, TopicName, 
                           NodeName, ParamName, TopicType, ConnectionID) where
 import Data.Word (Word32)
+import Foreign.Storable.Tuple ()
 
 type URI          = String
 type CallerID     = String
