@@ -126,14 +126,14 @@ genMsgCabal pkgPath pkgName =
                               else "")
                   , ""
                   , "  Build-Depends:   base >= 4.2 && < 6,"
-                  , "                   vector == 0.7.*,"
+                  , "                   vector > 0.7,"
                   , "                   time >= 1.1,"
                   , B.concat [ "                   roshask == "
                              , roshaskMajorMinor
                              , if null deps then ""  else "," ]
                   , B.intercalate ",\n" $
                     map (B.append "                   ") deps
-                  , "  GHC-Options:     -Odph" ]
+                  , "  GHC-Options:     -O2" ]
          pkgDesc = B.concat [preamble, "\n", target]
          --cabalFilePath = pkgPath</>"msg"</>"haskell"</>cabalPkg++".cabal"
      B.writeFile cabalFilePath pkgDesc

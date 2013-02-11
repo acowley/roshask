@@ -52,23 +52,23 @@ prepCabal pkgName rosDeps = B.writeFile (pkgName</>(pkgName++".cabal")) $
           target = B.intercalate "\n" $
                    [ B.concat ["Executable ", pack pkgName]
                    , "  Build-Depends:   base >= 4.2 && < 6,"
-                   , "                   vector == 0.7.*,"
+                   , "                   vector > 0.7,"
                    , "                   time >= 1.1,"
                    , "                   ROS-rosgraph-msgs,"
                    , B.append "                   roshask == 0.1.*" moreDeps
                    , rosDeps
-                   , "  GHC-Options:     -Odph"
+                   , "  GHC-Options:     -O2"
                    , "  Hs-Source-Dirs:  src"
                    , "  Main-Is:         Main.hs"
                    , B.append "  Other-Modules:   " pkgName' ]
           lib = B.intercalate "\n" $
                 [ "Library"
                 , "  Build-Depends:   base >= 4.2 && < 6,"
-                , "                   vector == 0.7.*,"
+                , "                   vector > 0.7,"
                 , "                   time >= 1.1,"
                 , B.append "                   roshask == 0.1.*" moreDeps
                 , rosDeps
-                , "  GHC-Options:     -Odph"
+                , "  GHC-Options:     -O2"
                 , B.concat ["  Exposed-Modules: ", pkgName']
                 , "  Hs-Source-Dirs:  src" ]  
           pkgName' = pack $ toUpper (head pkgName) : tail pkgName
