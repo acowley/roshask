@@ -11,7 +11,7 @@ Description: A demonstration of composing two Node values in order to
 
 Executable composition
   Build-Depends:   base >= 4.2 && < 6,
-                   vector == 0.7.*,
+                   vector > 0.7,
                    time >= 1.1,
                    roshask == 0.1.*,
                    mtl,
@@ -25,7 +25,7 @@ Executable composition
 
 Executable scope
   Build-Depends:   base >= 4.2 && < 6,
-                   vector == 0.7.*,
+                   vector > 0.7,
                    time >= 1.1,
                    roshask == 0.1.*,
                    mtl,
@@ -38,7 +38,7 @@ Executable scope
 
 Executable detect
   Build-Depends:   base >= 4.2 && < 6,
-                   vector == 0.7.*,
+                   vector > 0.7,
                    time >= 1.1,
                    roshask == 0.1.*,
                    mtl,
