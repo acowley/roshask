@@ -15,3 +15,5 @@ documentation for information on message types).
 
 See [the wiki](http://github.com/acowley/roshask/wiki) for more information on
 getting started.
+
+[![Build Status](https://travis-ci.org/acowley/roshask.png)](https://travis-ci.org/acowley/roshask)
