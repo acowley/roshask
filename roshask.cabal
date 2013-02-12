@@ -158,5 +158,5 @@ Executable roshask
                   Ros.Core.Build.Init Ros.Core.Build.SetupUtil
                   Ros.Core.Msg.Instances.Binary Ros.Core.Msg.Instances.Storable
                   Ros.Core.Msg.FieldImports Ros.Core.Msg.Instances.NFData
-                  Ros.Core.PathUtil Paths_roshask
+                  Ros.Core.Msg.Unregister Ros.Core.PathUtil Paths_roshask
   Hs-Source-Dirs: src
