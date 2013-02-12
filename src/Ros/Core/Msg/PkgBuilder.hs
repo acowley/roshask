@@ -4,12 +4,14 @@ module Ros.Core.Msg.PkgBuilder where
 import Control.Applicative
 import Control.Monad (when)
 import qualified Data.ByteString.Char8 as B
+import Data.Char (isSpace)
 import Data.Either (rights)
-import Data.List (findIndex, intercalate, isSuffixOf, nub)
+import Data.List (findIndex, intercalate, isSuffixOf, isPrefixOf, nub)
 import System.Directory (createDirectoryIfMissing, getDirectoryContents,
                          doesDirectoryExist, removeFile)
 import System.FilePath
-import System.Process (createProcess, proc, CreateProcess(..), waitForProcess)
+import System.Process (createProcess, proc, CreateProcess(..), waitForProcess,
+                       readProcess)
 import System.Exit (ExitCode(..))
 import Ros.Core.Build.DepFinder (findMessages, findDepsWithMessages, hasMsgs)
 import Ros.Core.Msg.Analysis
@@ -20,7 +22,8 @@ import Data.ByteString.Char8 (ByteString)
 import Paths_roshask (version)
 import Data.Version (versionBranch)
 
--- The current version of roshask.
+-- The current version of roshask. We tag generated message packages
+-- with the same version.
 roshaskVersion :: B.ByteString
 roshaskVersion = B.pack . intercalate "." $ map show (versionBranch version)
 
@@ -31,33 +34,49 @@ roshaskMajorMinor :: B.ByteString
 roshaskMajorMinor = B.pack . intercalate "." $ 
                     map show (take 2 (versionBranch version)) ++ ["*"]
 
--- Build all messages defined by a package.
+pathToRosPkg :: FilePath -> FilePath
+pathToRosPkg = last . splitDirectories
+
+-- Determine if a roshask package is already registered with ghc-pkg
+-- for the given ROS package.
+packageRegistered :: FilePath -> IO Bool
+packageRegistered pkg = any (isPrefixOf cabalPkg . dropWhile isSpace) . lines 
+                     <$> readProcess "ghc-pkg" ["list", cabalPkg] ""
+  where cabalPkg = (rosPkg2CabalPkg $ pathToRosPkg pkg) ++ 
+                   "-" ++ B.unpack roshaskVersion
+
+-- | Build all messages defined by a package unless that package is
+-- already registered with ghc-pkg.
 buildPkgMsgs :: FilePath -> MsgInfo ()
-buildPkgMsgs fname = do liftIO . putStrLn $ "Generating package " ++ fname
-                        destDir <- liftIO $ codeGenDir fname
-                        liftIO $ createDirectoryIfMissing True destDir
-                        pkgMsgs <- liftIO $ findMessages fname
-                        let pkgMsgs' = map (B.pack . cap . 
-                                            dropExtension . takeFileName)
-                                           pkgMsgs
-                            checkErrors xs = case findIndex isLeft xs of
-                                               Nothing -> rights xs
-                                               Just i -> err (pkgMsgs !! i)
-                            names = map ((destDir </>) .
-                                        flip replaceExtension ".hs" . 
-                                        takeFileName)
-                                        pkgMsgs
-                            gen = generateMsgType pkgHier pkgMsgs'
-                        parsed <- liftIO $ checkErrors <$> mapM parseMsg pkgMsgs
-                        mapM_ (\(n, m) -> gen m >>= 
-                                          liftIO . B.writeFile n)
-                              (zip names parsed)
-                        liftIO $ do f <- hasMsgs fname
-                                    when f (removeOldCabal fname >> compileMsgs)
-                          
+buildPkgMsgs fname = do r <- liftIO $packageRegistered fname
+                        if r
+                          then liftIO . putStrLn $ 
+                               "Using existing " ++ pathToRosPkg fname
+                          else buildNewPkgMsgs fname
+
+-- | Generate Haskell implementations of all message definitions in
+-- the given package.
+buildNewPkgMsgs :: FilePath -> MsgInfo ()
+buildNewPkgMsgs fname = 
+  do liftIO . putStrLn $ "Generating package " ++ fname
+     destDir <- liftIO $ codeGenDir fname
+     liftIO $ createDirectoryIfMissing True destDir
+     pkgMsgs <- liftIO $ findMessages fname
+     let pkgMsgs' = map (B.pack . cap . dropExtension . takeFileName) pkgMsgs
+         checkErrors xs = case findIndex isLeft xs of
+                            Nothing -> rights xs
+                            Just i -> err (pkgMsgs !! i)
+         names = map ((destDir </>)
+                      . flip replaceExtension ".hs"
+                      . takeFileName)
+                     pkgMsgs
+         gen = generateMsgType pkgHier pkgMsgs'
+     parsed <- liftIO $ checkErrors <$> mapM parseMsg pkgMsgs
+     mapM_ (\(n, m) -> gen m >>= liftIO . B.writeFile n) (zip names parsed)
+     liftIO $ do f <- hasMsgs fname
+                 when f (removeOldCabal fname >> compileMsgs)
     where err pkg = error $ "Couldn't parse message " ++ pkg
-          --destDir = fname </> "msg" </> "haskell" </> "Ros" </> cap pkgName
-          pkgName = last . splitDirectories $ fname
+          pkgName = pathToRosPkg fname
           pkgHier = B.pack $ "Ros." ++ cap pkgName ++ "."
           isLeft (Left _) = True
           isLeft _ = False
@@ -88,7 +107,6 @@ removeOldCabal pkgPath =
      when f (getDirectoryContents msgPath >>=
              mapM_ (removeFile . (msgPath </>)) . 
                    filter ((== ".cabal") . takeExtension))
-  --where msgPath = pkgPath </> "msg" </> "haskell"
 
 -- Extract a Msg module name from a Path
 path2MsgModule :: FilePath -> String
@@ -99,8 +117,6 @@ getHaskellMsgFiles :: FilePath -> String -> IO [FilePath]
 getHaskellMsgFiles pkgPath _pkgName = do
   d <- codeGenDir pkgPath
   map (d </>) . filter ((== ".hs") . takeExtension) <$> getDirectoryContents d
-  -- map (dir </>) . filter ((== ".hs") . takeExtension) <$> getDirectoryContents dir
-  -- where dir = pkgPath </> "msg" </> "haskell" </> "Ros" </> cap pkgName
 
 -- Generate a .cabal file to build this ROS package's messages.
 genMsgCabal :: FilePath -> String -> IO FilePath
