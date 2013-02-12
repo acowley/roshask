@@ -50,7 +50,7 @@ Extra-source-files:  Examples/PubSub/CMakeLists.txt
                      Examples/Turtle/Setup.hs
                      Examples/Turtle/mainpage.dox
                      Examples/Turtle/manifest.xml
-                     Examples/Turtle/src/Turtle.hs
+                     Examples/Turtle/src/*.hs
                      Examples/NodePlugins/Makefile
                      Examples/NodePlugins/NodePlugins.cabal
                      Examples/NodePlugins/Setup.hs
