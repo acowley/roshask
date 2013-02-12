@@ -1,5 +1,5 @@
 import Distribution.Simple
-import Ros.Core.Build.SetupUtil
+import Ros.Internal.SetupUtil
 
 main = defaultMainWithHooks $
        simpleUserHooks { confHook = rosConf }

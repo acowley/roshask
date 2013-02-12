@@ -6,7 +6,7 @@ import Control.Concurrent.STM.TVar
 import Control.Concurrent.STM
 import Data.Map (Map)
 import qualified Data.Map as M
-import Ros.Core.RosTypes
+import Ros.Internal.RosTypes
 
 data SubStats = SubStats { bytesReceived  :: !Int
                          , subConnected   :: !Bool }

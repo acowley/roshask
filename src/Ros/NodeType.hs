@@ -12,11 +12,11 @@ import qualified Data.Map as M
 import Data.Set (Set)
 import qualified Data.Set as S
 import Control.Concurrent (ThreadId)
-import Ros.Core.RosTypes (URI)
+import Ros.Internal.RosTypes (URI)
+import Ros.Internal.Util.ArgRemapping (ParamVal)
+import Ros.Internal.Util.AppConfig (ConfigOptions)
 import Ros.SlaveAPI (RosSlave(..))
 import Ros.TopicStats
-import Ros.Core.Util.ArgRemapping (ParamVal)
-import Ros.Core.Util.AppConfig (ConfigOptions)
 
 data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , addPub    :: URI -> IO ThreadId

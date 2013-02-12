@@ -1,7 +1,7 @@
 -- Client functionality for the ROS Master API
 module Ros.MasterAPI where
 import Network.XmlRpc.Client
-import Ros.Core.RosTypes
+import Ros.Internal.RosTypes
 
 -- |Subscribe the caller to the specified topic. In addition to
 -- receiving a list of current publishers, the subscriber will also

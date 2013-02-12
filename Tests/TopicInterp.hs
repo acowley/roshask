@@ -4,10 +4,10 @@ import Control.Concurrent
 import Ros.Topic
 import Ros.TopicUtil (forkTopic)
 import Ros.TopicStamped
-import Ros.Core.Header
-import qualified Ros.Core.Header as H
-import Ros.Core.Msg.HeaderSupport
-import Ros.Core.RosTime
+import Ros.Internal.Header
+import qualified Ros.Internal.Header as H
+import Ros.Internal.Msg.HeaderSupport
+import Ros.Internal.RosTime
 
 newtype CharMsg = CharMsg {unCM :: (Char, Header)}
 

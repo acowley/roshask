@@ -11,7 +11,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BL
 import System.IO (Handle)
 import Ros.Topic
-import Ros.Core.RosBinary (RosBinary(get))
+import Ros.Internal.RosBinary (RosBinary(get))
 
 -- Get the specified number of bytes from a 'Handle'. Returns a
 -- wrapped-up 'Nothing' if the client shutdown (indicated by receiving

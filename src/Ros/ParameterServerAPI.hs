@@ -6,7 +6,7 @@ module Ros.ParameterServerAPI (deleteParam, setParam, getParam, searchParam,
                                getParamNames) where
 import Network.XmlRpc.Client
 import Network.XmlRpc.Internals (XmlRpcType)
-import Ros.Core.RosTypes
+import Ros.Internal.RosTypes
 
 -- |Delete a parameter on the server.
 deleteParam :: URI -> CallerID -> ParamName -> IO (Int,String,Int)

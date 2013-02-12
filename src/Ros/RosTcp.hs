@@ -18,15 +18,16 @@ import qualified Network.Socket as Sock
 import Network.Socket.ByteString
 import System.IO (IOMode(ReadMode))
 import Text.URI (parseURI, uriRegName)
+
 import Ros.BinaryIter (streamIn)
-import Ros.Core.RosTypes
+import Ros.Internal.Msg.MsgInfo
+import Ros.Internal.RosBinary
+import Ros.Internal.RosTypes
+import Ros.Internal.Util.RingChan
+import Ros.Internal.Util.AppConfig (Config, debug, forkConfig)
 import Ros.Topic (Topic(..))
-import Ros.Core.RosBinary
 import Ros.ConnectionHeader
-import Ros.Core.Msg.MsgInfo
 import Ros.SlaveAPI (requestTopicClient)
-import Ros.Core.Util.RingChan
-import Ros.Core.Util.AppConfig (Config, debug, forkConfig)
 
 -- |Push each item from this client's buffer over the connected
 -- socket.

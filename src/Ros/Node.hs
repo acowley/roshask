@@ -5,8 +5,8 @@
 module Ros.Node (Node, runNode, advertise, advertiseBuffered, 
                  subscribe, getShutdownAction, runHandler, getParam, 
                  getParamOpt, getName, getNamespace, 
-                 module Ros.Core.RosTypes, Topic(..), topicRate, 
-                 module Ros.Core.RosTime, liftIO) where
+                 module Ros.Internal.RosTypes, Topic(..), topicRate, 
+                 module Ros.Internal.RosTime, liftIO) where
 import Control.Applicative ((<$>))
 import Control.Concurrent (newEmptyMVar, readMVar, putMVar)
 import Control.Concurrent.BoundedChan
@@ -20,19 +20,20 @@ import Control.Concurrent (forkIO, ThreadId)
 import Data.Dynamic
 import System.Environment (getEnvironment, getArgs)
 import Network.XmlRpc.Internals (XmlRpcType)
-import Ros.Core.Msg.MsgInfo
+
+import Ros.Internal.Msg.MsgInfo
+import Ros.Internal.RosBinary (RosBinary)
+import Ros.Internal.RosTypes
+import Ros.Internal.RosTime
+import Ros.Internal.Util.AppConfig (Config, parseAppConfig, forkConfig, configured)
+import Ros.Internal.Util.ArgRemapping
 import Ros.NodeType
 import qualified Ros.ParameterServerAPI as P
-import Ros.Core.RosBinary (RosBinary)
-import Ros.Core.RosTypes
 import Ros.RosTcp (subStream, runServer)
 import qualified Ros.RunNode as RN
-import Ros.TopicStats (recvMessageStat, sendMessageStat)
-import Ros.Core.Util.AppConfig (Config, parseAppConfig, forkConfig, configured)
-import Ros.Core.Util.ArgRemapping
 import Ros.Topic
+import Ros.TopicStats (recvMessageStat, sendMessageStat)
 import Ros.TopicUtil (topicRate, share)
-import Ros.Core.RosTime
 
 -- |Maximum number of items to buffer for a subscriber.
 recvBufferSize :: Int

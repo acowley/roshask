@@ -13,12 +13,12 @@
 -- rate), and another 'Topic' that imposes a rate limit.
 module Ros.TopicStamped (everyNew, interpolate, batch) where
 import Data.Time.Clock (getCurrentTime, diffUTCTime)
+import System.Timeout
 import qualified Ros.Topic as T
 import Ros.Topic (Topic(..), metamorphM, yieldM)
 import qualified Ros.TopicUtil as T
-import Ros.Core.Msg.HeaderSupport
-import Ros.Core.RosTime
-import System.Timeout
+import Ros.Internal.Msg.HeaderSupport
+import Ros.Internal.RosTime
 
 -- |Given two consecutive values, pick the one with the closest time
 -- stamp to another value.

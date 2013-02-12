@@ -4,10 +4,10 @@ import qualified Control.Concurrent.SSem as Sem
 import qualified Control.Exception as E
 import Control.Monad.IO.Class
 import System.Posix.Signals (installHandler, Handler(..), sigINT)
-import Ros.Core.RosTypes
+import Ros.Internal.RosTypes
+import Ros.Internal.Util.AppConfig (Config, debug)
 import Ros.MasterAPI
 import Ros.SlaveAPI
-import Ros.Core.Util.AppConfig (Config, debug)
 
 -- Inform the master that we are publishing a particular topic.
 registerPublication :: RosSlave n => 

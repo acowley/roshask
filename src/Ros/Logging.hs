@@ -7,14 +7,15 @@ module Ros.Logging (Log, LogLevel(..), enableLogging,
 import Control.Concurrent.Chan
 import Control.Monad (when)
 import Data.IORef
-import System.IO.Unsafe
 import Data.Word (Word8)
-import Ros.Core.Log (Log(Log))
-import qualified Ros.Core.Log as Log
-import Ros.Core.Header
+import Language.Haskell.TH
+import System.IO.Unsafe
+
+import Ros.Internal.Log (Log(Log))
+import qualified Ros.Internal.Log as Log
+import Ros.Internal.Header
 import Ros.Node
 import Ros.TopicUtil (fromList)
-import Language.Haskell.TH
 
 emptyHeader :: Header
 emptyHeader = Header 0 (0,0) ""
