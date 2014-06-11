@@ -5,3 +5,7 @@ dist
 dist_roshask
 
 
+/.vagrant/
+/Examples/PubSub/bin/
+/Examples/Turtle/bin/
+/vagrant/ssh/

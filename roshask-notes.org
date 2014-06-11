@@ -1,0 +1,42 @@
+* TODO Investigate ROS Hydro paths
+  :PROPERTIES:
+  :ID:       EE33213B-DBF3-4CB4-813E-BAB5C277395A
+  :END:
+  Did things like =roscore=, =roslib=, and basic message definitions (e.g. log messages) move or change?
+
+* TODO Change from =snap= to =warp=
+  :PROPERTIES:
+  :ID:       34EBDA27-4791-4ED4-8D87-C832D6833C16
+  :END:
+  It looks like building directly on =warp= might be a simpler choice for all HTTP needs. We do most of our work through =haxr= as it stands, and do not want or need a heavier server.
+
+* TODO Reorganize the source tree
+  :PROPERTIES:
+  :ID:       80B7083F-B685-4AF7-9BD5-5F25C1146661
+  :END:
+  It's too flat, making it hard to identify the key areas: talking to a ROS master/leader, running a node, topics, and supporting functionality.
+
+* Vagrant
+  [[http://www.vagrantup.com] [Vagrant]] is used to provide a common development environment that can be re-created on various platforms. On Windows and Mac, VirtualBox can be used to provide a virtual machine (VM) to host a ROS-friendly Ubuntu environment. When the current working directory contains the =Vagrantfile= defining a VM, a few simple commands to remember are:
+
+  | command                    | description                                   |
+  |----------------------------+-----------------------------------------------|
+  | vagrant up                 | Start a new VM                                |
+  | vagrant ssh                | ssh into a running VM                         |
+  | vagrant suspend            | Suspend a running VM                          |
+  | vagrant resume             | Resume a suspended VM                         |
+  | vagrant reload --provision | Restart a VM after changing its configuration |
+  | vagrant destroy            | Remove all resources used by a VM             |
+
+
+** VM Configuration
+    As well as the =Vagrantfile=, we use a bash script, =vagrant/bootstrap.sh= to install things in the VM. This is somewhat flaky at the moment as it, for example, runs through the ROS installation procedure which appends a line at the end of =~/.bashrc= even if that line is already there.
+
+    By default, the directory containing the =Vagrantfile= is shared with the VM. This will be root =roshask= directory in most cases. This directory on the host (your computer) is mapped to =/vagrant= on the guest (the VM).
+
+*** GitHub 
+    A convention used here is to configure SSH on the guest to work with [[http://www.github.com] [GitHub]] by using a key file the guest finds at =/vagrant/vagrant/ssh/github=, which maps to the host at =roshask/vagrant/ssh/github=. Generate a new SSH key on your host machine at the mapped location, set that key up with GitHub, and now the VM can push to your repositories on GitHub.
+
+
+** Emacs
+    Try out vagrant-tramp mode. It is on MELPA, and I patched it to work with default VirtualBox-based Vagrant configurations.
