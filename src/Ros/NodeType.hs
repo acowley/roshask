@@ -1,4 +1,4 @@
-{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, 
+{-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, GADTs,
              ExistentialQuantification, GeneralizedNewtypeDeriving #-}
 module Ros.NodeType where
 import Control.Applicative (Applicative(..), (<$>))
@@ -16,6 +16,7 @@ import Ros.Internal.RosTypes (URI)
 import Ros.Internal.Util.ArgRemapping (ParamVal)
 import Ros.Internal.Util.AppConfig (ConfigOptions)
 import Ros.SlaveAPI (RosSlave(..))
+import Ros.Topic (Topic)
 import Ros.TopicStats
 
 data Subscription = Subscription { knownPubs :: TVar (Set URI)
@@ -23,11 +24,17 @@ data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , subType   :: String
                                  , subStats  :: StatMap SubStats }
 
+data DynTopic where
+  DynTopic :: Typeable a => Topic IO a -> DynTopic
+
+fromDynTopic :: Typeable a => DynTopic -> Maybe (Topic IO a)
+fromDynTopic (DynTopic t) = gcast t
+
 data Publication = Publication { subscribers :: TVar (Set URI)
                                , pubType     :: String
                                , pubPort     :: Int
                                , pubCleanup  :: IO ()
-                               , pubTopic    :: Dynamic
+                               , pubTopic    :: DynTopic
                                , pubStats    :: StatMap PubStats }
 
 data NodeState = NodeState { nodeName       :: String
@@ -37,7 +44,6 @@ data NodeState = NodeState { nodeName       :: String
                            , signalShutdown :: MVar (IO ())
                            , subscriptions  :: Map String Subscription
                            , publications   :: Map String Publication }
-
 
 type Params = [(String, ParamVal)]
 type Remap = [(String,String)]

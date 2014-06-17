@@ -10,7 +10,6 @@ import Control.Applicative
 import Control.Arrow ((***), second)
 import Control.Monad ((<=<), (>=>))
 import Control.Monad.IO.Class
-import Data.Typeable
 
 -- |A Topic is an infinite stream of values that steps between values
 -- in a 'Monad'.
@@ -22,11 +21,6 @@ instance Functor m => Functor (Topic m) where
 instance Applicative m => Applicative (Topic m) where
   pure x = let t = Topic $ pure (x, t) in t
   Topic ma <*> Topic mb = Topic $ uncurry (***) . (($) *** (<*>)) <$> ma <*> mb
-
-
-instance (Typeable1 m, Typeable a) => Typeable (Topic m a) where
-  typeOf _ = mkTyConApp (mkTyCon3 "roshask" "Ros.Topic" "Topic") 
-                        [typeOf1 (undefined::m a), typeOf (undefined::a)]
 
 -- |Return the first value produced by a 'Topic'.
 head :: Functor m => Topic m a -> m a

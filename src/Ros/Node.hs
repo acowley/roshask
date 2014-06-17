@@ -78,7 +78,7 @@ mkPubAux trep t runServer' bufferSize =
        (cleanup, port) <- runServer' (sendMessageStat stats) bufferSize
        known <- liftIO $ newTVarIO S.empty
        cleanup' <- configured cleanup
-       return $ Publication known trep port cleanup' (toDyn t) stats
+       return $ Publication known trep port cleanup' (DynTopic t) stats
 
 -- |Subscribe to the given Topic. Returns a 'Ros.TopicUtil.share'd 'Topic'.
 subscribe :: (RosBinary a, MsgInfo a, Typeable a) => 
@@ -97,7 +97,7 @@ subscribe name = do n <- get
                               put n { subscriptions = M.insert name' sub subs }
                               --return stream
                               liftIO $ share stream
-  where fromDynErr = maybe (error msg) id . fromDynamic
+  where fromDynErr = maybe (error msg) id . fromDynTopic
         msg = "Subscription to "++name++" at a different type than "++
               "what that Topic was already advertised at by this Node."
 
