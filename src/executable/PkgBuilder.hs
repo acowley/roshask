@@ -1,28 +1,65 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- |Build all messages defined in a ROS package.
 module PkgBuilder where
+import Analysis
 import Control.Applicative
+import Control.Concurrent (forkIO)
+import Control.Concurrent (newEmptyMVar)
+import Control.Concurrent (putMVar)
+import Control.Concurrent (takeMVar)
+import Control.DeepSeq (rnf)
+import qualified Control.Exception as C
 import Control.Monad (when)
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Char (isSpace)
 import Data.Either (rights)
+import qualified Data.Foldable as F
 import Data.List (findIndex, intercalate, isSuffixOf, isPrefixOf, nub)
 import Data.Version (versionBranch)
-import System.Directory (createDirectoryIfMissing, getDirectoryContents,
-                         doesDirectoryExist, removeFile)
-import System.FilePath
-import System.Process (createProcess, proc, CreateProcess(..), waitForProcess,
-                       readProcess)
-import System.Exit (ExitCode(..))
+import Gen (generateMsgType)
+import Parse (parseMsg)
+import Paths_roshask (version, getBinDir)
 
 import Ros.Internal.DepFinder (findMessages, findDepsWithMessages, hasMsgs)
 import Ros.Internal.PathUtil (codeGenDir, cap)
-import Paths_roshask (version)
+import System.Directory (createDirectoryIfMissing, getDirectoryContents,
+                         doesDirectoryExist, removeFile)
+import System.Exit (ExitCode(..))
+import System.FilePath
+import System.IO (hClose)
+import System.IO (hGetContents)
+import System.Process (StdStream(CreatePipe))
+import System.Process (createProcess, proc, CreateProcess(..), waitForProcess)
 
-import Analysis
-import Gen (generateMsgType)
-import Parse (parseMsg)
+-- | Determine if we are working in a sandbox by checking of roshask
+-- was installed in one. If so, return the immediate parent of the
+-- sandbox directory.
+sandboxDir :: IO (Maybe FilePath)
+sandboxDir = do d <- splitPath <$> getBinDir
+                return $ case reverse d of
+                           ("bin" : ".cabal-sandbox" : ds) -> 
+                             Just . joinPath $ reverse ds
+                           _ -> Nothing
+
+-- | Information on how to invoke @ghc-pkg@ (or @cabal sandbox
+-- hc-pkg@) and the @cabal@ executable.
+data ToolPaths = ToolPaths { ghcPkg       :: [String] -> CreateProcess
+                           , cabalInstall :: [String] -> CreateProcess }
+
+-- | If we are not in a sandbox, then we can use 'ghc-pkg' to get a
+-- list of installed packages, and 'cabal install' to install a
+-- package. If we are in a sandbox, we must invoke the tools from the
+-- directory containing the sandbox directory, and use @cabal sandbox
+-- hc-pkg@ instead of @ghc-pkg@.
+toolPaths :: IO ToolPaths
+toolPaths =
+  sandboxDir >>= \md -> return $ case md of
+    Nothing -> ToolPaths (\args -> (proc "ghc-pkg" args) {std_out=CreatePipe})
+                         (\args -> proc "cabal" args)
+    Just _ -> ToolPaths (\args -> (proc "cabal sandbox hc-pkg" args) 
+                                  {cwd=md, std_out=CreatePipe})
+                        (\args -> (proc "cabal" args) {cwd=md})
 
 -- The current version of roshask. We tag generated message packages
 -- with the same version.
@@ -33,7 +70,7 @@ roshaskVersion = B.pack . intercalate "." $ map show (versionBranch version)
 -- asterisk. The intension is to allow a compiled roshask package to
 -- work with newer patch levels of roshask itself.
 roshaskMajorMinor :: B.ByteString
-roshaskMajorMinor = B.pack . intercalate "." $ 
+roshaskMajorMinor = B.pack . intercalate "." $
                     map show (take 2 (versionBranch version)) ++ ["*"]
 
 pathToRosPkg :: FilePath -> FilePath
@@ -41,25 +78,39 @@ pathToRosPkg = last . splitDirectories
 
 -- Determine if a roshask package is already registered with ghc-pkg
 -- for the given ROS package.
-packageRegistered :: FilePath -> IO Bool
-packageRegistered pkg = any (isPrefixOf cabalPkg . dropWhile isSpace) . lines 
-                     <$> readProcess "ghc-pkg" ["list", cabalPkg] ""
+packageRegistered :: ToolPaths -> FilePath -> IO Bool
+packageRegistered tools pkg =
+  any (isPrefixOf cabalPkg . dropWhile isSpace) . lines
+  <$> getList -- readProcess "ghc-pkg" ["list", cabalPkg] ""
   where cabalPkg = (rosPkg2CabalPkg $ pathToRosPkg pkg) ++ 
                    "-" ++ B.unpack roshaskVersion
+        getList = do (i,Just o,_,ph) <-
+                       createProcess (ghcPkg tools ["list", cabalPkg])
+                     F.mapM_ hClose i
+                     output <- hGetContents o
+                     done <- newEmptyMVar
+                     _ <- forkIO $ C.evaluate (rnf output) >> putMVar done ()
+                     takeMVar done
+                     hClose o
+                     ex <- waitForProcess ph
+                     case ex of
+                       ExitSuccess -> return output
+                       ExitFailure _ -> error "Error getting GHC package list"
 
 -- | Build all messages defined by a package unless that package is
 -- already registered with ghc-pkg.
 buildPkgMsgs :: FilePath -> MsgInfo ()
-buildPkgMsgs fname = do r <- liftIO $packageRegistered fname
+buildPkgMsgs fname = do tools <- liftIO $ toolPaths
+                        r <- liftIO $ packageRegistered tools fname
                         if r
                           then liftIO . putStrLn $ 
                                "Using existing " ++ pathToRosPkg fname
-                          else buildNewPkgMsgs fname
+                          else buildNewPkgMsgs tools fname
 
 -- | Generate Haskell implementations of all message definitions in
 -- the given package.
-buildNewPkgMsgs :: FilePath -> MsgInfo ()
-buildNewPkgMsgs fname = 
+buildNewPkgMsgs :: ToolPaths -> FilePath -> MsgInfo ()
+buildNewPkgMsgs tools fname =
   do liftIO . putStrLn $ "Generating package " ++ fname
      destDir <- liftIO $ codeGenDir fname
      liftIO $ createDirectoryIfMissing True destDir
@@ -83,10 +134,8 @@ buildNewPkgMsgs fname =
           isLeft (Left _) = True
           isLeft _ = False
           compileMsgs = do cpath <- genMsgCabal fname pkgName
-                           let cpath' = dropFileName cpath
-                           (_,_,_,procH) <- 
-                             createProcess (proc "cabal" ["install"])
-                                           { cwd = Just cpath' }
+                           (_,_,_,procH) <- createProcess $
+                             cabalInstall tools ["install", cpath]
                            code <- waitForProcess procH
                            when (code /= ExitSuccess)
                                 (error $ "Building messages for "++

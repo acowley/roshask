@@ -142,6 +142,7 @@ Executable roshask
   Build-Depends:  base >= 4.2 && < 6,
                   bytestring,
                   containers,
+                  deepseq,
                   mtl >= 2,
                   vector >= 0.10,
                   binary,
