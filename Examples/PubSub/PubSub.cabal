@@ -7,7 +7,7 @@ Build-type:          Custom
 
 Executable talker
   Build-Depends:  base >= 4.2 && < 6,
-                  vector == 0.7.*,
+                  vector >= 0.7,
                   time >= 1.1,
                   roshask == 0.1.*,
                   ROS-std-msgs
@@ -17,7 +17,7 @@ Executable talker
 
 Executable listener
   Build-Depends:  base >= 4.2 && < 6,
-                  vector == 0.7.*,
+                  vector >= 0.7,
                   time >= 1.1,
                   roshask == 0.1.*,
                   ROS-std-msgs
