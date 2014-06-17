@@ -3,7 +3,7 @@ module Parse (parseMsg, simpleFieldAssoc) where
 import Prelude hiding (takeWhile)
 import Control.Applicative
 import Control.Arrow ((***), (&&&))
-import Data.Attoparsec.Char8
+import Data.Attoparsec.ByteString.Char8
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (pack, unpack)
 import qualified Data.ByteString.Char8 as B
