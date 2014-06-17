@@ -35,11 +35,18 @@ getPackages = (map attrVal .
     where pkg = QName "package" Nothing Nothing
           dep = QName "depend" Nothing Nothing
 
+-- The catkin build system uses a @package.xml@ file that is somewhat
+-- different from the older @manifest.xml@.
+catkinBuildDeps :: String -> Maybe [Package]
+catkinBuildDeps = fmap (map strContent . findChildren dep) . parseXMLDoc
+  where dep = QName "build_depend" Nothing Nothing
+
 -- The given path is a possible package path root, as are all of its
 -- subdirectories that are stacks (indicated by the presence of a
 -- stack.xml file). Returns a list of package directories.
 packagePaths :: FilePath -> IO [FilePath]
-packagePaths = F.find always (contains "manifest.xml")
+packagePaths = F.find always $
+               contains "manifest.xml" ||? contains "package.xml"
 
 -- Get every package directory on the ROS search path.
 getRosPaths :: IO [FilePath]
@@ -58,7 +65,7 @@ getRosPaths =
 -- dependencies.
 ignoredPackages :: [String]
 ignoredPackages = ["genmsg_cpp", "rospack", "rosconsole", "rosbagmigration", 
-                   "roscpp", "rospy", "roslisp", "std_srvs", "roslib"]
+                   "roscpp", "rospy", "roslisp", "std_srvs", "roslib", "boost"]
 
 -- |Find the names of the ROS packages this package depends on as
 -- indicated by the manifest.xml file in this package's root
@@ -66,12 +73,16 @@ ignoredPackages = ["genmsg_cpp", "rospack", "rosconsole", "rosbagmigration",
 findPackageDepNames :: FilePath -> IO [String]
 findPackageDepNames pkgRoot = 
   let manifest = pkgRoot </> "manifest.xml"
+      pkg = pkgRoot </> "package.xml"
   in do exists <- doesFileExist manifest
-        when (not exists)
-             (error $ "Couldn't find "++manifest)
-        txt <- readFile manifest
-        case getPackages txt of
-          Nothing -> error $ "Couldn't parse " ++ manifest
+        existsCatkin <- doesFileExist pkg
+        when (not $ exists || existsCatkin)
+             (error $ "Couldn't find "++manifest++" or "++pkg)
+        pkgs <- if exists
+                then getPackages <$> readFile manifest
+                else catkinBuildDeps <$> readFile pkg
+        case pkgs of
+          Nothing -> error $ "Couldn't parse package file for " ++ pkgRoot
           Just ps -> return . nub $ filter (not . (`elem` ignoredPackages)) ps
 
 -- |Returns 'True' if the ROS package at the given 'FilePath' defines
