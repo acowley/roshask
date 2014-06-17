@@ -28,9 +28,14 @@ apt-get update
 apt-get install -y ghc-7.6.3
 apt-get install -y cabal-install-1.20
 
-# Configure SSH
+# cabal-install bash completion
+wget https://raw.githubusercontent.com/haskell/cabal/master/cabal-install/bash-completion/cabal -O /etc/bash_completion.d/cabal
+
+# Setup PATH, run cabal update, and configure SSH
 su vagrant <<EOF
-echo "PATH=/opt/ghc/7.6.3/bin:$PATH" >> ~/.bashrc
+echo "PATH=/home/vagrant/.cabal/bin:/opt/ghc/7.6.3/bin:/opt/cabal/1.20/bin:$PATH" >> ~/.bashrc
+/opt/cabal/1.20/bin/cabal update
+/opt/cabal/1.20/bin/cabal install cabal-install
 echo "Host github.com" > ~/.ssh/config
 echo "User git" >> ~/.ssh/config
 # echo "IdentityFile ~/.ssh/github" >> ~/.ssh/config
