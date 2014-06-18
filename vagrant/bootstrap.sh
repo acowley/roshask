@@ -34,6 +34,7 @@ wget https://raw.githubusercontent.com/haskell/cabal/master/cabal-install/bash-c
 # Setup PATH, run cabal update, and configure SSH
 su vagrant <<EOF
 echo "PATH=/home/vagrant/.cabal/bin:/opt/ghc/7.6.3/bin:/opt/cabal/1.20/bin:$PATH" >> ~/.bashrc
+echo "PATH=/opt/ros/hydro/bin:$PATH" >> ~/.bashrc
 /opt/cabal/1.20/bin/cabal update
 /opt/cabal/1.20/bin/cabal install cabal-install
 echo "Host github.com" > ~/.ssh/config
