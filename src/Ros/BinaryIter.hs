@@ -38,4 +38,4 @@ streamIn h = Topic go
                   Just item' -> return (item', Topic go)
 
 getInt :: Get Int
-getInt = fromIntegral <$> getWord32host
+getInt = fromIntegral <$> getWord32le
