@@ -36,7 +36,7 @@ import System.Process (createProcess, proc, CreateProcess(..), waitForProcess)
 -- was installed in one. If so, return the immediate parent of the
 -- sandbox directory.
 sandboxDir :: IO (Maybe FilePath)
-sandboxDir = do d <- splitPath <$> getBinDir
+sandboxDir = do d <- splitDirectories <$> getBinDir
                 return $ case reverse d of
                            ("bin" : ".cabal-sandbox" : ds) -> 
                              Just . joinPath $ reverse ds
@@ -45,7 +45,8 @@ sandboxDir = do d <- splitPath <$> getBinDir
 -- | Information on how to invoke @ghc-pkg@ (or @cabal sandbox
 -- hc-pkg@) and the @cabal@ executable.
 data ToolPaths = ToolPaths { ghcPkg       :: [String] -> CreateProcess
-                           , cabalInstall :: [String] -> CreateProcess }
+                           , cabalInstall :: [String] -> CreateProcess
+                           , forceFlag    :: [String] }
 
 -- | If we are not in a sandbox, then we can use 'ghc-pkg' to get a
 -- list of installed packages, and 'cabal install' to install a
@@ -55,11 +56,14 @@ data ToolPaths = ToolPaths { ghcPkg       :: [String] -> CreateProcess
 toolPaths :: IO ToolPaths
 toolPaths =
   sandboxDir >>= \md -> return $ case md of
-    Nothing -> ToolPaths (\args -> (proc "ghc-pkg" args) {std_out=CreatePipe})
+    Nothing -> ToolPaths (\args -> (proc "ghc-pkg" args)
+                                   {std_in=CreatePipe, std_out=CreatePipe})
                          (\args -> proc "cabal" args)
-    Just _ -> ToolPaths (\args -> (proc "cabal sandbox hc-pkg" args) 
+                         ["--force"]
+    Just _ -> ToolPaths (\args -> (proc "cabal" ("sandbox":"hc-pkg":args))
                                   {cwd=md, std_out=CreatePipe})
                         (\args -> (proc "cabal" args) {cwd=md})
+                        ["--", "--force"]
 
 -- The current version of roshask. We tag generated message packages
 -- with the same version.
@@ -76,26 +80,30 @@ roshaskMajorMinor = B.pack . intercalate "." $
 pathToRosPkg :: FilePath -> FilePath
 pathToRosPkg = last . splitDirectories
 
+-- | Somewhat more flexibile than 'System.Process.readProcess'. Not as
+-- robust to exceptions.
+myReadProcess :: CreateProcess -> IO String
+myReadProcess cp =
+  do (i, Just o, _, ph) <- createProcess cp
+     F.mapM_ hClose i
+     output <- hGetContents o
+     done <- newEmptyMVar
+     _ <- forkIO $ C.evaluate (rnf output) >> putMVar done ()
+     takeMVar done
+     hClose o
+     ex <- waitForProcess ph
+     case ex of
+       ExitSuccess -> return output
+       ExitFailure e -> error $ "Error reading process: "++show e
+
 -- Determine if a roshask package is already registered with ghc-pkg
 -- for the given ROS package.
 packageRegistered :: ToolPaths -> FilePath -> IO Bool
 packageRegistered tools pkg =
-  any (isPrefixOf cabalPkg . dropWhile isSpace) . lines
-  <$> getList -- readProcess "ghc-pkg" ["list", cabalPkg] ""
+  any (isPrefixOf cabalPkg . dropWhile isSpace) . lines <$> getList
   where cabalPkg = (rosPkg2CabalPkg $ pathToRosPkg pkg) ++ 
                    "-" ++ B.unpack roshaskVersion
-        getList = do (i,Just o,_,ph) <-
-                       createProcess (ghcPkg tools ["list", cabalPkg])
-                     F.mapM_ hClose i
-                     output <- hGetContents o
-                     done <- newEmptyMVar
-                     _ <- forkIO $ C.evaluate (rnf output) >> putMVar done ()
-                     takeMVar done
-                     hClose o
-                     ex <- waitForProcess ph
-                     case ex of
-                       ExitSuccess -> return output
-                       ExitFailure _ -> error "Error getting GHC package list"
+        getList = myReadProcess $ ghcPkg tools ["list", cabalPkg]
 
 -- | Build all messages defined by a package unless that package is
 -- already registered with ghc-pkg.

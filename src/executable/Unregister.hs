@@ -4,27 +4,31 @@ import Control.Applicative
 import Data.Char
 import Data.List
 import Data.Maybe
+import PkgBuilder (myReadProcess, toolPaths, ToolPaths(..))
 import System.Exit (ExitCode(..))
 import System.IO (hFlush, stdout)
 import System.Process
 
-findROSPackages :: IO [String]
-findROSPackages = mapMaybe (isROS . dropWhile isSpace) . lines
-               <$> readProcess "ghc-pkg" ["list"] "" 
+findROSPackages :: ToolPaths -> IO [String]
+findROSPackages tools =
+  mapMaybe (isROS . dropWhile isSpace) . lines
+  <$> myReadProcess (ghcPkg tools ["list"])
   where isROS s
           | "ROS-" `isPrefixOf` s = Just s
           | otherwise = Nothing
 
-unregisterPackage :: String -> IO ()
-unregisterPackage pkg = rawSystem "ghc-pkg" ["unregister", "--force", pkg] 
-                        >>= aux
-  where aux ExitSuccess = return ()
-        aux (ExitFailure e) = putStrLn $ "ghc-pkg unregister "++pkg++
-                                         " failed: exit code "++show e
+unregisterPackage :: ToolPaths -> String -> IO ()
+unregisterPackage tools pkg =
+  do (_,_,_, ph) <-
+       createProcess (ghcPkg tools ("unregister":pkg:(forceFlag tools)))
+     waitForProcess ph >>= \ex -> case ex of
+       ExitSuccess -> return ()
+       ExitFailure e -> putStrLn $ "Unregistering "++pkg++" failed: "++show e
 
 unregisterInteractive :: IO ()
 unregisterInteractive = 
-  do pkgs <- findROSPackages
+  do tools <- toolPaths
+     pkgs <- findROSPackages tools
      if null pkgs
        then putStrLn "No ROS packages to remove!"
        else do putStrLn "Ready to remove the following packags:"
@@ -34,5 +38,5 @@ unregisterInteractive =
                s <- map toLower <$> getLine
                if s == "n" || s == "no"
                  then putStrLn "Cancelling unregistration."
-                 else mapM_ unregisterPackage pkgs >>
+                 else mapM_ (unregisterPackage tools) pkgs >>
                       putStrLn "Unregistration complete!"
