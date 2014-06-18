@@ -18,12 +18,11 @@ import Ros.Internal.RosBinary (RosBinary(get))
 -- a message of zero length).
 hGetAll :: Handle -> Int -> MaybeT IO BL.ByteString
 hGetAll h n = go n []
-    where go n' acc = do bs <- liftIO $ BS.hGet h n'
+    where go 0 acc = return . BL.fromChunks $ reverse acc
+          go n' acc = do bs <- liftIO $ BS.hGet h n'
                          case BS.length bs of
                            0 -> MaybeT $ return Nothing
-                           x | x < n' -> go (n' - x) (bs:acc)
-                             | otherwise -> return . BL.fromChunks $ 
-                                            reverse (bs:acc)
+                           x -> go (n' - x) (bs:acc)
 
 -- |The function that does the work of streaming members of the
 -- 'RosBinary' class in from a 'Handle'.
