@@ -11,7 +11,7 @@
    extract build dependency elements. Do the runtime dependencies
    affect roshask?
 
-* TODO rostcp slave API requestTopic return type
+* DONE rostcp slave API requestTopic return type
   :PROPERTIES:
   :ID:       08B40EF7-25B4-42AE-B72B-C910016F95F6
   :END:
