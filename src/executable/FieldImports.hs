@@ -29,6 +29,7 @@ vectorDeps = S.fromList [ "qualified Data.Vector.Storable as V" ]
 -- unqualified names), the third is the 'MsgType' to generate imports
 -- for.
 typeDependency :: ByteString -> [ByteString] -> MsgType -> Set ByteString
+typeDependency _ _ RBool                = wordImport
 typeDependency _ _ RInt8                = intImport
 typeDependency _ _ RChar                = intImport
 typeDependency _ _ RUInt8               = wordImport

@@ -158,7 +158,7 @@ addField t = ros2Hask t >>= setTypeInfo t . defaultFlat
 -- Generate the name of the Haskell type that corresponds to a flat
 -- (i.e. non-array) ROS type.
 mkFlatType :: MsgType -> ByteString
-mkFlatType RBool         = "P.Bool"
+mkFlatType RBool         = "Word.Word8"
 mkFlatType RInt8         = "Int.Int8"
 mkFlatType RUInt8        = "Word.Word8"
 mkFlatType RByte         = "Word.Word8"
