@@ -139,9 +139,11 @@ parseMsg fname = do msgFile <- B.readFile fname
                         longName = genName fname
                         parser = mkParser shortName longName msgFile
                     case feed (parse parser msgFile) "" of
-                      Done leftOver msg
+                      Done leftOver msg -> return $ Right msg
+{-
                           | B.null leftOver -> return $ Right msg
                           | otherwise -> return $ Left $ "Couldn't parse " ++ 
                                                          unpack leftOver
+-}
                       Fail _ _ctxt err -> return $ Left err
                       Partial _ -> return $ Left "Incomplete msg definition"
