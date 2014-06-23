@@ -2,7 +2,7 @@
 module Parse (parseMsg, simpleFieldAssoc) where
 import Prelude hiding (takeWhile)
 import Control.Applicative
-import Control.Arrow ((***), (&&&))
+import Control.Arrow ((&&&))
 import Data.Attoparsec.ByteString.Char8
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (pack, unpack)
@@ -100,10 +100,10 @@ fieldParsers = map (comment *>) $
                                [simpleParser, fixedArrayParser, varArrayParser]
 
 mkParser :: String -> String -> ByteString -> Parser Msg
-mkParser sname lname txt = uncurry (Msg sname lname txt) . 
-                           (map buildField *** map buildConst) .
-                           partitionEithers <$> 
-                           many (choice fieldParsers)
+mkParser sname lname txt = aux . partitionEithers <$> many (choice fieldParsers)
+  where aux (fs, cs) = Msg sname lname txt
+                           (map buildField fs)
+                           (map buildConst cs)
 
 buildField :: (ByteString, MsgType) -> MsgField
 buildField (name,typ) = MsgField (sanitize name) typ name
@@ -116,7 +116,7 @@ testMsg :: ByteString
 testMsg = "# Foo bar\n\n#   \nHeader header  # a header\nuint32 aNum # a number \n  # It's not important\ngeometry_msgs/PoseStamped[] poses\nbyte DEBUG=1 #debug level\n"
 
 test :: Result Msg
-test = feed (parse (mkParser "" "") testMsg) ""
+test = feed (parse (comment *> (mkParser "" "" testMsg)) testMsg) ""
 -}
 
 -- Ensure that field and constant names are valid Haskell identifiers
@@ -137,7 +137,7 @@ parseMsg :: FilePath -> IO (Either String Msg)
 parseMsg fname = do msgFile <- B.readFile fname
                     let shortName = dropExtension . takeFileName $ fname
                         longName = genName fname
-                        parser = mkParser shortName longName msgFile
+                        parser = comment *> mkParser shortName longName msgFile
                     case feed (parse parser msgFile) "" of
                       Done leftOver msg
                           | B.null leftOver -> return $ Right msg
