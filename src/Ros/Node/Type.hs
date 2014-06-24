@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances, GADTs,
              ExistentialQuantification, GeneralizedNewtypeDeriving #-}
-module Ros.NodeType where
+module Ros.Node.Type where
 import Control.Applicative (Applicative(..), (<$>))
 import Control.Concurrent (MVar, putMVar)
 import Control.Concurrent.STM (atomically, TVar, readTVar, writeTVar)

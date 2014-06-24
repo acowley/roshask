@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
-module Ros.RosTcp (subStream, runServer, runServers) where
+module Ros.Node.RosTcp (subStream, runServer, runServers) where
 import Control.Applicative ((<$>))
 import Control.Arrow (first)
 import Control.Concurrent (forkIO, killThread, newEmptyMVar, takeMVar, putMVar)
@@ -19,14 +19,14 @@ import Network.Socket.ByteString
 import System.IO (IOMode(ReadMode))
 import Text.URI (parseURI, uriRegName)
 
-import Ros.BinaryIter (streamIn)
+import Ros.Node.BinaryIter (streamIn)
 import Ros.Internal.Msg.MsgInfo
 import Ros.Internal.RosBinary
 import Ros.Internal.RosTypes
 import Ros.Internal.Util.RingChan
 import Ros.Internal.Util.AppConfig (Config, debug, forkConfig)
 import Ros.Topic (Topic(..))
-import Ros.ConnectionHeader
+import Ros.Node.ConnectionHeader
 import Ros.Graph.Slave (requestTopicClient)
 
 -- |Push each item from this client's buffer over the connected

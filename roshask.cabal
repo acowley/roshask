@@ -129,8 +129,8 @@ Library
   
   -- Modules not exported by this package.
   Other-modules:      Ros.Graph.Master Ros.Graph.Slave Ros.Graph.ParameterServer
-                      Ros.NodeType Ros.RunNode Ros.BinaryIter 
-                      Ros.RosTcp Ros.ConnectionHeader Ros.Topic.Stats 
+                      Ros.Node.Type Ros.Node.RunNode Ros.Node.BinaryIter 
+                      Ros.Node.RosTcp Ros.Node.ConnectionHeader Ros.Topic.Stats 
                       Ros.Internal.Util.RingChan 
                       Ros.Internal.Util.ArgRemapping
                       Ros.Internal.DepFinder 

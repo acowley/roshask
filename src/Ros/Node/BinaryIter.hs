@@ -1,7 +1,7 @@
 -- |Binary iteratee-style serialization helpers for working with ROS
 -- message types. This module is used by the automatically-generated
 -- code for ROS .msg types.
-module Ros.BinaryIter (streamIn) where
+module Ros.Node.BinaryIter (streamIn) where
 import Control.Applicative
 import Control.Concurrent (myThreadId, killThread)
 import Control.Monad.IO.Class

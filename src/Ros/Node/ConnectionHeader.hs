@@ -2,7 +2,7 @@
 -- connection being established, including typing information and
 -- routing information. How it is exchanged depends on the ROS
 -- transport being used.
-module Ros.ConnectionHeader (genHeader, ConnHeader(..), parseHeader) where
+module Ros.Node.ConnectionHeader (genHeader, ConnHeader(..), parseHeader) where
 import Control.Applicative ((<$>))
 import Control.Arrow (second, (***))
 import Data.Binary.Get (getWord32le, Get, getLazyByteString, runGetState)
@@ -47,21 +47,3 @@ parseHeader :: ByteString -> [(String, String)]
 parseHeader bs | B.null bs = []
                | otherwise = let (p,rst,_) = runGetState parsePair bs 0
                              in p : parseHeader rst
-{-
--- A simple example to demonstrate round-tripping.
-test = let h = genHeader [("callerid","roshask"),("topic","foo")]
-       in case consume h of
-            Emit (ConnHeader fields) _ -> fields
-
--- |Incremental deserialization of ROS Connection Header values.
-instance BinaryIter ConnHeader where
-    consume bs = if B.length bs < 4 
-                 then More (consume . B.append bs)
-                 else let (h,t) = B.splitAt 4 bs
-                          len = fromIntegral $ runGet getInt h
-                      in getCount len t
-        where getCount n bs = 
-                  if B.length bs < n then More (getCount n . B.append bs)
-                  else let (h,t) = B.splitAt n bs
-                       in Emit (ConnHeader (parseHeader h)) t
--}

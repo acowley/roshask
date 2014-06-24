@@ -27,10 +27,10 @@ import Ros.Internal.RosTypes
 import Ros.Internal.RosTime
 import Ros.Internal.Util.AppConfig (Config, parseAppConfig, forkConfig, configured)
 import Ros.Internal.Util.ArgRemapping
-import Ros.NodeType
+import Ros.Node.Type
 import qualified Ros.Graph.ParameterServer as P
-import Ros.RosTcp (subStream, runServer)
-import qualified Ros.RunNode as RN
+import Ros.Node.RosTcp (subStream, runServer)
+import qualified Ros.Node.RunNode as RN
 import Ros.Topic
 import Ros.Topic.Stats (recvMessageStat, sendMessageStat)
 import Ros.Topic.Util (topicRate, share)

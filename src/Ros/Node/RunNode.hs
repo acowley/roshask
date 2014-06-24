@@ -1,4 +1,4 @@
-module Ros.RunNode (runNode) where
+module Ros.Node.RunNode (runNode) where
 import Control.Concurrent (readMVar,forkIO, killThread)
 import qualified Control.Concurrent.SSem as Sem
 import qualified Control.Exception as E
