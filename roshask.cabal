@@ -1,5 +1,5 @@
 Name:                roshask
-Version:             0.1.3
+Version:             0.1.4
 Synopsis:            Haskell support for the ROS robotics framework.
 License:             BSD3
 License-file:        LICENSE
@@ -97,11 +97,10 @@ Library
   
   -- Packages needed in order to build this package.
   Build-depends:       base >= 4.5 && < 6,
-                       binary,
+                       binary >= 0.7.2.1,
                        bytestring,
                        containers,
                        network >= 2.3,
-                       -- Cabal >= 1.8,
                        Cabal >= 1.20,
                        stm >= 2.1.2,
                        mtl >= 2.0,
@@ -129,11 +128,11 @@ Library
   
   -- Modules not exported by this package.
   Other-modules:      Ros.Graph.Master Ros.Graph.Slave Ros.Graph.ParameterServer
-                      Ros.Node.Type Ros.Node.RunNode Ros.Node.BinaryIter 
-                      Ros.Node.RosTcp Ros.Node.ConnectionHeader Ros.Topic.Stats 
-                      Ros.Internal.Util.RingChan 
+                      Ros.Node.Type Ros.Node.RunNode Ros.Node.BinaryIter
+                      Ros.Node.RosTcp Ros.Node.ConnectionHeader Ros.Topic.Stats
+                      Ros.Internal.Util.RingChan
                       Ros.Internal.Util.ArgRemapping
-                      Ros.Internal.DepFinder 
+                      Ros.Internal.DepFinder
                       Ros.Internal.Util.AppConfig
                       Paths_roshask
 
@@ -145,7 +144,7 @@ Executable roshask
                   deepseq,
                   mtl >= 2,
                   vector >= 0.10,
-                  binary,
+                  binary >= 0.7.2.1,
                   filepath > 1.1,
                   attoparsec > 0.8,
                   directory > 1.0,

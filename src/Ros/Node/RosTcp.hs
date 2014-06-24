@@ -36,8 +36,7 @@ serviceClient c s = forever $ do bs <- readChan c
                                  let len = runPut $ 
                                            putWord32le . fromIntegral $ 
                                            BL.length bs
-                                 --sendAll s (BL.append len bs)
-                                 sendMany s (BL.toChunks (BL.append len bs))
+                                 sendAll s (BL.toStrict $ BL.append len bs)
 
 recvAll :: Socket -> Int -> IO B.ByteString
 recvAll s = flip go []
@@ -50,7 +49,7 @@ negotiatePub :: String -> String -> Socket -> IO ()
 negotiatePub ttype md5 sock = 
     do headerLength <- runGet (fromIntegral <$> getWord32le) <$>
                        BL.fromChunks . (:[]) <$> recvAll sock 4
-       headerBytes <- BL.fromChunks . (:[]) <$> recvAll sock headerLength
+       headerBytes <- recvAll sock headerLength
        let connHeader = parseHeader headerBytes
            wildCard = case lookup "type" connHeader of
                         Just t | t == "*" -> True
@@ -71,8 +70,7 @@ negotiatePub ttype md5 sock =
        case lookup "tcp_nodelay" connHeader of
          Just "1" -> setSocketOption sock NoDelay 0
          _ -> return ()
-       _ <- sendMany sock $ BL.toChunks $ genHeader [("md5sum",md5),("type",ttype)] 
-       return ()
+       sendAll sock $ genHeader [("md5sum",md5),("type",ttype)]
 
 -- |Accept new client connections. A new send buffer is allocated for
 -- each new client and added to the client list along with an action
@@ -128,13 +126,12 @@ pubStreamIO = do m <- newEmptyMVar
 -- Negotiate a TCPROS subscriber connection.
 negotiateSub :: Socket -> String -> String -> String -> IO ()
 negotiateSub sock tname ttype md5 = 
-    do sendMany sock $ BL.toChunks $ 
-                genHeader [ ("callerid", "roshask"), ("topic", tname)
-                          , ("md5sum", md5), ("type", ttype) 
-                          , ("tcp_nodelay", "1") ]
+    do sendAll sock $ genHeader [ ("callerid", "roshask"), ("topic", tname)
+                                , ("md5sum", md5), ("type", ttype) 
+                                , ("tcp_nodelay", "1") ]
        responseLength <- runGet (fromIntegral <$> getWord32le) <$>
                          BL.fromChunks . (:[]) <$> recvAll sock 4
-       headerBytes <- BL.fromChunks . (:[]) <$> recvAll sock responseLength
+       headerBytes <- recvAll sock responseLength
        let connHeader = parseHeader headerBytes
        case lookup "type" connHeader of
          Just t | t == ttype -> return ()
