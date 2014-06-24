@@ -26,7 +26,7 @@ import System.Posix.Process (getProcessID)
 #endif
 import System.Process (readProcess)
 import Ros.Internal.RosTypes
-import Ros.TopicStats (PubStats(PubStats), SubStats(SubStats))
+import Ros.Topic.Stats (PubStats(PubStats), SubStats(SubStats))
 import Ros.MasterAPI
 
 class RosSlave a where

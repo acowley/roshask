@@ -1,8 +1,8 @@
 -- |PID related functions for 'Topic's.
-module Ros.TopicPID where
+module Ros.Topic.PID where
 import Control.Applicative
 import Ros.Topic
-import Ros.TopicUtil
+import Ros.Topic.Util
 import qualified Ros.Util.PID as P
 
 -- |@pidUniform2 kp ki kd setpoint t@ runs a PID controller that

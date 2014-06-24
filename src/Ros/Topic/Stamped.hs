@@ -11,12 +11,12 @@
 -- common use case is calling the 'bothNew' function with a 'Topic'
 -- that produces very quickly (faster than the minimum required update
 -- rate), and another 'Topic' that imposes a rate limit.
-module Ros.TopicStamped (everyNew, interpolate, batch) where
+module Ros.Topic.Stamped (everyNew, interpolate, batch) where
 import Data.Time.Clock (getCurrentTime, diffUTCTime)
 import System.Timeout
 import qualified Ros.Topic as T
 import Ros.Topic (Topic(..), metamorphM, yieldM)
-import qualified Ros.TopicUtil as T
+import qualified Ros.Topic.Util as T
 import Ros.Internal.Msg.HeaderSupport
 import Ros.Internal.RosTime
 

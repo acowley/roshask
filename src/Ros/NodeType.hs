@@ -17,7 +17,7 @@ import Ros.Internal.Util.ArgRemapping (ParamVal)
 import Ros.Internal.Util.AppConfig (ConfigOptions)
 import Ros.SlaveAPI (RosSlave(..))
 import Ros.Topic (Topic)
-import Ros.TopicStats
+import Ros.Topic.Stats
 
 data Subscription = Subscription { knownPubs :: TVar (Set URI)
                                  , addPub    :: URI -> IO ThreadId

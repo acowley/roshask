@@ -72,10 +72,10 @@ Library
   -- Modules exported by the library.
   Exposed-modules:     Ros.Node
                        Ros.Topic
-                       Ros.TopicUtil
-                       Ros.TopicPID
-                       Ros.TopicMT
-                       Ros.TopicStamped
+                       Ros.Topic.Util
+                       Ros.Topic.PID
+                       Ros.Topic.Transformers
+                       Ros.Topic.Stamped
                        Ros.Rate
                        Ros.Internal.Msg.MsgInfo
                        Ros.Internal.Msg.HeaderSupport 
@@ -130,7 +130,7 @@ Library
   -- Modules not exported by this package.
   Other-modules:      Ros.MasterAPI Ros.SlaveAPI Ros.ParameterServerAPI
                       Ros.NodeType Ros.RunNode Ros.BinaryIter 
-                      Ros.RosTcp Ros.ConnectionHeader Ros.TopicStats 
+                      Ros.RosTcp Ros.ConnectionHeader Ros.Topic.Stats 
                       Ros.Internal.Util.RingChan 
                       Ros.Internal.Util.ArgRemapping
                       Ros.Internal.DepFinder 

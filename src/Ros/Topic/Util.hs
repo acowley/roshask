@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 -- |Utility functions for working with 'Topic's. These functions are
 -- primarily combinators for fusing two 'Topic's in various ways.
-module Ros.TopicUtil where
+module Ros.Topic.Util where
 import Prelude hiding (dropWhile, filter, splitAt, mapM)
 import Control.Applicative
 import Control.Arrow ((***), second)

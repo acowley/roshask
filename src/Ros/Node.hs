@@ -32,8 +32,8 @@ import qualified Ros.ParameterServerAPI as P
 import Ros.RosTcp (subStream, runServer)
 import qualified Ros.RunNode as RN
 import Ros.Topic
-import Ros.TopicStats (recvMessageStat, sendMessageStat)
-import Ros.TopicUtil (topicRate, share)
+import Ros.Topic.Stats (recvMessageStat, sendMessageStat)
+import Ros.Topic.Util (topicRate, share)
 
 -- |Maximum number of items to buffer for a subscriber.
 recvBufferSize :: Int

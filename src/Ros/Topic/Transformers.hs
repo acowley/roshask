@@ -1,7 +1,7 @@
 -- |Functions for working with 'Topic's built around monad
 -- transformers. These make it possible to, for example, repeat a
 -- stateful action to produce a 'Topic''s values.
-module Ros.TopicMT where
+module Ros.Topic.Transformers where
 import Control.Arrow
 import qualified Control.Monad.State.Lazy as L
 import qualified Control.Monad.State.Strict as S

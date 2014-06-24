@@ -15,7 +15,7 @@ import Ros.Internal.Log (Log(Log))
 import qualified Ros.Internal.Log as Log
 import Ros.Internal.Header
 import Ros.Node
-import Ros.TopicUtil (fromList)
+import Ros.Topic.Util (fromList)
 
 emptyHeader :: Header
 emptyHeader = Header 0 (0,0) ""

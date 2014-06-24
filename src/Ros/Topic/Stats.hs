@@ -1,6 +1,6 @@
 {-# LANGUAGE TupleSections #-}
-module Ros.TopicStats (sendMessageStat, recvMessageStat, statSnapshot,
-                       StatMap, SubStats(..), PubStats(..)) where
+module Ros.Topic.Stats (sendMessageStat, recvMessageStat, statSnapshot,
+                        StatMap, SubStats(..), PubStats(..)) where
 import Control.Applicative ((<$>))
 import Control.Concurrent.STM.TVar
 import Control.Concurrent.STM
