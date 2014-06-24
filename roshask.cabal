@@ -128,7 +128,7 @@ Library
   Hs-Source-Dirs:      src
   
   -- Modules not exported by this package.
-  Other-modules:      Ros.MasterAPI Ros.SlaveAPI Ros.ParameterServerAPI
+  Other-modules:      Ros.Graph.Master Ros.Graph.Slave Ros.Graph.ParameterServer
                       Ros.NodeType Ros.RunNode Ros.BinaryIter 
                       Ros.RosTcp Ros.ConnectionHeader Ros.Topic.Stats 
                       Ros.Internal.Util.RingChan 

@@ -1,5 +1,5 @@
 -- Client functionality for the ROS Master API
-module Ros.MasterAPI where
+module Ros.Graph.Master where
 import Network.XmlRpc.Client
 import Ros.Internal.RosTypes
 

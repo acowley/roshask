@@ -27,7 +27,7 @@ import Ros.Internal.Util.RingChan
 import Ros.Internal.Util.AppConfig (Config, debug, forkConfig)
 import Ros.Topic (Topic(..))
 import Ros.ConnectionHeader
-import Ros.SlaveAPI (requestTopicClient)
+import Ros.Graph.Slave (requestTopicClient)
 
 -- |Push each item from this client's buffer over the connected
 -- socket.

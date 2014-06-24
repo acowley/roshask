@@ -1,6 +1,6 @@
 {-# LANGUAGE CPP, OverloadedStrings #-}
-module Ros.SlaveAPI (RosSlave(..), runSlave, requestTopicClient, 
-                     cleanupNode) where
+module Ros.Graph.Slave (RosSlave(..), runSlave, requestTopicClient,
+                       cleanupNode) where
 import Control.Applicative
 import Control.Concurrent (killThread, forkIO, threadDelay, MVar, putMVar,
                            isEmptyMVar, readMVar, modifyMVar_)
@@ -27,7 +27,7 @@ import System.Posix.Process (getProcessID)
 import System.Process (readProcess)
 import Ros.Internal.RosTypes
 import Ros.Topic.Stats (PubStats(PubStats), SubStats(SubStats))
-import Ros.MasterAPI
+import Ros.Graph.Master
 
 class RosSlave a where
     getMaster :: a -> URI

@@ -28,7 +28,7 @@ import Ros.Internal.RosTime
 import Ros.Internal.Util.AppConfig (Config, parseAppConfig, forkConfig, configured)
 import Ros.Internal.Util.ArgRemapping
 import Ros.NodeType
-import qualified Ros.ParameterServerAPI as P
+import qualified Ros.Graph.ParameterServer as P
 import Ros.RosTcp (subStream, runServer)
 import qualified Ros.RunNode as RN
 import Ros.Topic

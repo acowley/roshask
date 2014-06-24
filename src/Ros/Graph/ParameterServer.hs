@@ -1,9 +1,9 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 -- |Client interface for the ROS Parameter Server API. Note that
 -- dictionary values are not supported.
-module Ros.ParameterServerAPI (deleteParam, setParam, getParam, searchParam, 
-                               subscribeParam, unsubscribeParam, hasParam, 
-                               getParamNames) where
+module Ros.Graph.ParameterServer (deleteParam, setParam, getParam, searchParam, 
+                                  subscribeParam, unsubscribeParam, hasParam, 
+                                  getParamNames) where
 import Network.XmlRpc.Client
 import Network.XmlRpc.Internals (XmlRpcType)
 import Ros.Internal.RosTypes

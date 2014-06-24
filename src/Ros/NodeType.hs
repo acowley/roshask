@@ -15,7 +15,7 @@ import Control.Concurrent (ThreadId)
 import Ros.Internal.RosTypes (URI)
 import Ros.Internal.Util.ArgRemapping (ParamVal)
 import Ros.Internal.Util.AppConfig (ConfigOptions)
-import Ros.SlaveAPI (RosSlave(..))
+import Ros.Graph.Slave (RosSlave(..))
 import Ros.Topic (Topic)
 import Ros.Topic.Stats
 
