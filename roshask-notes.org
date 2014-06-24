@@ -4,19 +4,36 @@
   :END:
   It looks like building directly on =warp= might be a simpler choice for all HTTP needs. We do most of our work through =haxr= as it stands, and do not want or need a heavier server.
 
-* TODO Reorganize the source tree
-  :PROPERTIES:
-  :ID:       80B7083F-B685-4AF7-9BD5-5F25C1146661
-  :END:
-  It's too flat, making it hard to identify the key areas: talking to
-  a ROS master/leader, running a node, topics, and supporting
-  functionality.
+* Code Organization
+** Ros
+*** Graph
+    The ROS computation graph is the overarching connectivity between
+    ROS nodes and a ROS master. This is where topic publication is
+    registered with the master, subscriptions are initiated between
+    nodes, node parameters may be set, and services are registered.
+*** Node
+    Functionality related to ROS nodes: registration with a master,
+    topic publication registration, inter-node connectivity.
+*** Topic
+    Functionality relating to ROS topics. Combinators for working with
+    topic streams, stamped and otherwise.
+*** Rate
+    A rate limiter often used by publishers.
+*** Logging
+    Support for ROS-style log messages using Template Haskell to get
+    source location.
+*** Util
+    Additional supporting definitions for client code rather than
+    internal implementation.
+*** Internal
+    Definitions used in the implementation that are not likely to be
+    relevant to end users.
 
-* TODO Find a place for the service API
-  :PROPERTIES:
-  :ID:       6BAD00E5-8A92-47C7-8662-C1309053C4E4
-  :END:
-  This should probably be under the Node umbrella.
+** executable
+   The =roshask= executable whose primary responsibilities are to
+   initialize new packages and generation Haskell packages
+   corresponding to message definitions found in ROS package
+   dependencies.
 * Vagrant
   [[http://www.vagrantup.com] [Vagrant]] is used to provide a common development environment that can be re-created on various platforms. On Windows and Mac, VirtualBox can be used to provide a virtual machine (VM) to host a ROS-friendly Ubuntu environment. When the current working directory contains the =Vagrantfile= defining a VM, a few simple commands to remember are:
 

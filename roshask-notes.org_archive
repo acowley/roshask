@@ -41,3 +41,26 @@ Archived entries from file /Users/acowley/Documents/Projects/roshask/roshask-not
   :ARCHIVE_CATEGORY: roshask-notes
   :ARCHIVE_TODO: DONE
   :END:
+
+* DONE Reorganize the source tree
+  :PROPERTIES:
+  :ID:       80B7083F-B685-4AF7-9BD5-5F25C1146661
+  :ARCHIVE_TIME: 2014-06-24 Tue 16:46
+  :ARCHIVE_FILE: ~/Documents/Projects/roshask/roshask-notes.org
+  :ARCHIVE_CATEGORY: roshask-notes
+  :ARCHIVE_TODO: DONE
+  :END:
+  It's too flat, making it hard to identify the key areas: talking to
+  a ROS master/leader, running a node, topics, and supporting
+  functionality.
+
+
+* DONE Find a place for the service API
+  :PROPERTIES:
+  :ID:       6BAD00E5-8A92-47C7-8662-C1309053C4E4
+  :ARCHIVE_TIME: 2014-06-24 Tue 16:46
+  :ARCHIVE_FILE: ~/Documents/Projects/roshask/roshask-notes.org
+  :ARCHIVE_CATEGORY: roshask-notes
+  :ARCHIVE_TODO: DONE
+  :END:
+  This should go in the Graph section.
