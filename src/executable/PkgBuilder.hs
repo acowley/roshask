@@ -132,7 +132,6 @@ buildNewPkgMsgs tools fname =
                       . cap
                       . takeFileName)
                      pkgMsgs
-                 where
          gen = generateMsgType pkgHier pkgMsgs'
      parsed <- liftIO $ checkErrors <$> mapM parseMsg pkgMsgs
      mapM_ (\(n, m) -> gen m >>= liftIO . B.writeFile n) (zip names parsed)
