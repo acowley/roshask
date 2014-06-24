@@ -6,6 +6,7 @@ import Data.ByteString.Char8 (ByteString, pack)
 import qualified Data.ByteString.Char8 as B
 import Types
 import Analysis
+import Ros.Internal.PathUtil (cap)
 
 serialize :: MsgType -> MsgInfo ByteString
 serialize = getTypeInfo >=> return . putField
@@ -34,4 +35,5 @@ genBinaryInstance m
                           B.intercalate " <*> " gets,
                           if hasHeader m then putMsgHeader else ""]
     where buildPut f ser = B.concat [ser, " (", f, " obj')"]
-          name' = pack (shortName m)
+          name' = pack $ cap (shortName m)
+          
