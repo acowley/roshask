@@ -86,7 +86,8 @@ constParsers = map (uncurry constParser . swap) simpleFieldAssoc
 -- stripped).
 sanitizeConstants :: (a, MsgType, ByteString) -> (a, MsgType, ByteString)
 sanitizeConstants (name, RString, val) = 
-    (name, RString, B.concat ["\"",val,"\""])
+    (name, RString, B.concat ["\"", removeQuotes val,"\""])
+  where removeQuotes = B.filter (/= '"')
 sanitizeConstants (name, t, val) = 
     (name, t, B.takeWhile (\c -> c /= '#' && not (isSpace c)) val)
 

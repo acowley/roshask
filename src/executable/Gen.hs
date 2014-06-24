@@ -11,6 +11,7 @@ import FieldImports
 import Instances.Binary
 import Instances.Storable
 import MD5
+import Ros.Internal.PathUtil (cap)
 
 generateMsgType :: ByteString -> [ByteString] -> Msg -> MsgInfo ByteString
 generateMsgType pkgPath pkgMsgs msg =
@@ -62,7 +63,7 @@ genHasHeader :: Msg -> ByteString
 genHasHeader m = 
     if hasHeader m
     then let hn = fieldName (head (fields m)) -- The header field name
-         in B.concat ["instance HasHeader ", pack (shortName m), " where\n",
+         in B.concat ["instance HasHeader ", pack (cap . shortName $ m), " where\n",
                       "  getSequence = Header.seq . ", hn, "\n",
                       "  getFrame = Header.frame_id . ", hn, "\n",
                       "  getStamp = Header.stamp . " , hn, "\n",
@@ -72,7 +73,7 @@ genHasHeader m =
 
 genHasHash :: Msg -> MsgInfo ByteString
 genHasHash m = msgMD5 m >>= return . aux
-  where aux md5 = B.concat ["instance MsgInfo ", pack (shortName m),
+  where aux md5 = B.concat ["instance MsgInfo ", pack (cap . shortName $ m),
                             " where\n  sourceMD5 _ = \"", pack md5,
                             "\"\n  msgTypeName _ = \"", pack (longName m),
                             "\"\n"]
