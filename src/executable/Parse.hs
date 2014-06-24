@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings, TupleSections #-}
+-- | Parser components for the ROS message description language (@msg@
+-- files). See http://wiki.ros.org/msg for reference.
 module Parse (parseMsg, simpleFieldAssoc) where
 import Prelude hiding (takeWhile)
 import Control.Applicative
