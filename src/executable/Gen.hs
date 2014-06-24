@@ -74,7 +74,7 @@ genHasHash :: Msg -> MsgInfo ByteString
 genHasHash m = msgMD5 m >>= return . aux
   where aux md5 = B.concat ["instance MsgInfo ", pack (shortName m),
                             " where\n  sourceMD5 _ = \"", pack md5,
-                            "\"\n  msgTypeName _ = \"", pack (longName m),
+                            "\"\n  msgTypeName _ = \"", pack (fullRosMsgName m),
                             "\"\n"]
 
 generateField :: MsgField -> MsgInfo ByteString

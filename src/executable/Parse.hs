@@ -13,7 +13,7 @@ import Data.Char (toLower, digitToInt)
 import Data.Either (partitionEithers)
 import Data.List (foldl')
 import System.FilePath (dropExtension, takeFileName, splitDirectories)
-import Types (MsgType(..), MsgField(..), MsgConst(..), Msg(Msg))
+import Types
 
 simpleFieldTypes :: [MsgType]
 simpleFieldTypes = [ RBool, RInt8, RUInt8, RInt16, RUInt16, RInt32, RUInt32, 
@@ -102,7 +102,7 @@ fieldParsers = map (comment *>) $
     where builtIns = concatMap (flip map simpleFieldAssoc)
                                [simpleParser, fixedArrayParser, varArrayParser]
 
-mkParser :: String -> String -> ByteString -> Parser Msg
+mkParser :: MsgName -> String -> ByteString -> Parser Msg
 mkParser sname lname txt = aux . partitionEithers <$> many (choice fieldParsers)
   where aux (fs, cs) = Msg sname lname txt
                            (map buildField fs)
@@ -131,16 +131,16 @@ sanitize "class" = "_class"
 sanitize "module" = "_module"
 sanitize x = B.cons (toLower (B.head x)) (B.tail x)
 
-genName :: FilePath -> String
-genName f = let parts = splitDirectories f
-                [pkg,_,msgFile] = drop (length parts - 3) parts
-            in pkg ++ "/" ++ dropExtension msgFile
+pkgName :: FilePath -> String
+pkgName f = let parts = splitDirectories f
+                [pkg,_,_msgFile] = drop (length parts - 3) parts
+            in pkg
 
 parseMsg :: FilePath -> IO (Either String Msg)
 parseMsg fname = do msgFile <- B.readFile fname
-                    let shortName = dropExtension . takeFileName $ fname
-                        longName = genName fname
-                        parser = comment *> mkParser shortName longName msgFile
+                    let tName = msgName . dropExtension . takeFileName $ fname
+                        longName = pkgName fname
+                        parser = comment *> mkParser tName longName msgFile
                     case feed (parse parser msgFile) "" of
                       Done leftOver msg
                           | B.null leftOver -> return $ Right msg

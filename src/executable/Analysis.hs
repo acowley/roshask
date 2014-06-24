@@ -10,7 +10,7 @@ import qualified Data.Map as M
 import Data.Maybe (isJust)
 import System.FilePath (takeFileName, dropExtension)
 import Ros.Internal.DepFinder (findMessagesInPkg)
-import Types
+import Types hiding (msgName)
 import Parse
 import ResolutionTypes
 
@@ -81,7 +81,7 @@ isStorable = isJust . size
 -- context.
 addMsg :: Msg -> MsgInfo SerialMsg
 addMsg msg = do oldHome <- homePkg <$> get
-                let pkgName = pack $ takeWhile (/= '/') (longName msg)
+                let pkgName = B.pack $ msgPackage msg
                     sName = pack $ shortName msg
                     tName = B.concat [sName, ".", sName]
                 setHomePkg pkgName
@@ -94,7 +94,7 @@ addMsg msg = do oldHome <- homePkg <$> get
 withMsg :: Msg -> MsgInfo a -> MsgInfo a
 withMsg msg action = do _ <- addMsg msg
                         oldHome <- homePkg <$> get
-                        setHomePkg (pack $ takeWhile (/= '/') (longName msg))
+                        setHomePkg . B.pack $ msgPackage msg
                         r <- action
                         setHomePkg oldHome
                         return r
