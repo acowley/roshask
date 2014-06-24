@@ -127,9 +127,33 @@ mulSize _ (SerialInfo _ _ _ Nothing) =
     error "Can't generate a Storable instance for a RFixedArray\
           \with a non-Storable element type."
 
+-- NOTE: ROS specifies that we serialize booleans as a single byte,
+-- while there is an instance of Haskell's 'Storable' class for 'Bool'
+-- that uses four bytes for each boolean value. We handle individual
+-- boolean values with the 'RosBinary' instance for the Haskell 'Bool'
+-- type (i.e. one byte for each boolean). We must handle arrays of
+-- booleans specially as the serialized form must still be one byte
+-- per value.
+
+-- | Deserialization source code string to read a vector of bytes,
+-- then convert that to a vector of 'Bool's.
+getBoolFromWord :: ByteString
+getBoolFromWord = "P.fmap (V.map (P.> 0) :: V.Vector Word.Word8 \
+                  \-> V.Vector P.Bool) get"
+
+-- | Serialization source code string to convert a vector of 'Bool's
+-- to a vector of bytes before serializing.
+putWordFromBool :: ByteString
+putWordFromBool = "(put . (V.map (P.fromIntegral . P.fromEnum)\
+                  \ :: V.Vector P.Bool -> V.Vector Word.Word8))"
+
 -- Add a SerialInfo value for a 'MsgType' to the 'MsgInfo' context.
 addField :: MsgType -> MsgInfo SerialInfo
 addField RString = ros2Hask RString >>= setTypeInfo RString . defaultNonFlat
+addField t@(RVarArray RBool) =
+  do lst <- vecOf RBool
+     let arr = SerialInfo lst putWordFromBool getBoolFromWord Nothing
+     setTypeInfo t arr
 addField t@(RVarArray el) = 
     do elInfo <- getTypeInfo el
        arr <- if isStorable elInfo
@@ -138,6 +162,11 @@ addField t@(RVarArray el) =
               else do lst <- listOf el
                       return $ SerialInfo lst "putList" "getList" Nothing
        setTypeInfo t arr
+addField t@(RFixedArray n RBool) =
+  do lst <- vecOf RBool
+     let arr = SerialInfo lst putWordFromBool getBoolFromWord
+                          (Just . B.pack $ show n)
+     setTypeInfo t arr
 addField t@(RFixedArray n el) = 
     do elInfo <- getTypeInfo el
        arr <- if isStorable elInfo
@@ -158,7 +187,7 @@ addField t = ros2Hask t >>= setTypeInfo t . defaultFlat
 -- Generate the name of the Haskell type that corresponds to a flat
 -- (i.e. non-array) ROS type.
 mkFlatType :: MsgType -> ByteString
-mkFlatType RBool         = "Word.Word8"
+mkFlatType RBool         = "P.Bool"
 mkFlatType RInt8         = "Int.Int8"
 mkFlatType RUInt8        = "Word.Word8"
 mkFlatType RByte         = "Word.Word8"

@@ -1,26 +1,3 @@
-* DONE Investigate ROS Hydro paths
-  :PROPERTIES:
-  :ID:       EE33213B-DBF3-4CB4-813E-BAB5C277395A
-  :END:
-  Did things like =roscore=, =roslib=, and basic message definitions
-  (e.g. log messages) move or change?
-
-** Be wary of further changes!
-   I added preliminary support for the catkin build system's approach
-   to package description files (what were package manifests). We only
-   extract build dependency elements. Do the runtime dependencies
-   affect roshask?
-
-* DONE rostcp slave API requestTopic return type
-  :PROPERTIES:
-  :ID:       08B40EF7-25B4-42AE-B72B-C910016F95F6
-  :END:
-  It should return a list of triples for protocols. This seems to
-  cause a problem with interactions with roscpp.
-* TODO Handle empty message files
-  :PROPERTIES:
-  :ID:       445371C6-0975-43F6-8B45-51BDCD54D3C3
-  :END:
 * TODO Change from =snap= to =warp=
   :PROPERTIES:
   :ID:       34EBDA27-4791-4ED4-8D87-C832D6833C16
@@ -54,13 +31,43 @@
 
 
 ** VM Configuration
-    As well as the =Vagrantfile=, we use a bash script, =vagrant/bootstrap.sh= to install things in the VM. This is somewhat flaky at the moment as it, for example, runs through the ROS installation procedure which appends a line at the end of =~/.bashrc= even if that line is already there.
+    As well as the =Vagrantfile=, we use a bash script,
+    =vagrant/bootstrap.sh= to install things in the VM. This is
+    somewhat flaky at the moment as it, for example, runs through the
+    ROS installation procedure which appends a line at the end of
+    =~/.bashrc= even if that line is already there.
 
-    By default, the directory containing the =Vagrantfile= is shared with the VM. This will be root =roshask= directory in most cases. This directory on the host (your computer) is mapped to =/vagrant= on the guest (the VM).
+    By default, the directory containing the =Vagrantfile= is shared
+    with the VM. This will be the root =roshask= directory in most
+    cases. This directory on the host (your computer) is mapped to
+    =/vagrant= on the guest (the VM).
 
 *** GitHub 
-    A convention used here is to configure SSH on the guest to work with [[http://www.github.com] [GitHub]] by using a key file the guest finds at =/vagrant/vagrant/ssh/github=, which maps to the host at =roshask/vagrant/ssh/github=. Generate a new SSH key on your host machine at the mapped location, set that key up with GitHub, and now the VM can push to your repositories on GitHub.
+    A convention used here is to configure SSH on the guest to work
+    with [[http://www.github.com] [GitHub]] by using a key file the
+    guest finds at =/vagrant/vagrant/ssh/github=, which maps to the
+    host at =roshask/vagrant/ssh/github=. Generate a new SSH key on
+    your host machine at the mapped location, set that key up with
+    GitHub, and now the VM can push to your repositories on GitHub.
 
 
 ** Emacs
-    Try out vagrant-tramp mode. It is on MELPA, and I patched it to work with default VirtualBox-based Vagrant configurations.
+    Try out vagrant-tramp mode. It is on MELPA, and I patched it to
+    work with default VirtualBox-based Vagrant configurations.
+
+** Workflow
+   I work with the source on a host machine, but build and test in the
+   vagrant environment. The =roshask= directory on my host machine is
+   mapped to =/vagrant= on the guest, while the user home directory on
+   the guest is =/home/vagrant=. On the guest machine, I create the
+   directory =/home/vagrant/roshask=, then symlink all source
+   directories and files from =/vagrant= to =/home/vagrant/roshask=. I
+   then initialize a sandbox in =/home/vagrant/roshask=, so that
+   =.cabal-sandbox= is on the guest machine.
+   
+   It can be convenient to share sandboxes between the example
+   programs and roshask itself if you are working on roshask. In an
+   example program directory, run =cabal sandbox init
+   --sandbox=/home/vagrant/roshask/.cabal-sandbox=. The absolute path
+   is important as you don't want to accidentally follow a symlink
+   back to the directory shared with the host.
