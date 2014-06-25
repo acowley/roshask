@@ -129,6 +129,7 @@ buildNewPkgMsgs tools fname =
                             Just i -> err (pkgMsgs !! i)
          names = map ((destDir </>)
                       . flip replaceExtension ".hs"
+                      . cap
                       . takeFileName)
                      pkgMsgs
          gen = generateMsgType pkgHier pkgMsgs'
