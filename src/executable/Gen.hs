@@ -32,16 +32,17 @@ generateMsgType pkgPath pkgMsgs msg =
                                        , fieldSpecs
                                        , "\n"
                                        , fieldIndent
-                                       , "} deriving (P.Show, P.Eq, P.Ord, T.Typeable)\n\n"]
+                                       , "} deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)\n\n"]
                        , binInst, "\n\n"
                        , storableInstance
                        --, genNFDataInstance msg
                        , genHasHeader msg
                        , msgHash
+                       , genDefault msg
                        , cons ]
     where name = shortName msg
           tName = pack $ toUpper (head name) : tail name
-          modLine = B.concat ["{-# LANGUAGE OverloadedStrings, DeriveDataTypeable #-}\n",
+          modLine = B.concat ["{-# LANGUAGE OverloadedStrings, DeriveDataTypeable, DeriveGeneric #-}\n",
                               "module ", pkgPath, tName, " where"]
           imports = B.concat ["import qualified Prelude as P\n",
                               "import Prelude ((.), (+), (*))\n",
@@ -49,12 +50,14 @@ generateMsgType pkgPath pkgMsgs msg =
                               "import Control.Applicative\n",
                               "import Ros.Internal.RosBinary\n",
                               "import Ros.Internal.Msg.MsgInfo\n",
+                              "import qualified GHC.Generics as G\n",
+                              "import qualified Data.Default.Generics as D\n",
                               genImports pkgPath pkgMsgs 
                                          (map fieldType (fields msg))]
                               --nfImport]
           dataLine = B.concat ["\ndata ", tName, " = ", tName, " { "]
           dataSingleton = B.concat ["\ndata ", tName, " = ", tName, 
-                                    " deriving (P.Show, P.Eq, P.Ord)\n\n"]
+                                    " deriving (P.Show, P.Eq, P.Ord, G.Generic)\n\n"]
           fieldIndent = B.replicate (B.length dataLine - 3) ' '
           lineSep = B.concat ["\n", fieldIndent, ", "]
 
@@ -70,12 +73,15 @@ genHasHeader m =
                       " = (", hn, " x') { Header.seq = seq } }\n\n"]
     else ""
 
+genDefault :: Msg -> ByteString
+genDefault m = B.concat["instance D.Default ", pack (shortName m), "\n"]
+
 genHasHash :: Msg -> MsgInfo ByteString
 genHasHash m = msgMD5 m >>= return . aux
   where aux md5 = B.concat ["instance MsgInfo ", pack (shortName m),
                             " where\n  sourceMD5 _ = \"", pack md5,
                             "\"\n  msgTypeName _ = \"", pack (fullRosMsgName m),
-                            "\"\n"]
+                            "\"\n\n"]
 
 generateField :: MsgField -> MsgInfo ByteString
 generateField (MsgField name t _) = do t' <- hType <$> getTypeInfo t
