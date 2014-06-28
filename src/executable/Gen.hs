@@ -93,5 +93,6 @@ genConstants = fmap B.concat . mapM buildLine . constants
           escapeQuotes _       = id
           buildLine (MsgConst name rosType val _) = 
               do t <- hType <$> getTypeInfo rosType
-                 return $ B.concat ["\n",name, " :: ", t, "\n", 
-                                    name, " = ", escapeQuotes rosType val, "\n"]
+                 return $ B.concat [ "\n",name, " :: ", t, "\n"
+                                   , name, " = \""
+                                   , escapeQuotes rosType val, "\"\n"]
