@@ -89,10 +89,13 @@ generateField (MsgField name t _) = do t' <- hType <$> getTypeInfo t
 
 genConstants :: Msg -> MsgInfo ByteString
 genConstants = fmap B.concat . mapM buildLine . constants
-    where escapeQuotes RString = B.intercalate "\\\"" . B.split '"'
-          escapeQuotes _       = id
+    where escapeQuotes RString x =
+            B.concat [ "\""
+                     , B.intercalate "\\\"" (B.split '"' x)
+                     , "\"" ]
+          escapeQuotes _       x = x
           buildLine (MsgConst name rosType val _) = 
               do t <- hType <$> getTypeInfo rosType
                  return $ B.concat [ "\n",name, " :: ", t, "\n"
-                                   , name, " = \""
-                                   , escapeQuotes rosType val, "\"\n"]
+                                   , name, " = "
+                                   , escapeQuotes rosType val, "\n"]
