@@ -6,6 +6,7 @@
 -- using either qualification (e.g. @import qualified Ros.TopicUtil as
 -- T@), an explicit import list, or a @hiding@ clause.
 module Ros.Topic where
+import Prelude hiding (join)
 import Control.Applicative
 import Control.Arrow ((***), second)
 import Control.Monad ((<=<), (>=>))
