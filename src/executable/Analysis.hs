@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings, TupleSections #-}
-module Analysis (MsgInfo, liftIO, getTypeInfo, withMsg, getMsg,
+module Analysis (MsgInfo, liftIO, getTypeInfo, withMsg, getMsg, addMsg,
                  runAnalysis, isFlat, SerialInfo(..)) where
 import Control.Applicative
 import Control.Arrow ((&&&))
@@ -20,8 +20,7 @@ type SerialMsg = (SerialInfo, Msg)
 
 -- Front-end to run analyses.
 runAnalysis :: MsgInfo a -> IO a
-runAnalysis m = evalStateT (cachePackage "rosgraph_msgs" >> m) 
-                           (MsgContext "" M.empty)
+runAnalysis m = evalStateT (cachePackage "rosgraph_msgs" >> m) emptyMsgContext
 
 -- All the .msg files in a package are cached for quick lookup on
 -- subsequent type resolutions.

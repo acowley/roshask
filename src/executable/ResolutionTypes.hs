@@ -2,7 +2,9 @@
 module ResolutionTypes where
 import Control.Monad.State
 import Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as B
 import Data.Map (Map, insert, alter)
+import qualified Data.Map as M
 
 import Types
 
@@ -37,6 +39,11 @@ data SerialInfo = SerialInfo { hType    :: ByteString
 
 type MsgInfo = StateT MsgContext IO
 
+-- | An empty 'MsgContext' from which one can begin running a
+-- 'MsgInfo'.
+emptyMsgContext :: MsgContext
+emptyMsgContext = MsgContext B.empty M.empty
+
 setHomePkg :: ByteString -> MsgInfo ()
 setHomePkg = modify . aux
     where aux n ctxt = ctxt { homePkg = n }
@@ -56,7 +63,7 @@ alterPkgMap f = modify aux
 -- Add a binding from a message type string to a parsed 'Msg' value to
 -- a package's existing map.
 addParsedMsg :: ByteString -> ByteString -> SerialInfo -> Msg -> MsgInfo ()
-addParsedMsg pkg msgType info msg = 
+addParsedMsg pkg msgType info msg =
   do ctxt <- get
      let defs' = alter (fmap aux) pkg (msgDefs ctxt)
      put $ ctxt { msgDefs = defs' }
