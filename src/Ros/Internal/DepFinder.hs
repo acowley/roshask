@@ -119,7 +119,7 @@ findPackageDeps pkgRoot =
        case findIndex isNothing pkgPaths of
          Just i -> putStrLn ("Looking for "++show pkgs++
                              ", dependencies of"++pkgRoot) >>
-                   error ("Couldn't find path to package " ++ (pkgs !! i))
+                   error ("Couldn't find path to package (1) " ++ (pkgs !! i))
          Nothing -> return $ map fromJust pkgPaths
 
 -- |Transitive closure of 'findPackageDeps'. Find the paths to the
@@ -135,7 +135,7 @@ findPackageDepsTrans pkgRoot =
               case findIndex isNothing pkgPaths of
                 Just i -> putStrLn ("Looking for "++show pkgDeps++
                                     ", dependencies of "++pkgRoot) >>
-                          error ("Couldn't find path to package " ++ 
+                          error ("Couldn't find path to package (2) " ++ 
                                  (pkgDeps !! i))
                 Nothing -> return $ map fromJust pkgPaths
          recurse p = do deps <- getDeps p
@@ -159,7 +159,7 @@ findMessagesInPkg pkgName = do searchPaths <- getRosPaths
                                              findPackagePath searchPaths pkgName
                                msgs <- findMessages pkgPath
                                return (pkgPath, msgs)
-    where err = error $ "Couldn't find path to package " ++ pkgName
+    where err = error $ "Couldn't find path to package (3) " ++ pkgName
 
 -- |Find the path to the message definition (.msg) file for a message
 -- type with the given name. The first argument is a home package used
