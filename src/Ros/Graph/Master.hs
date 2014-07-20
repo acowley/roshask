@@ -41,4 +41,62 @@ unregisterPublisher :: URI -> String -> TopicName -> String ->
 unregisterPublisher = flip remote "unregisterPublisher"
 
 
+{-
+lookupService(caller_id, service)
 
+Lookup all provider of a particular service.
+
+Parameters
+caller_id (str)
+ROS caller ID
+service (str)
+Fully-qualified name of service
+Returns (int, str, str)
+(code, statusMessage, serviceUrl)
+
+service URL is provides address and port of the service. Fails if there is no provider.
+-}
+
+lookupService :: URI -> String -> ServiceName -> IO(Int, String, String)
+lookupService = flip remote "lookupService"
+
+{-
+registerService(caller_id, service, service_api, caller_api)
+
+Register the caller as a provider of the specified service.
+
+Parameters
+caller_id (str)
+ROS caller ID
+service (str)
+Fully-qualified name of service
+service_api (str)
+ROSRPC Service URI
+caller_api (str)
+XML-RPC URI of caller node
+Returns (int, str, int)
+(code, statusMessage, ignore)
+-}
+registerService :: URI -> String -> ServiceName -> URI -> URI -> IO(Int, String, Int)
+registerService = flip remote "registerService"
+
+{-
+unregisterService(caller_id, service, service_api)
+
+Unregister the caller as a provider of the specified service.
+
+Parameters
+caller_id (str)
+ROS caller ID
+service (str)
+Fully-qualified name of service
+service_api (str)
+API URI of service to unregister. Unregistration will only occur if current registration matches.
+
+Returns (int, str, int)
+(code, statusMessage, numUnregistered).
+
+Number of unregistrations (either 0 or 1). If this is zero it means that the caller was not registered as a service provider. The call still succeeds as the intended final state is reached.
+-}
+unregisterService :: URI -> String -> ServiceName -> URI -> IO(Int, String, Int)
+unregisterService = flip remote "unregisterService"
