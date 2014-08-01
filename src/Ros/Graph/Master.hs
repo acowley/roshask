@@ -42,6 +42,7 @@ unregisterPublisher = flip remote "unregisterPublisher"
 
 
 {-
+--TODO: make comment nice
 lookupService(caller_id, service)
 
 Lookup all provider of a particular service.
@@ -49,8 +50,10 @@ Lookup all provider of a particular service.
 Parameters
 caller_id (str)
 ROS caller ID
+
 service (str)
 Fully-qualified name of service
+
 Returns (int, str, str)
 (code, statusMessage, serviceUrl)
 
@@ -61,6 +64,7 @@ lookupService :: URI -> String -> ServiceName -> IO(Int, String, String)
 lookupService = flip remote "lookupService"
 
 {-
+--TODO: make comment nice
 registerService(caller_id, service, service_api, caller_api)
 
 Register the caller as a provider of the specified service.

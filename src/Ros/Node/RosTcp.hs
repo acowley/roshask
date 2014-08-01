@@ -13,11 +13,11 @@ import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import Network.BSD (getHostByName, hostAddress)
-import Network.Socket hiding (send, sendTo, recv, recvFrom, Stream)
+import Network.Socket hiding (send, sendTo, recv, recvFrom, Stream, ServiceName)
 import qualified Network.Socket as Sock
 import Network.Socket.ByteString
 import System.IO (IOMode(ReadMode))
-import Text.URI (parseURI, uriRegName)
+import Text.URI (parseURI, uriRegName, uriPort)
 
 import Ros.Node.BinaryIter (streamIn)
 import Ros.Internal.Msg.MsgInfo
@@ -28,6 +28,8 @@ import Ros.Internal.Util.AppConfig (Config, debug, forkConfig)
 import Ros.Topic (Topic(..))
 import Ros.Node.ConnectionHeader
 import Ros.Graph.Slave (requestTopicClient)
+import Ros.Graph.Master (lookupService)
+import Data.Maybe (fromMaybe)
 
 -- |Push each item from this client's buffer over the connected
 -- socket.
@@ -170,12 +172,45 @@ subStream target tname _updateStats =
        --hSetBuffering h NoBuffering
        debug $ "Streaming "++tname++" from "++target
        return $ streamIn h
-    where host = case parseURI target of
-                   Just u -> case uriRegName u of
-                               Just host' -> host'
-                               Nothing -> error $ "Couldn't parse hostname "++ 
-                                                  "from "++target
-                   Nothing -> error $ "Couldn't parse URI "++target
+    where host = parseHost target
+
+parseHost :: URI -> String
+parseHost target = case parseURI target of
+  Just u -> fromMaybe
+            (error $ "Couldn't parse hostname "++ "from "++target)
+            (uriRegName u)
+  Nothing -> error $ "Couldn't parse URI "++target
+
+parsePort :: URI -> Integer
+parsePort target = case parseURI target of
+  Just u -> fromMaybe
+            (error $ "Couldn't parse port "++ "from "++ target)
+            (uriPort u)
+  Nothing -> error $ "Couldn't parse URI "++target
+
+--callService :: (RosBinary a, RosBinary b, MsgInfo a, MsgInfo b) => URI -> ServiceName -> a -> b
+callService :: URI -> ServiceName -> t -> IO ()
+callService rosMaster serviceName message = do
+  --lookup the service with the master
+  (code, statusMessage, serviceUrl) <- lookupService rosMaster callerID serviceName
+  -- make a socket
+  sock <- socket AF_INET Sock.Stream defaultProtocol
+  -- connect to the socket
+  let host = parseHost serviceUrl
+  ip <- hostAddress <$> getHostByName host
+  let port = fromIntegral $ parsePort serviceUrl
+  connect sock $ SockAddrInet port ip
+  negotiateService sock serviceName
+  close sock
+  return ()
+    where
+      --TODO: use the correct callerID
+      callerID = "roshask"
+
+-- Precondition: The socket is already connected to the server
+-- Exchange ROSTCP connection headers with the server
+negotiateService :: t -> t1 -> a
+negotiateService sock serviceName = undefined
 
 -- Helper to run the publisher's side of a topic negotiation with a
 -- new client.
