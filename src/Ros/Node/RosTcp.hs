@@ -124,6 +124,7 @@ pubStreamIO = do m <- newEmptyMVar
                  return (feed, putMVar m)
 
 -- Negotiate a TCPROS subscriber connection.
+-- Precondition: The socket is connected
 negotiateSub :: Socket -> String -> String -> String -> IO ()
 negotiateSub sock tname ttype md5 = 
     do sendAll sock $ genHeader [ ("callerid", "roshask"), ("topic", tname)
