@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
-module Ros.Node.RosTcp (subStream, runServer, runServers) where
+module Ros.Node.RosTcp (subStream, runServer, runServers, callService) where
 import Control.Applicative ((<$>))
 import Control.Arrow (first)
 import Control.Concurrent (forkIO, killThread, newEmptyMVar, takeMVar, putMVar)
@@ -188,8 +188,9 @@ parsePort target = case parseURI target of
             (uriPort u)
   Nothing -> error $ "Couldn't parse URI "++target
 
---callService :: (RosBinary a, RosBinary b, MsgInfo a, MsgInfo b) => URI -> ServiceName -> a -> b
-callService :: URI -> ServiceName -> t -> IO ()
+callService :: (RosBinary a, MsgInfo a) => URI -> ServiceName -> a -> IO b
+--callService :: URI -> ServiceName -> t -> IO ()
+--callService :: URI -> ServiceName -> a -> IO b
 callService rosMaster serviceName message = do
   --lookup the service with the master
   (code, statusMessage, serviceUrl) <- lookupService rosMaster callerID serviceName
@@ -200,18 +201,29 @@ callService rosMaster serviceName message = do
   ip <- hostAddress <$> getHostByName host
   let port = fromIntegral $ parsePort serviceUrl
   connect sock $ SockAddrInet port ip
-  negotiateService sock serviceName
+  let
+    md5 = sourceMD5 message
+    serviceType = msgTypeName message
+  negotiateService sock serviceName serviceType md5
   close sock
-  return ()
+  return (undefined :: b)
     where
       --TODO: use the correct callerID
       callerID = "roshask"
 
 -- Precondition: The socket is already connected to the server
 -- Exchange ROSTCP connection headers with the server
-negotiateService :: t -> t1 -> a
-negotiateService sock serviceName = undefined
-
+--negotiateService :: t -> t1 -> a
+negotiateService :: Socket -> String -> String -> String -> IO ()
+negotiateService sock serviceName serviceType md5 =
+    do sendAll sock $ genHeader [ ("callerid", "roshask"), ("service", serviceName)
+                                , ("md5sum", md5), ("type", serviceType) ]
+       responseLength <- runGet (fromIntegral <$> getWord32le) <$>
+                         BL.fromChunks . (:[]) <$> recvAll sock 4
+       headerBytes <- recvAll sock responseLength
+       let connHeader = parseHeader headerBytes
+       print connHeader
+                                    
 -- Helper to run the publisher's side of a topic negotiation with a
 -- new client.
 mkPubNegotiator :: MsgInfo a => a -> Socket -> IO ()
@@ -288,3 +300,10 @@ runServers = return . first sequence_ . unzip <=< mapM feed
   where feed (Feeder (MsgInfoRcd md5 typeName) bufSize stats push) = 
           let pub = negotiatePub typeName md5
           in runServerAux pub push stats bufSize
+{-
+main = serviceTest
+
+serviceTest = callService rosMast "/spawn" (I.Int64 0)
+  where
+    rosMast = "http://localhost:11311/"
+-}
