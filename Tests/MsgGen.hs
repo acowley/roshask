@@ -95,12 +95,23 @@ testStringMsg = do
   md5 <- testMD5 messageFile "a8e1a25e612660c2e8d3d161e9e91950"
   return $ testGroup "String constants" [gen, md5]
 
+--Test that the MD5 for a service is generated correctly
+addTwoIntsServiceMD5 :: TestTree
+addTwoIntsServiceMD5 = testGroup "Services" [md5Test]
+  where md5Test = testCase "Service MD5 for AddTwoInts" $ md5 @=? genMD5
+        -- from rossrv
+        md5 = "6a2e34150c00229791cc89ff309fff21"
+        genMD5 = ""
+                 
+
 -- | ROOT TEST
 
 -- | Tests for message generation.
 tests :: IO TestTree
-tests = fmap (testGroup "Message generation") $
-        flip evalStateT emptyMsgContext $ do
-          prepMsgGen
-          sequence [testActionMsgs
-                   , testStringMsg]
+tests =
+  fmap (testGroup "Message generation") $
+  do testList <- flip evalStateT emptyMsgContext $
+              do prepMsgGen
+                 sequence [testActionMsgs
+                          , testStringMsg]
+     return (addTwoIntsServiceMD5:testList)
