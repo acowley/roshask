@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module MD5 (msgMD5) where
+module MD5 (msgMD5, srvMD5) where
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Digest.Pure.MD5 (md5)
@@ -45,3 +45,7 @@ msgMD5 m = let cs = map constantText (constants m)
   where constantText (MsgConst _ t v n) = B.concat [tMap ! t, " ", n, "=", v]
         fieldText (MsgField _ t n) = do t' <- typeText t
                                         return $ B.concat [t', " ", n]
+
+-- todo, implement
+srvMD5 :: Srv -> MsgInfo String
+srvMD5 s = return "Implement Me!"

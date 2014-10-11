@@ -2,7 +2,7 @@
 -- |ROS message types.
 module Types (MsgType(..), MsgField(..), MsgConst(..),
               MsgName, msgName, shortName, rawName, fullRosMsgName,
-              Msg(..), hasHeader) where
+              Msg(..), hasHeader, Srv(..)) where
 import Data.ByteString.Char8 (ByteString)
 import Data.Char (toUpper)
 import Data.List (intercalate)
@@ -69,3 +69,10 @@ hasHeader msg = case fields msg of
                   --((_, RUserType "Header"):_) -> True
                   (MsgField _ (RUserType "Header") _ : _) -> True
                   _ -> False
+
+-- |A service has a request message, a response message, and a name.
+data Srv = Srv { srvRequest :: Msg
+               , srvResponse :: Msg
+               , srvName :: MsgName
+               , srvPackage :: String
+               , srvSource :: ByteString }

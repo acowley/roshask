@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, TupleSections #-}
 -- | Parser components for the ROS message description language (@msg@
 -- files). See http://wiki.ros.org/msg for reference.
-module Parse (parseMsg, simpleFieldAssoc) where
+module Parse (parseMsg, parseSrv, simpleFieldAssoc) where
 import Prelude hiding (takeWhile)
 import Control.Applicative
 import Control.Arrow ((&&&))
@@ -146,3 +146,14 @@ parseMsg fname = do msgFile <- B.readFile fname
                                                          unpack leftOver
                       Fail _ _ctxt err -> return $ Left err
                       Partial _ -> return $ Left "Incomplete msg definition"
+
+--todo: write this
+parseSrv :: FilePath -> IO (Either String Srv)
+parseSrv fname = do srvFile <- B.readFile fname
+                    return undefined
+                    
+splitService :: ByteString -> (ByteString, ByteString)
+splitService service = (request, response) where
+  divider = "\n---\n"
+  (request, dividerAndResponse) = B.breakSubstring divider service
+  response = B.drop (B.length divider) dividerAndResponse

@@ -8,8 +8,8 @@ import Control.Monad.State (evalStateT)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as M
 import Gen (generateMsgType)
-import MD5 (msgMD5)
-import Parse (parseMsg)
+import MD5 (msgMD5, srvMD5)
+import Parse (parseMsg, parseSrv)
 import ResolutionTypes (emptyMsgContext, alterPkgMap, MsgInfo)
 import Ros.Internal.DepFinder (findMessages)
 import System.FilePath ((</>), dropExtension, takeFileName)
@@ -66,6 +66,13 @@ testMD5 msgPath  md5 =
      genMD5 <- msgMD5 msg
      return $ testCase ("MD5 for " ++ msgPath) $ md5 @=? genMD5
 
+testSrvMD5 :: FilePath -> String -> MsgInfo TestTree
+testSrvMD5 srvPath md5 =
+  do srv <- liftIO $ 
+             either error id <$> parseSrv srvPath
+     genMD5 <- srvMD5 srv
+     return $ testCase ("MD5 for " ++ srvPath) $ md5 @=? genMD5
+
 -- TESTS
 
 testActionMsgs :: MsgInfo TestTree
@@ -96,12 +103,15 @@ testStringMsg = do
   return $ testGroup "String constants" [gen, md5]
 
 --Test that the MD5 for a service is generated correctly
-addTwoIntsServiceMD5 :: TestTree
-addTwoIntsServiceMD5 = testGroup "Services" [md5Test]
-  where md5Test = testCase "Service MD5 for AddTwoInts" $ md5 @=? genMD5
-        -- from rossrv
-        md5 = "6a2e34150c00229791cc89ff309fff21"
-        genMD5 = ""
+addTwoIntsServiceMD5 :: MsgInfo TestTree
+addTwoIntsServiceMD5 = do
+  md5Test <- testSrvMD5 "Tests/test_srvs/srv/AddTwoInts.srv" md5
+  return $ testGroup "Services" [md5Test]
+  -- where md5Test = testCase "Service MD5 for AddTwoInts" $ md5 @=? genMD5
+  --       -- from rossrv
+  where
+    md5 = "6a2e34150c00229791cc89ff309fff21"
+  --       genMD5 = ""
                  
 
 -- | ROOT TEST
@@ -113,5 +123,6 @@ tests =
   do testList <- flip evalStateT emptyMsgContext $
               do prepMsgGen
                  sequence [testActionMsgs
-                          , testStringMsg]
-     return (addTwoIntsServiceMD5:testList)
+                          , testStringMsg
+                          , addTwoIntsServiceMD5]
+     return testList
