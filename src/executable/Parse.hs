@@ -137,17 +137,9 @@ pkgName f = let parts = splitDirectories f
 parseMsg :: FilePath -> IO (Either String Msg)
 parseMsg fname = do msgFile <- B.readFile fname
                     let tName = msgName . dropExtension . takeFileName $ fname
-                        longName = pkgName fname
-                        parser = comment *> mkParser tName longName msgFile
-                    case feed (parse parser msgFile) "" of
-                      Done leftOver msg
-                          | B.null leftOver -> return $ Right msg
-                          | otherwise -> return $ Left $ "Couldn't parse " ++ 
-                                                         unpack leftOver
-                      Fail _ _ctxt err -> return $ Left err
-                      Partial _ -> return $ Left "Incomplete msg definition"
+                        packageName = pkgName fname
+                    return $ parseMsgWithName tName packageName msgFile
 
--- todo: refactor parseMsg to use this function
 parseMsgWithName :: MsgName -> String -> ByteString -> Either String Msg
 parseMsgWithName name packageName msgFile =
   case feed (parse parser msgFile) "" of
@@ -163,20 +155,19 @@ parseMsgWithName name packageName msgFile =
 -- | Parse a service file by splitting the file into a request and a response
 -- | and parsing each part separately.
 parseSrv :: FilePath -> IO (Either String Srv)
-parseSrv fname = do srvFile <- B.readFile fname
-                    let (request, response) = splitService srvFile
-                        packageName = pkgName fname
-                        rawServiceName = dropExtension . takeFileName $ fname
-                        requestMsg = parseMsgWithName (requestMsgName rawServiceName) packageName request
-                        responseMsg = parseMsgWithName (responseMsgName rawServiceName) packageName response
-                        srv = do rqst <- requestMsg
-                                 resp <- responseMsg
-                                 return Srv{srvRequest = rqst
-                                           , srvResponse = resp
-                                           , srvName = msgName rawServiceName
-                                           , srvPackage = packageName
-                                           , srvSource = srvFile}
-                    return srv
+parseSrv fname = do
+  srvFile <- B.readFile fname
+  let (request, response) = splitService srvFile
+      packageName = pkgName fname
+      rawServiceName = dropExtension . takeFileName $ fname
+  return $ do
+    rqst <- parseMsgWithName (requestMsgName rawServiceName) packageName request
+    resp <- parseMsgWithName (responseMsgName rawServiceName) packageName response
+    return Srv{srvRequest = rqst
+              , srvResponse = resp
+              , srvName = msgName rawServiceName
+              , srvPackage = packageName
+              , srvSource = srvFile}
 
 splitService :: ByteString -> (ByteString, ByteString)
 splitService service = (request, response) where
