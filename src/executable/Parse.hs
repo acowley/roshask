@@ -147,8 +147,7 @@ parseMsg fname = do msgFile <- B.readFile fname
                       Fail _ _ctxt err -> return $ Left err
                       Partial _ -> return $ Left "Incomplete msg definition"
 
-
-
+-- todo: refactor parseMsg to use this function
 parseMsgWithName :: MsgName -> String -> ByteString -> Either String Msg
 parseMsgWithName name packageName msgFile =
   case feed (parse parser msgFile) "" of
@@ -161,7 +160,8 @@ parseMsgWithName name packageName msgFile =
   where
     parser = comment *> mkParser name packageName msgFile
 
---todo: write this
+-- | Parse a service file by splitting the file into a request and a response
+-- | and parsing each part separately.
 parseSrv :: FilePath -> IO (Either String Srv)
 parseSrv fname = do srvFile <- B.readFile fname
                     let (request, response) = splitService srvFile
@@ -177,7 +177,7 @@ parseSrv fname = do srvFile <- B.readFile fname
                                            , srvPackage = packageName
                                            , srvSource = srvFile}
                     return srv
-                    
+
 splitService :: ByteString -> (ByteString, ByteString)
 splitService service = (request, response) where
   divider = "\n---\n"
