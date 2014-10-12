@@ -105,14 +105,11 @@ testStringMsg = do
 --Test that the MD5 for a service is generated correctly
 addTwoIntsServiceMD5 :: MsgInfo TestTree
 addTwoIntsServiceMD5 = do
-  md5Test <- testSrvMD5 "Tests/test_srvs/srv/AddTwoInts.srv" md5
+  md5Test <- testSrvMD5 file md5
   return $ testGroup "Services" [md5Test]
-  -- where md5Test = testCase "Service MD5 for AddTwoInts" $ md5 @=? genMD5
-  --       -- from rossrv
   where
+    file = "Tests/test_srvs/srv/AddTwoInts.srv"
     md5 = "6a2e34150c00229791cc89ff309fff21"
-  --       genMD5 = ""
-                 
 
 -- | ROOT TEST
 

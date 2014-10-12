@@ -71,8 +71,13 @@ hasHeader msg = case fields msg of
                   _ -> False
 
 -- |A service has a request message, a response message, and a name.
-data Srv = Srv { srvRequest :: Msg
-               , srvResponse :: Msg
-               , srvName :: MsgName
+data Srv = Srv { srvName :: MsgName
                , srvPackage :: String
-               , srvSource :: ByteString }
+               , srvSource :: ByteString
+               , srvRequest :: Msg
+               , srvResponse :: Msg
+               }
+
+instance Show Srv where
+  show (Srv name package _ req res) = intercalate " "
+                                      ["Srv", show name, show package, show req, show res]

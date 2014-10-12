@@ -147,10 +147,40 @@ parseMsg fname = do msgFile <- B.readFile fname
                       Fail _ _ctxt err -> return $ Left err
                       Partial _ -> return $ Left "Incomplete msg definition"
 
+
+
+parseMsgWithName :: MsgName -> String -> ByteString -> Either String Msg
+parseMsgWithName name packageName msgFile =
+  case feed (parse parser msgFile) "" of
+    Done leftOver msg
+      | B.null leftOver -> Right msg
+      | otherwise -> Left $ "Couldn't parse " ++ 
+                     unpack leftOver
+    Fail _ _ctxt err -> Left err
+    Partial _ -> Left "Incomplete msg definition"
+  where
+    parser = comment *> mkParser name packageName msgFile
+
 --todo: write this
 parseSrv :: FilePath -> IO (Either String Srv)
 parseSrv fname = do srvFile <- B.readFile fname
-                    return undefined
+                    let (request, response) = splitService srvFile
+                        -- todo use correct names
+                        packageName = pkgName fname
+                        requestMsg = parseMsgWithName (msgName "request") packageName request
+                        responseMsg = parseMsgWithName (msgName "response") packageName response
+                        srv = do rqst <- requestMsg
+                                 resp <- responseMsg
+                                 return Srv{srvRequest = rqst
+                                           , srvResponse = resp
+                                           , srvName = msgName . dropExtension . takeFileName $ fname
+                                           , srvPackage = packageName
+                                           , srvSource = srvFile}
+                    -- todo, remove prints
+                    print (either id show requestMsg)
+                    print (either id show responseMsg)
+                    print (either id show srv)
+                    return srv
                     
 splitService :: ByteString -> (ByteString, ByteString)
 splitService service = (request, response) where
