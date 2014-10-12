@@ -165,21 +165,17 @@ parseMsgWithName name packageName msgFile =
 parseSrv :: FilePath -> IO (Either String Srv)
 parseSrv fname = do srvFile <- B.readFile fname
                     let (request, response) = splitService srvFile
-                        -- todo use correct names
                         packageName = pkgName fname
-                        requestMsg = parseMsgWithName (msgName "request") packageName request
-                        responseMsg = parseMsgWithName (msgName "response") packageName response
+                        rawServiceName = dropExtension . takeFileName $ fname
+                        requestMsg = parseMsgWithName (requestMsgName rawServiceName) packageName request
+                        responseMsg = parseMsgWithName (responseMsgName rawServiceName) packageName response
                         srv = do rqst <- requestMsg
                                  resp <- responseMsg
                                  return Srv{srvRequest = rqst
                                            , srvResponse = resp
-                                           , srvName = msgName . dropExtension . takeFileName $ fname
+                                           , srvName = msgName rawServiceName
                                            , srvPackage = packageName
                                            , srvSource = srvFile}
-                    -- todo, remove prints
-                    print (either id show requestMsg)
-                    print (either id show responseMsg)
-                    print (either id show srv)
                     return srv
                     
 splitService :: ByteString -> (ByteString, ByteString)

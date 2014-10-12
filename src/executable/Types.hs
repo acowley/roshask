@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- |ROS message types.
 module Types (MsgType(..), MsgField(..), MsgConst(..),
-              MsgName, msgName, shortName, rawName, fullRosMsgName,
+              MsgName, msgName, requestMsgName, responseMsgName, shortName, rawName, fullRosMsgName,
               Msg(..), hasHeader, Srv(..)) where
 import Data.ByteString.Char8 (ByteString)
 import Data.Char (toUpper)
@@ -36,6 +36,12 @@ data MsgName = MsgName { msgRawName :: String
 msgName :: String -> MsgName
 msgName [] = error "An empty message name is impossible!"
 msgName n@(x:xs) = MsgName n (toUpper x : xs)
+
+requestMsgName :: String -> MsgName
+requestMsgName name = msgName $ name ++ "Request"
+
+responseMsgName :: String -> MsgName
+responseMsgName name = msgName $ name ++ "Response"
 
 -- | Pull the Haskell type name for a message from a 'Msg'.
 shortName :: Msg -> String
