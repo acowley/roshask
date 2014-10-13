@@ -1,11 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- |ROS message types.
 module Types (MsgType(..), MsgField(..), MsgConst(..),
-              MsgName, msgName, requestMsgName, responseMsgName, shortName, rawName, fullRosMsgName,
+              MsgName, msgName, requestMsgName, responseMsgName,
+              shortName, rawName, fullRosMsgName,
+              fullRosSrvName,
               Msg(..), hasHeader, Srv(..)) where
 import Data.ByteString.Char8 (ByteString)
 import Data.Char (toUpper)
-import Data.List (intercalate)
 
 -- |A variant type describing the types that may be included in a ROS
 -- message.
@@ -58,6 +59,9 @@ rawName = msgRawName . shortTypeName
 fullRosMsgName :: Msg -> String
 fullRosMsgName m = msgPackage m ++ '/' : rawName m
 
+fullRosSrvName :: Srv -> String
+fullRosSrvName s = srvPackage s ++ '/' : (msgRawName . srvName) s
+
 -- |A message has a short name, a long name, an md5 sum, and a list of
 -- named, typed fields.
 data Msg = Msg { shortTypeName :: MsgName
@@ -67,7 +71,7 @@ data Msg = Msg { shortTypeName :: MsgName
                , constants     :: [MsgConst] }
 
 instance Show Msg where
-    show (Msg sn ln _ f c) = intercalate " " 
+    show (Msg sn ln _ f c) = unwords 
                              ["Msg", show sn, show ln, show f, show c]
 
 hasHeader :: Msg -> Bool
@@ -85,5 +89,5 @@ data Srv = Srv { srvName :: MsgName
                }
 
 instance Show Srv where
-  show (Srv name package _ req res) = intercalate " "
+  show (Srv name package _ req res) = unwords
                                       ["Srv", show name, show package, show req, show res]

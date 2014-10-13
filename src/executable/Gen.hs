@@ -1,6 +1,6 @@
 -- |Generate Haskell source files for ROS .msg types.
 {-# LANGUAGE OverloadedStrings #-}
-module Gen (generateMsgType) where
+module Gen (generateMsgType, generateSrvTypes) where
 import Control.Applicative ((<$>), (<*>))
 import Data.ByteString.Char8 (pack, ByteString)
 import qualified Data.ByteString.Char8 as B
@@ -12,8 +12,21 @@ import Instances.Binary
 import Instances.Storable
 import MD5
 
+-- | pkgMsgs is a list of all the Mesages defined in the package (can be refered to
+-- | with unqualified names)
+generateSrvTypes :: ByteString -> [ByteString] -> Srv -> MsgInfo (ByteString, ByteString)
+generateSrvTypes pkgPath pkgMsgs srv = do
+  let msgs = [srvRequest srv, srvResponse srv]
+  srvInfo <- mapM (genSrvInfo srv) msgs
+  [requestMsg, responseMsg] <- mapM (generateMsgTypeExtraImport "import Ros.Internal.Msg.SrvInfo\n" pkgPath pkgMsgs) msgs
+  let [requestType, responseType] = zipWith B.append [requestMsg, responseMsg] srvInfo
+  return (requestType, responseType)
+
 generateMsgType :: ByteString -> [ByteString] -> Msg -> MsgInfo ByteString
-generateMsgType pkgPath pkgMsgs msg =
+generateMsgType = generateMsgTypeExtraImport ""
+
+generateMsgTypeExtraImport :: ByteString -> ByteString -> [ByteString] -> Msg -> MsgInfo ByteString
+generateMsgTypeExtraImport extraImport pkgPath pkgMsgs msg =
   do (fDecls, binInst, st, cons) <- withMsg msg $
                                     (,,,) <$> mapM generateField (fields msg)
                                           <*> genBinaryInstance msg
@@ -52,6 +65,7 @@ generateMsgType pkgPath pkgMsgs msg =
                               "import Ros.Internal.Msg.MsgInfo\n",
                               "import qualified GHC.Generics as G\n",
                               "import qualified Data.Default.Generics as D\n",
+                              extraImport,
                               genImports pkgPath pkgMsgs 
                                          (map fieldType (fields msg))]
                               --nfImport]
@@ -74,13 +88,19 @@ genHasHeader m =
     else ""
 
 genDefault :: Msg -> ByteString
-genDefault m = B.concat["instance D.Default ", pack (shortName m), "\n"]
+genDefault m = B.concat["instance D.Default ", pack (shortName m), "\n\n"]
 
 genHasHash :: Msg -> MsgInfo ByteString
 genHasHash m = msgMD5 m >>= return . aux
   where aux md5 = B.concat ["instance MsgInfo ", pack (shortName m),
                             " where\n  sourceMD5 _ = \"", pack md5,
                             "\"\n  msgTypeName _ = \"", pack (fullRosMsgName m),
+                            "\"\n\n"]
+genSrvInfo :: Srv -> Msg -> MsgInfo ByteString
+genSrvInfo s m = srvMD5 s >>= return .aux
+  where aux md5 = B.concat ["instance SrvInfo ", pack (shortName m),
+                            " where\n  srvMD5 _ = \"", pack md5,
+                            "\"\n  srvTypeName _ = \"", pack (fullRosSrvName s),
                             "\"\n\n"]
 
 generateField :: MsgField -> MsgInfo ByteString
@@ -96,6 +116,6 @@ genConstants = fmap B.concat . mapM buildLine . constants
           escapeQuotes _       x = x
           buildLine (MsgConst name rosType val _) = 
               do t <- hType <$> getTypeInfo rosType
-                 return $ B.concat [ "\n",name, " :: ", t, "\n"
+                 return $ B.concat [ name, " :: ", t, "\n"
                                    , name, " = "
-                                   , escapeQuotes rosType val, "\n"]
+                                   , escapeQuotes rosType val, "\n\n"]

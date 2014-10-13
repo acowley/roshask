@@ -7,7 +7,7 @@ import Control.Monad.IO.Class
 import Control.Monad.State (evalStateT)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as M
-import Gen (generateMsgType)
+import Gen (generateMsgType, generateSrvTypes)
 import MD5 (msgMD5, srvMD5)
 import Parse (parseMsg, parseSrv)
 import ResolutionTypes (emptyMsgContext, alterPkgMap, MsgInfo)
@@ -15,6 +15,7 @@ import Ros.Internal.DepFinder (findMessages)
 import System.FilePath ((</>), dropExtension, takeFileName)
 import Test.Tasty
 import Test.Tasty.HUnit
+import Types(srvRequest, srvResponse)
 
 -- CONSTANTS
 
@@ -50,13 +51,27 @@ prepMsgGen = do cachePkg "Tests/std_msgs"
 -- | The third argument is a list of paths to the golden Haskell file
 -- | Precondition: cachePkg has been called
 testGeneratedHaskell :: B.ByteString -> [FilePath] -> [FilePath] -> [B.ByteString] -> MsgInfo TestTree
-testGeneratedHaskell packagePath msgPaths haskellPaths moduleNames =
+testGeneratedHaskell packagePath msgPaths haskellPaths pkgMsgs =
   do msgs <- liftIO $ mapM (fmap (either error id) . parseMsg) msgPaths
      golds <- liftIO $ mapM B.readFile haskellPaths
      mapM_ addMsg msgs
-     gens <- mapM (generateMsgType packagePath moduleNames) msgs
+     gens <- mapM (generateMsgType packagePath pkgMsgs) msgs
      return $ testGroup "Generated Haskell" $ zipWith3
-       (\name gold gen -> testCase (B.unpack name) $ gold @=? gen) moduleNames golds gens
+       (\name gold gen -> testCase name $ gold @=? gen) msgPaths golds gens
+
+-- | moduleNames is a list of the other messages in the package
+testGeneratedService :: B.ByteString -> FilePath -> FilePath -> FilePath -> [B.ByteString] -> MsgInfo TestTree
+testGeneratedService packagePath srvPath requestGolden responseGolden pkgMsgs =
+  do srv <- liftIO $
+            either error id <$> parseSrv srvPath
+     golds <- liftIO $ mapM B.readFile [requestGolden, responseGolden]
+     let requestMsg = srvRequest srv
+         responseMsg = srvResponse srv
+     mapM_ addMsg [requestMsg, responseMsg]
+     (request, response) <- generateSrvTypes packagePath pkgMsgs srv
+     return $ testGroup "Generated Haskell" $ zipWith3
+       (\name gold gen -> testCase name $ gold @=? gen) [srvPath ++" request", srvPath++" response"] golds [request, response]
+     
 
 -- | Precondition: cachePkg has been called
 testMD5 :: FilePath -> String -> MsgInfo TestTree
@@ -113,6 +128,17 @@ addTwoIntsServiceMD5 = do
     file = "Tests/test_srvs/srv/AddTwoInts.srv"
     md5 = "6a2e34150c00229791cc89ff309fff21"
 
+addTwoIntsGen :: MsgInfo TestTree
+addTwoIntsGen = do
+  cachePkg testDir
+  genTests <- testGeneratedService "Ros.Test_srvs." srvFile requestFile responseFile []
+  return $ testGroup "Services" [genTests]
+  where
+    testDir = "Tests/test_srvs"
+    srvFile = "Tests/test_srvs/srv/AddTwoInts.srv"
+    requestFile = "Tests/test_srvs/golden/AddTwoIntsRequest.hs"
+    responseFile = "Tests/test_srvs/golden/AddTwoIntsResponse.hs"
+
 -- | ROOT TEST
 
 -- | Tests for message generation.
@@ -123,5 +149,6 @@ tests =
               do prepMsgGen
                  sequence [testActionMsgs
                           , testStringMsg
-                          , addTwoIntsServiceMD5]
+                          , addTwoIntsServiceMD5
+                          , addTwoIntsGen]
      return testList

@@ -3,7 +3,7 @@ dist
 *.hi
 .hsenv_roshask
 dist_roshask
-
+*.*~
 
 /.vagrant/
 /Examples/PubSub/bin/
