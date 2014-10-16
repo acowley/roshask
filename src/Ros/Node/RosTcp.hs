@@ -12,15 +12,20 @@ import Data.Binary.Get (runGet, getWord32le)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+
 import Network.BSD (getHostByName, hostAddress)
 import Network.Socket hiding (send, sendTo, recv, recvFrom, Stream, ServiceName)
 import qualified Network.Socket as Sock
 import Network.Socket.ByteString
+import qualified Network.Socket.ByteString.Lazy as BSL
+import Prelude hiding (getContents)
+
 import System.IO (IOMode(ReadMode))
 import Text.URI (parseURI, uriRegName, uriPort)
 
 import Ros.Node.BinaryIter (streamIn)
 import Ros.Internal.Msg.MsgInfo
+import Ros.Internal.Msg.SrvInfo
 import Ros.Internal.RosBinary
 import Ros.Internal.RosTypes
 import Ros.Internal.Util.RingChan
@@ -39,6 +44,14 @@ serviceClient c s = forever $ do bs <- readChan c
                                            putWord32le . fromIntegral $ 
                                            BL.length bs
                                  sendAll s (BL.toStrict $ BL.append len bs)
+
+sendBS :: Socket -> ByteString -> IO ()
+sendBS sock bs =
+  let len = runPut $ 
+            putWord32le . fromIntegral $ 
+            BL.length bs
+  in
+   sendAll sock (BL.toStrict $ BL.append len bs)
 
 recvAll :: Socket -> Int -> IO B.ByteString
 recvAll s = flip go []
@@ -188,7 +201,9 @@ parsePort target = case parseURI target of
             (uriPort u)
   Nothing -> error $ "Couldn't parse URI "++target
 
-callService :: (RosBinary a, MsgInfo a) => URI -> ServiceName -> a -> IO b
+--TODO: use SrvInfo instead of MsgInfo
+--TODO: return the answer
+callService :: (RosBinary a, SrvInfo a) => URI -> ServiceName -> a -> IO b
 --callService :: URI -> ServiceName -> t -> IO ()
 --callService :: URI -> ServiceName -> a -> IO b
 callService rosMaster serviceName message = do
@@ -202,9 +217,14 @@ callService rosMaster serviceName message = do
   let port = fromIntegral $ parsePort serviceUrl
   connect sock $ SockAddrInet port ip
   let
-    md5 = sourceMD5 message
-    serviceType = msgTypeName message
+    md5 = srvMD5 message
+    serviceType = srvTypeName message
   negotiateService sock serviceName serviceType md5
+  let
+    bytes = runPut $ putMsg 0 message
+  --TODO: should this be lazy or strict?
+  --BSL.sendAll sock bytes
+  sendBS sock bytes
   close sock
   return (undefined :: b)
     where
