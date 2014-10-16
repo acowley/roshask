@@ -1,7 +1,7 @@
 -- |Binary iteratee-style serialization helpers for working with ROS
 -- message types. This module is used by the automatically-generated
 -- code for ROS .msg types.
-module Ros.Node.BinaryIter (streamIn) where
+module Ros.Node.BinaryIter (streamIn, getServiceResult) where
 import Control.Applicative
 import Control.Concurrent (myThreadId, killThread)
 import Control.Monad.IO.Class
@@ -38,3 +38,12 @@ streamIn h = Topic go
 
 getInt :: Get Int
 getInt = fromIntegral <$> getWord32le
+
+-- Get the result back from a service call (called by the service client)
+-- TODO: read the okByte and handle the possible error message
+-- (see http://wiki.ros.org/ROS/TCPROS)
+getServiceResult :: RosBinary a => Handle -> IO (Maybe a)
+getServiceResult h = runMaybeT $ do
+  okByte <- runGet getInt <$> hGetAll h 1
+  len <- runGet getInt <$> hGetAll h 4
+  runGet get <$> hGetAll h len

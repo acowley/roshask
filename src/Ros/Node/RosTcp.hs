@@ -20,10 +20,10 @@ import Network.Socket.ByteString
 import qualified Network.Socket.ByteString.Lazy as BSL
 import Prelude hiding (getContents)
 
-import System.IO (IOMode(ReadMode))
+import System.IO (IOMode(ReadMode), hClose)
 import Text.URI (parseURI, uriRegName, uriPort)
 
-import Ros.Node.BinaryIter (streamIn)
+import Ros.Node.BinaryIter (streamIn, getServiceResult)
 import Ros.Internal.Msg.MsgInfo
 import Ros.Internal.Msg.SrvInfo
 import Ros.Internal.RosBinary
@@ -201,9 +201,8 @@ parsePort target = case parseURI target of
             (uriPort u)
   Nothing -> error $ "Couldn't parse URI "++target
 
---TODO: use SrvInfo instead of MsgInfo
 --TODO: return the answer
-callService :: (RosBinary a, SrvInfo a) => URI -> ServiceName -> a -> IO b
+callService :: (RosBinary a, SrvInfo a, RosBinary b) => URI -> ServiceName -> a -> IO (Maybe b)
 --callService :: URI -> ServiceName -> t -> IO ()
 --callService :: URI -> ServiceName -> a -> IO b
 callService rosMaster serviceName message = do
@@ -222,11 +221,11 @@ callService rosMaster serviceName message = do
   negotiateService sock serviceName serviceType md5
   let
     bytes = runPut $ putMsg 0 message
-  --TODO: should this be lazy or strict?
-  --BSL.sendAll sock bytes
   sendBS sock bytes
-  close sock
-  return (undefined :: b)
+  handle <- socketToHandle sock ReadMode
+  result <- getServiceResult handle
+  hClose handle
+  return result
     where
       --TODO: use the correct callerID
       callerID = "roshask"
