@@ -5,6 +5,14 @@ import Ros.Node.RosTcp (callService)
 import Ros.Internal.RosBinary
 
 
+-- To run:
+-- 0. Install roshask
+-- 1. start ros, run "roscore"
+-- 2. in another terminal start the add_two_ints server:
+--      "roscd rospy_tutorials"
+--      "python 005_add_two_ints/add_two_ints_server"
+--3. in roshask/Tests/ServiceClientTests run
+--      "runhaskell ServiceClientTest.hs"
 main :: IO ()
 main = clientTest
 

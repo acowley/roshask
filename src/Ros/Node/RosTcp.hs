@@ -17,7 +17,6 @@ import Network.BSD (getHostByName, hostAddress)
 import Network.Socket hiding (send, sendTo, recv, recvFrom, Stream, ServiceName)
 import qualified Network.Socket as Sock
 import Network.Socket.ByteString
-import qualified Network.Socket.ByteString.Lazy as BSL
 import Prelude hiding (getContents)
 
 import System.IO (IOMode(ReadMode), hClose)
@@ -207,6 +206,7 @@ callService :: (RosBinary a, SrvInfo a, RosBinary b) => URI -> ServiceName -> a 
 --callService :: URI -> ServiceName -> a -> IO b
 callService rosMaster serviceName message = do
   --lookup the service with the master
+  -- TODO: look at the code and status message
   (code, statusMessage, serviceUrl) <- lookupService rosMaster callerID serviceName
   -- make a socket
   sock <- socket AF_INET Sock.Stream defaultProtocol
@@ -232,16 +232,17 @@ callService rosMaster serviceName message = do
 
 -- Precondition: The socket is already connected to the server
 -- Exchange ROSTCP connection headers with the server
---negotiateService :: t -> t1 -> a
+-- todo: check the recieved header
 negotiateService :: Socket -> String -> String -> String -> IO ()
 negotiateService sock serviceName serviceType md5 =
     do sendAll sock $ genHeader [ ("callerid", "roshask"), ("service", serviceName)
                                 , ("md5sum", md5), ("type", serviceType) ]
-       responseLength <- runGet (fromIntegral <$> getWord32le) <$>
-                         BL.fromChunks . (:[]) <$> recvAll sock 4
-       headerBytes <- recvAll sock responseLength
-       let connHeader = parseHeader headerBytes
-       print connHeader
+--       responseLength <- runGet (fromIntegral <$> getWord32le) <$>
+--                         BL.fromChunks . (:[]) <$> recvAll sock 4
+--       headerBytes <- recvAll sock responseLength
+--       let connHeader = parseHeader headerBytes
+--       print connHeader
+       return ()
                                     
 -- Helper to run the publisher's side of a topic negotiation with a
 -- new client.
@@ -319,10 +320,3 @@ runServers = return . first sequence_ . unzip <=< mapM feed
   where feed (Feeder (MsgInfoRcd md5 typeName) bufSize stats push) = 
           let pub = negotiatePub typeName md5
           in runServerAux pub push stats bufSize
-{-
-main = serviceTest
-
-serviceTest = callService rosMast "/spawn" (I.Int64 0)
-  where
-    rosMast = "http://localhost:11311/"
--}
