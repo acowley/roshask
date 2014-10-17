@@ -201,7 +201,7 @@ parsePort target = case parseURI target of
             (uriPort u)
   Nothing -> error $ "Couldn't parse URI "++target
 
---TODO: return the answer
+--TODO: return the answer, account for the OK byte
 callService :: (RosBinary a, SrvInfo a, RosBinary b) => URI -> ServiceName -> a -> IO (Maybe b)
 --callService :: URI -> ServiceName -> t -> IO ()
 --callService :: URI -> ServiceName -> a -> IO b
