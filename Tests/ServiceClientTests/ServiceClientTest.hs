@@ -2,23 +2,24 @@
 import Ros.Test_srvs.AddTwoIntsRequest
 import Ros.Test_srvs.AddTwoIntsResponse
 import Ros.Node.RosTcp (callService)
-import Ros.Internal.RosBinary
-
+import Test.Tasty
+import Test.Tasty.HUnit
+import GHC.Int
 
 -- To run:
--- 0. Install roshask
--- 1. start ros, run "roscore"
+-- 1. start ros: run "roscore" (you may need to edit "rosMaster" match $ROS_MASTER_URI)"
 -- 2. in another terminal start the add_two_ints server:
---      "roscd rospy_tutorials"
---      "python 005_add_two_ints/add_two_ints_server"
---3. in roshask/Tests/ServiceClientTests run
---      "runhaskell ServiceClientTest.hs"
-main :: IO ()
-main = clientTest
+--      python roshask/Tests/ServiceClientTests/add_two_ints_server.py
+-- 3. run
+--      cabal test servicetest --show-details=always
 
-clientTest :: IO ()
-clientTest = do res <- (callService rosMast "/add_two_ints" (AddTwoIntsRequest{a= 42, b= 9})) :: IO (Maybe AddTwoIntsResponse)
-                case res of Nothing -> putStrLn "No result"
-                            Just item -> print res
-  where
-    rosMast = "http://localhost:11311/"
+rosMaster :: String
+rosMaster = "http://localhost:11311/"
+
+main :: IO ()
+main = defaultMain $ testGroup "Service Tests" [addIntsTest 4 7]
+
+addIntsTest :: GHC.Int.Int64 -> GHC.Int.Int64 -> TestTree
+addIntsTest x y = testCase ("add_two_ints, add " ++ show x ++ " + " ++ show y) $
+  do res <- callService rosMaster "/add_two_ints" AddTwoIntsRequest{a=x, b=y} :: IO (Maybe AddTwoIntsResponse)
+     Just (AddTwoIntsResponse (x + y)) @?= res
