@@ -237,9 +237,9 @@ negotiateService :: Socket -> String -> String -> String -> IO ()
 negotiateService sock serviceName serviceType md5 =
     do sendAll sock $ genHeader [ ("callerid", "roshask"), ("service", serviceName)
                                 , ("md5sum", md5), ("type", serviceType) ]
---       responseLength <- runGet (fromIntegral <$> getWord32le) <$>
---                         BL.fromChunks . (:[]) <$> recvAll sock 4
---       headerBytes <- recvAll sock responseLength
+       responseLength <- runGet (fromIntegral <$> getWord32le) <$>
+                         BL.fromChunks . (:[]) <$> recvAll sock 4
+       headerBytes <- recvAll sock responseLength
 --       let connHeader = parseHeader headerBytes
 --       print connHeader
        return ()
