@@ -10,7 +10,7 @@ import GHC.Int
 -- 1. start ros: run "roscore" (you may need to edit "rosMaster" match $ROS_MASTER_URI)"
 -- 2. in another terminal start the add_two_ints server:
 --      python roshask/Tests/ServiceClientTests/add_two_ints_server.py
--- 3. run
+-- 3. in a new terminal run
 --      cabal test servicetest --show-details=always
 
 rosMaster :: String
