@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
-module Ros.Node.RosTcp (subStream, runServer, runServers, callService) where
+module Ros.Node.RosTcp (subStream, runServer, runServers, callServiceWithMaster) where
 import Control.Applicative ((<$>))
 import Control.Arrow (first)
 import Control.Concurrent (forkIO, killThread, newEmptyMVar, takeMVar, putMVar)
@@ -198,11 +198,9 @@ parsePort target = case parseURI target of
   Nothing -> error $ "Couldn't parse URI "++target
 
 --TODO: Handle error cases, account for the OK byte
---TODO: make a wrapper that looks up the ROS Master
---TODO: don't put the user callable function in Ros.Node since non-ROS nodes can be service clients
 --TODO: check that the SrvInfo for request and response types match
-callService :: (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => URI -> ServiceName -> a -> IO (Maybe b)
-callService rosMaster serviceName message = do
+callServiceWithMaster :: (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => URI -> ServiceName -> a -> IO (Maybe b)
+callServiceWithMaster rosMaster serviceName message = do
   --lookup the service with the master
   -- TODO: look at the code and status message
   (code, statusMessage, serviceUrl) <- lookupService rosMaster callerID serviceName
