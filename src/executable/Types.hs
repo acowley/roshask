@@ -89,5 +89,5 @@ data Srv = Srv { srvName :: MsgName
                }
 
 instance Show Srv where
-  show (Srv name package _ req res) = unwords
-                                      ["Srv", show name, show package, show req, show res]
+  show (Srv name package _ req res) =
+    unwords ["Srv", show name, show package, show req, show res]

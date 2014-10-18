@@ -32,7 +32,7 @@ parseName = skipSpace *> identifier <* eatLine <* try comment
 
 identifier :: Parser ByteString
 identifier = B.cons <$> letter_ascii <*> takeWhile validChar
-    where validChar c = or (map ($ c) [isDigit, isAlpha_ascii, (== '_'), (== '/')])
+    where validChar c = any ($ c) [isDigit, isAlpha_ascii, (== '_'), (== '/')]
 
 parseInt :: Parser Int
 parseInt = foldl' (\s x -> s*10 + digitToInt x) 0 <$> many1 digit
@@ -97,7 +97,7 @@ fieldParsers :: [Parser (Either (ByteString, MsgType)
 fieldParsers = map (comment *>) $
                map (Right . sanitizeConstants <$>) constParsers ++ 
                map (Left <$>) (builtIns ++ [userTypeParser])
-    where builtIns = concatMap (flip map simpleFieldAssoc)
+    where builtIns = concatMap (`map` simpleFieldAssoc)
                                [simpleParser, fixedArrayParser, varArrayParser]
 
 mkParser :: MsgName -> String -> ByteString -> Parser Msg

@@ -18,8 +18,9 @@ generateSrvTypes :: ByteString -> [ByteString] -> Srv -> MsgInfo (ByteString, By
 generateSrvTypes pkgPath pkgMsgs srv = do
   let msgs = [srvRequest srv, srvResponse srv]
   srvInfo <- mapM (genSrvInfo srv) msgs
-  [requestMsg, responseMsg] <- mapM (generateMsgTypeExtraImport "import Ros.Internal.Msg.SrvInfo\n" pkgPath pkgMsgs) msgs
-  let [requestType, responseType] = zipWith B.append [requestMsg, responseMsg] srvInfo
+  requestResponseMsgs <-
+    mapM (generateMsgTypeExtraImport "import Ros.Internal.Msg.SrvInfo\n" pkgPath pkgMsgs) msgs
+  let [requestType, responseType] = zipWith B.append requestResponseMsgs srvInfo
   return (requestType, responseType)
 
 generateMsgType :: ByteString -> [ByteString] -> Msg -> MsgInfo ByteString
@@ -91,13 +92,13 @@ genDefault :: Msg -> ByteString
 genDefault m = B.concat["instance D.Default ", pack (shortName m), "\n\n"]
 
 genHasHash :: Msg -> MsgInfo ByteString
-genHasHash m = msgMD5 m >>= return . aux
+genHasHash m = fmap aux (msgMD5 m)
   where aux md5 = B.concat ["instance MsgInfo ", pack (shortName m),
                             " where\n  sourceMD5 _ = \"", pack md5,
                             "\"\n  msgTypeName _ = \"", pack (fullRosMsgName m),
                             "\"\n\n"]
 genSrvInfo :: Srv -> Msg -> MsgInfo ByteString
-genSrvInfo s m = srvMD5 s >>= return .aux
+genSrvInfo s m = fmap aux (srvMD5 s)
   where aux md5 = B.concat ["instance SrvInfo ", pack (shortName m),
                             " where\n  srvMD5 _ = \"", pack md5,
                             "\"\n  srvTypeName _ = \"", pack (fullRosSrvName s),

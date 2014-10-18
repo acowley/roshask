@@ -1,4 +1,4 @@
---import qualified Ros.Msg.Int64 as I
+module ServiceClientTest where
 import Ros.Test_srvs.AddTwoIntsRequest
 import Ros.Test_srvs.AddTwoIntsResponse
 import Ros.Node.RosTcp (callService)

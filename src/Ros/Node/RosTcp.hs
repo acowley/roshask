@@ -39,10 +39,7 @@ import Data.Maybe (fromMaybe)
 -- socket.
 serviceClient :: RingChan ByteString -> Socket -> IO ()
 serviceClient c s = forever $ do bs <- readChan c
-                                 let len = runPut $ 
-                                           putWord32le . fromIntegral $ 
-                                           BL.length bs
-                                 sendAll s (BL.toStrict $ BL.append len bs)
+                                 sendBS s bs
 
 sendBS :: Socket -> ByteString -> IO ()
 sendBS sock bs =
@@ -200,10 +197,11 @@ parsePort target = case parseURI target of
             (uriPort u)
   Nothing -> error $ "Couldn't parse URI "++target
 
---TODO: return the answer, account for the OK byte
-callService :: (RosBinary a, SrvInfo a, RosBinary b) => URI -> ServiceName -> a -> IO (Maybe b)
---callService :: URI -> ServiceName -> t -> IO ()
---callService :: URI -> ServiceName -> a -> IO b
+--TODO: Handle error cases, account for the OK byte
+--TODO: make a wrapper that looks up the ROS Master
+--TODO: don't put the user callable function in Ros.Node since non-ROS nodes can be service clients
+--TODO: check that the SrvInfo for request and response types match
+callService :: (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => URI -> ServiceName -> a -> IO (Maybe b)
 callService rosMaster serviceName message = do
   --lookup the service with the master
   -- TODO: look at the code and status message
