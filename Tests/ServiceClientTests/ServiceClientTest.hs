@@ -1,4 +1,4 @@
-module ServiceClientTest where
+module Main where
 import Ros.Test_srvs.AddTwoIntsRequest
 import Ros.Test_srvs.AddTwoIntsResponse
 import Ros.Node.RosTcp (callService)
