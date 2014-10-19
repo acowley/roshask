@@ -34,6 +34,7 @@ import Ros.Node.ConnectionHeader
 import Ros.Graph.Slave (requestTopicClient)
 import Ros.Graph.Master (lookupService)
 import Data.Maybe (fromMaybe)
+import Ros.Service.ServiceTypes(ServiceResponseError)
 
 -- |Push each item from this client's buffer over the connected
 -- socket.
@@ -199,7 +200,7 @@ parsePort target = case parseURI target of
 
 --TODO: Handle error cases, account for the OK byte
 --TODO: check that the SrvInfo for request and response types match
-callServiceWithMaster :: (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => URI -> ServiceName -> a -> IO (Maybe b)
+callServiceWithMaster :: (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => URI -> ServiceName -> a -> IO (Either ServiceResponseError b)
 callServiceWithMaster rosMaster serviceName message = do
   --lookup the service with the master
   -- TODO: look at the code and status message

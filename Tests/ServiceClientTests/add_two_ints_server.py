@@ -46,7 +46,10 @@ import rospy
 
 def add_two_ints(req):
     print "Returning [%s + %s = %s]"%(req.a, req.b, (req.a + req.b))
-    return AddTwoIntsResponse(req.a + req.b)
+    if (req.a == 100 and req.b == 100):
+        return None
+    else:
+        return AddTwoIntsResponse(req.a + req.b)
 
 def add_two_ints_server():
     rospy.init_node(NAME)

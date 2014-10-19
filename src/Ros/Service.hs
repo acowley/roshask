@@ -5,8 +5,12 @@ import Ros.Node.RosTcp(callServiceWithMaster)
 import Ros.Internal.RosTypes
 import Ros.Internal.RosBinary
 import Ros.Internal.Msg.SrvInfo
+import Ros.Service.ServiceTypes
 
-callService :: (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => ServiceName -> a -> IO (Maybe b)
+
+--type NotOkError = String
+
+callService :: (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => ServiceName -> a -> IO (Either ServiceResponseError b)
 callService name req =
   do
     env <- getEnvironment
