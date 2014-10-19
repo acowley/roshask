@@ -198,10 +198,10 @@ parsePort target = case parseURI target of
             (uriPort u)
   Nothing -> error $ "Couldn't parse URI "++target
 
---TODO: Handle error cases, account for the OK byte
---TODO: check that the SrvInfo for request and response types match
-callServiceWithMaster :: (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => URI -> ServiceName -> a -> IO (Either ServiceResponseError b)
+--TODO: Handle error cases
+callServiceWithMaster :: forall a b. (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => URI -> ServiceName -> a -> IO (Either ServiceResponseError b)
 callServiceWithMaster rosMaster serviceName message = do
+  checkServicesMatch message (undefined::b)
   --lookup the service with the master
   -- TODO: look at the code and status message
   (code, statusMessage, serviceUrl) <- lookupService rosMaster callerID serviceName
@@ -213,9 +213,9 @@ callServiceWithMaster rosMaster serviceName message = do
   let port = fromIntegral $ parsePort serviceUrl
   connect sock $ SockAddrInet port ip
   let
-    md5 = srvMD5 message
-    serviceType = srvTypeName message
-  negotiateService sock serviceName serviceType md5
+    reqMd5 = srvMD5 message
+    reqServiceType = srvTypeName message
+  negotiateService sock serviceName reqServiceType reqMd5
   let
     bytes = runPut $ putMsg 0 message
   sendBS sock bytes
@@ -226,6 +226,10 @@ callServiceWithMaster rosMaster serviceName message = do
     where
       --TODO: use the correct callerID
       callerID = "roshask"
+      checkServicesMatch x y =
+        if not match then error "Request and response type do not match" else return ()
+        where
+          match = (srvMD5 x == srvMD5 y && srvTypeName x == srvTypeName y)
 
 -- Precondition: The socket is already connected to the server
 -- Exchange ROSTCP connection headers with the server
