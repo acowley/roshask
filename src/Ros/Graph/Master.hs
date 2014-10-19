@@ -46,13 +46,13 @@ unregisterPublisher = flip remote "unregisterPublisher"
 -- | ROS API: lookupService(caller_id, service)
 -- Lookup provider of a particular service.
 -- Parameters
--- caller_id (str)
--- ROS caller ID
--- service (str)
--- Fully-qualified name of service
+--  caller_id (str)
+--   ROS caller ID
+--  service (str)
+--   Fully-qualified name of service
 -- Returns (int, str, str)
--- (code, statusMessage, serviceUrl)
--- service URL is provides address and port of the service. Fails if there is no provider.
+--  (code, statusMessage, serviceUrl)
+-- service URL provides address and port of the service. Fails if there is no provider.
 lookupService :: URI -> String -> ServiceName -> IO(Int, String, String)
 lookupService = flip remote "lookupService"
 

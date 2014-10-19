@@ -44,8 +44,8 @@ getInt = fromIntegral <$> getWord32le
 
 -- | Get the result back from a service call (called by the service client)
 -- (see http://wiki.ros.org/ROS/TCPROS)
-getServiceResult :: RosBinary a => Handle -> IO (Either ServiceResponseError  a)
-getServiceResult h = runErrorT $ do
+getServiceResult :: RosBinary a => Handle ->  ErrorT ServiceResponseError IO a
+getServiceResult h = do
   okByte <- runGet getWord8 <$> hGetAllET h 1 (ResponseReadError "Could not read okByte")
   case okByte of
     --0 -> ErrorT . return . Left . NotOkError $ ""

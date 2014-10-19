@@ -23,7 +23,8 @@ import Test.HUnit.Tools
 main :: IO ()
 main = defaultMain $ testGroup "Service Tests" [addIntsTest 4 7
                                                , notOkTest 100 100
-                                               , requestResponseDontMatchTest]
+                                               , requestResponseDontMatchTest
+                                               , noProviderTest]
 
 addIntsTest :: GHC.Int.Int64 -> GHC.Int.Int64 -> TestTree
 addIntsTest x y = testCase ("add_two_ints, add " ++ show x ++ " + " ++ show y) $
@@ -32,9 +33,18 @@ addIntsTest x y = testCase ("add_two_ints, add " ++ show x ++ " + " ++ show y) $
 
 -- add_two_ints_server returns None (triggering the NotOkError) if both a and b are 100
 notOkTest :: GHC.Int.Int64 -> GHC.Int.Int64 -> TestTree
-notOkTest x y = testCase ("add_two_ints, add " ++ show x ++ " + " ++ show y) $
+notOkTest x y = testCase ("NotOKError, add_two_ints, add " ++ show x ++ " + " ++ show y) $
   do res <- callService "/add_two_ints" Req.AddTwoIntsRequest{Req.a=x, Req.b=y} :: IO (Either ServiceResponseError Res.AddTwoIntsResponse)
      Left (NotOkError "service cannot process request: service handler returned None") @=? res
+
+-- tests that an error is returned if the server is not registered with the master
+noProviderTest :: TestTree
+noProviderTest = testCase ("service not registered error") $
+  do res <- callService "/not_add_two_ints" Req.AddTwoIntsRequest{Req.a=x, Req.b=y} :: IO (Either ServiceResponseError Res.AddTwoIntsResponse)
+     Left (MasterError "lookupService failed, code: -1, statusMessage: no provider") @=? res
+  where
+    x = 10
+    y = 10
 
 
 requestResponseDontMatchTest :: TestTree

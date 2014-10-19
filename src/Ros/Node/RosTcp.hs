@@ -34,7 +34,8 @@ import Ros.Node.ConnectionHeader
 import Ros.Graph.Slave (requestTopicClient)
 import Ros.Graph.Master (lookupService)
 import Data.Maybe (fromMaybe)
-import Ros.Service.ServiceTypes(ServiceResponseError)
+import Ros.Service.ServiceTypes
+import Control.Monad.Error
 
 -- |Push each item from this client's buffer over the connected
 -- socket.
@@ -200,32 +201,38 @@ parsePort target = case parseURI target of
 
 --TODO: Handle error cases
 callServiceWithMaster :: forall a b. (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => URI -> ServiceName -> a -> IO (Either ServiceResponseError b)
-callServiceWithMaster rosMaster serviceName message = do
+callServiceWithMaster rosMaster serviceName message = runErrorT $ do
   checkServicesMatch message (undefined::b)
   --lookup the service with the master
   -- TODO: look at the code and status message
-  (code, statusMessage, serviceUrl) <- lookupService rosMaster callerID serviceName
+  (code, statusMessage, serviceUrl) <- liftIO $ lookupService rosMaster callerID serviceName
+  checkLookupServiceCode code statusMessage
+  --print (code, statusMessage, serviceUrl)
   -- make a socket
-  sock <- socket AF_INET Sock.Stream defaultProtocol
-  -- connect to the socket
-  let host = parseHost serviceUrl
-  ip <- hostAddress <$> getHostByName host
-  let port = fromIntegral $ parsePort serviceUrl
-  connect sock $ SockAddrInet port ip
-  let
-    reqMd5 = srvMD5 message
-    reqServiceType = srvTypeName message
-  negotiateService sock serviceName reqServiceType reqMd5
-  let
-    bytes = runPut $ putMsg 0 message
-  sendBS sock bytes
-  handle <- socketToHandle sock ReadMode
+  handle <- liftIO $ do
+    sock <- socket AF_INET Sock.Stream defaultProtocol
+    -- connect to the socket
+    let host = parseHost serviceUrl
+    ip <- hostAddress <$> getHostByName host
+    let port = fromIntegral $ parsePort serviceUrl
+    connect sock $ SockAddrInet port ip
+    let
+      reqMd5 = srvMD5 message
+      reqServiceType = srvTypeName message
+    negotiateService sock serviceName reqServiceType reqMd5
+    let
+      bytes = runPut $ putMsg 0 message
+    sendBS sock bytes
+    socketToHandle sock ReadMode
   result <- getServiceResult handle
-  hClose handle
+  liftIO $ hClose handle
   return result
     where
       --TODO: use the correct callerID
       callerID = "roshask"
+      checkLookupServiceCode 1 _ = return ()
+      checkLookupServiceCode code statusMessage =
+        ErrorT. return . Left $ MasterError ("lookupService failed, code: " ++ show code ++ ", statusMessage: " ++ statusMessage)
       checkServicesMatch x y =
         if not match then error "Request and response type do not match" else return ()
         where
