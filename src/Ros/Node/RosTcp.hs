@@ -199,7 +199,7 @@ parsePort target = case parseURI target of
             (uriPort u)
   Nothing -> error $ "Couldn't parse URI "++target
 
---TODO: Check if the socket is left open when there is an error. Would this be bad?
+--TODO: use the correct callerID
 callServiceWithMaster :: forall a b. (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => URI -> ServiceName -> a -> IO (Either ServiceResponseError b)
 callServiceWithMaster rosMaster serviceName message = runErrorT $ do
   checkServicesMatch message (undefined::b)
@@ -228,7 +228,6 @@ callServiceWithMaster rosMaster serviceName message = runErrorT $ do
   liftIO $ hClose handle
   return result
     where
-      --TODO: use the correct callerID
       callerID = "roshask"
       checkLookupServiceCode 1 _ = return ()
       checkLookupServiceCode code statusMessage =
@@ -240,7 +239,6 @@ callServiceWithMaster rosMaster serviceName message = runErrorT $ do
 
 -- Precondition: The socket is already connected to the server
 -- Exchange ROSTCP connection headers with the server
--- todo: check the recieved header
 negotiateService :: Socket -> String -> String -> String -> ErrorT ServiceResponseError IO ()
 negotiateService sock serviceName serviceType md5 = do
     headerBytes <- liftIO $
@@ -252,7 +250,8 @@ negotiateService sock serviceName serviceType md5 = do
     let connHeader = parseHeader headerBytes
     case lookup "error" connHeader of
       Nothing -> return ()
-      Just _ -> throwError . ConHeadError $ "Connection header from server has error, connection header is: " ++ show connHeader
+      Just _ -> throwError . ConHeadError $
+                "Connection header from server has error, connection header is: " ++ show connHeader
                                     
 -- Helper to run the publisher's side of a topic negotiation with a
 -- new client.
