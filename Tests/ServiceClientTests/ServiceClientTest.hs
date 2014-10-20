@@ -24,7 +24,8 @@ main :: IO ()
 main = defaultMain $ testGroup "Service Tests" [addIntsTest 4 7
                                                , notOkTest 100 100
                                                , requestResponseDontMatchTest
-                                               , noProviderTest]
+                                               , noProviderTest
+                                               , connectionHeaderBadMD5Test]
 
 addIntsTest :: GHC.Int.Int64 -> GHC.Int.Int64 -> TestTree
 addIntsTest x y = testCase ("add_two_ints, add " ++ show x ++ " + " ++ show y) $
@@ -54,23 +55,26 @@ requestResponseDontMatchTest =
     testMd5 = testCase ("check md5") $ do
       assertRaises "Failed to detect mismatch"
         (ErrorCall "Request and response type do not match")
-        (callService "/add_two_ints" (Req.AddTwoIntsRequest 1 1) :: IO (Either ServiceResponseError BadResponse))
+        (callService "/add_two_ints" (Req.AddTwoIntsRequest 1 1) :: IO (Either ServiceResponseError BadMD5))
     testName =  testCase ("check name") $ do
       assertRaises "Failed to detect mismatch"
         (ErrorCall "Request and response type do not match")
         (callService "/add_two_ints" (Req.AddTwoIntsRequest 1 1) :: IO (Either ServiceResponseError BadName))
 
+connectionHeaderBadMD5Test :: TestTree
+connectionHeaderBadMD5Test = testCase "connection header wrong MD5 error" $ 
+  do res <- callService "/add_two_ints" $ BadMD5 10 :: IO (Either ServiceResponseError BadMD5)
+     Left (ConHeadError "Connection header from server has error, connection header is: [(\"error\",\"request from [roshask]: md5sums do not match: [6a2e34150c00229791cc89ff309fff22] vs. [6a2e34150c00229791cc89ff309fff21]\")]") @=? res
+    
+data BadMD5 = BadMD5 {a :: Int.Int64} deriving (Show, Eq)
 
-
-data BadResponse = BadResponse {a :: Int.Int64} deriving (Show, Eq)
-
-instance SrvInfo BadResponse where
+instance SrvInfo BadMD5 where
   srvMD5 _ = "6a2e34150c00229791cc89ff309fff22"
   srvTypeName _ = "test_srvs/AddTwoInts"
 
-instance RosBinary BadResponse where
+instance RosBinary BadMD5 where
   put obj' = put (a obj')
-  get = BadResponse <$> get
+  get = BadMD5 <$> get
 
 data BadName = BadName Int.Int64 deriving (Show, Eq)
 
@@ -84,3 +88,4 @@ instance RosBinary BadName where
 
 instance Eq ErrorCall where
     x == y = (show x) == (show y)
+

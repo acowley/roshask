@@ -48,7 +48,6 @@ getServiceResult :: RosBinary a => Handle ->  ErrorT ServiceResponseError IO a
 getServiceResult h = do
   okByte <- runGet getWord8 <$> hGetAllET h 1 (ResponseReadError "Could not read okByte")
   case okByte of
-    --0 -> ErrorT . return . Left . NotOkError $ ""
     0 -> do
       len <- runGet getInt <$> hGetAllET h 4 (ResponseReadError "Could not read length for notOk message")
       message <- hGetAllET h len (ResponseReadError "Could not read notOk message")
@@ -61,5 +60,5 @@ hGetAllET ::  Handle -> Int -> ServiceResponseError -> ErrorT ServiceResponseErr
 hGetAllET h n errorMessage = do
   maybeData <- liftIO . runMaybeT $ hGetAll h n
   case maybeData of
-    Nothing -> ErrorT . return $ Left errorMessage
+    Nothing -> throwError errorMessage
     Just b -> ErrorT . return $ Right b

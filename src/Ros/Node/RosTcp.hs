@@ -199,29 +199,29 @@ parsePort target = case parseURI target of
             (uriPort u)
   Nothing -> error $ "Couldn't parse URI "++target
 
---TODO: Handle error cases
+--TODO: Check if the socket is left open when there is an error. Would this be bad?
 callServiceWithMaster :: forall a b. (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => URI -> ServiceName -> a -> IO (Either ServiceResponseError b)
 callServiceWithMaster rosMaster serviceName message = runErrorT $ do
   checkServicesMatch message (undefined::b)
   --lookup the service with the master
-  -- TODO: look at the code and status message
-  (code, statusMessage, serviceUrl) <- liftIO $ lookupService rosMaster callerID serviceName
+  (code, statusMessage, serviceUrl) <- lookupService rosMaster callerID serviceName
   checkLookupServiceCode code statusMessage
-  --print (code, statusMessage, serviceUrl)
   -- make a socket
-  handle <- liftIO $ do
+  sock <- liftIO $ do
     sock <- socket AF_INET Sock.Stream defaultProtocol
     -- connect to the socket
     let host = parseHost serviceUrl
     ip <- hostAddress <$> getHostByName host
     let port = fromIntegral $ parsePort serviceUrl
     connect sock $ SockAddrInet port ip
-    let
-      reqMd5 = srvMD5 message
-      reqServiceType = srvTypeName message
-    negotiateService sock serviceName reqServiceType reqMd5
-    let
-      bytes = runPut $ putMsg 0 message
+    return sock
+  let
+    reqMd5 = srvMD5 message
+    reqServiceType = srvTypeName message
+  negotiateService sock serviceName reqServiceType reqMd5
+  let
+    bytes = runPut $ putMsg 0 message
+  handle <- liftIO $ do
     sendBS sock bytes
     socketToHandle sock ReadMode
   result <- getServiceResult handle
@@ -232,7 +232,7 @@ callServiceWithMaster rosMaster serviceName message = runErrorT $ do
       callerID = "roshask"
       checkLookupServiceCode 1 _ = return ()
       checkLookupServiceCode code statusMessage =
-        ErrorT. return . Left $ MasterError ("lookupService failed, code: " ++ show code ++ ", statusMessage: " ++ statusMessage)
+        throwError $ MasterError ("lookupService failed, code: " ++ show code ++ ", statusMessage: " ++ statusMessage)
       checkServicesMatch x y =
         if not match then error "Request and response type do not match" else return ()
         where
@@ -241,16 +241,18 @@ callServiceWithMaster rosMaster serviceName message = runErrorT $ do
 -- Precondition: The socket is already connected to the server
 -- Exchange ROSTCP connection headers with the server
 -- todo: check the recieved header
-negotiateService :: Socket -> String -> String -> String -> IO ()
-negotiateService sock serviceName serviceType md5 =
-    do sendAll sock $ genHeader [ ("callerid", "roshask"), ("service", serviceName)
+negotiateService :: Socket -> String -> String -> String -> ErrorT ServiceResponseError IO ()
+negotiateService sock serviceName serviceType md5 = do
+    headerBytes <- liftIO $
+      do sendAll sock $ genHeader [ ("callerid", "roshask"), ("service", serviceName)
                                 , ("md5sum", md5), ("type", serviceType) ]
-       responseLength <- runGet (fromIntegral <$> getWord32le) <$>
-                         BL.fromChunks . (:[]) <$> recvAll sock 4
-       headerBytes <- recvAll sock responseLength
---       let connHeader = parseHeader headerBytes
---       print connHeader
-       return ()
+         responseLength <- runGet (fromIntegral <$> getWord32le) <$>
+                           BL.fromChunks . (:[]) <$> recvAll sock 4
+         recvAll sock responseLength
+    let connHeader = parseHeader headerBytes
+    case lookup "error" connHeader of
+      Nothing -> return ()
+      Just _ -> throwError . ConHeadError $ "Connection header from server has error, connection header is: " ++ show connHeader
                                     
 -- Helper to run the publisher's side of a topic negotiation with a
 -- new client.

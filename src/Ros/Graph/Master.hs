@@ -2,6 +2,10 @@
 module Ros.Graph.Master where
 import Network.XmlRpc.Client
 import Ros.Internal.RosTypes
+import Ros.Service.ServiceTypes
+import Network.XmlRpc.Internals (fromValue)
+import Network.XmlRpc.Internals (toValue)
+import Control.Monad.Error
 
 -- |Subscribe the caller to the specified topic. In addition to
 -- receiving a list of current publishers, the subscriber will also
@@ -53,9 +57,12 @@ unregisterPublisher = flip remote "unregisterPublisher"
 -- Returns (int, str, str)
 --  (code, statusMessage, serviceUrl)
 -- service URL provides address and port of the service. Fails if there is no provider.
-lookupService :: URI -> String -> ServiceName -> IO(Int, String, String)
-lookupService = flip remote "lookupService"
-
+lookupService :: URI -> String -> ServiceName -> ErrorT ServiceResponseError IO (Int, String, String)
+lookupService u s1 s2 = ErrorT $ do
+  err <- runErrorT $ call u "lookupService" (fmap toValue [s1, s2]) >>= fromValue
+  case err of
+    Left x -> return . Left $ MasterError x
+    Right y -> return $ Right y
 
 -- | ROS API: registerService(caller_id, service, service_api, caller_api)
 -- Register the caller as a provider of the specified service.
