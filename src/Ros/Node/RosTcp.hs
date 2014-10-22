@@ -233,7 +233,9 @@ callServiceWithMaster rosMaster serviceName message = runErrorT $ do
       checkLookupServiceCode code statusMessage =
         throwError $ MasterError ("lookupService failed, code: " ++ show code ++ ", statusMessage: " ++ statusMessage)
       checkServicesMatch x y =
-        if not match then error "Request and response type do not match" else return ()
+        if not match then
+          -- throw error here since the calling code needs to be changed
+          error "Request and response type do not match" else return ()
         where
           match = (srvMD5 x == srvMD5 y && srvTypeName x == srvTypeName y)
 

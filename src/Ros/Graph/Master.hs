@@ -3,9 +3,10 @@ module Ros.Graph.Master where
 import Network.XmlRpc.Client
 import Ros.Internal.RosTypes
 import Ros.Service.ServiceTypes
-import Network.XmlRpc.Internals (fromValue)
-import Network.XmlRpc.Internals (toValue)
-import Control.Monad.Error
+import Network.XmlRpc.Internals (fromValue, toValue)
+import Control.Exception (handle, IOException)
+import Control.Monad.Error (ErrorT(..))
+
 
 -- |Subscribe the caller to the specified topic. In addition to
 -- receiving a list of current publishers, the subscriber will also
@@ -44,9 +45,6 @@ unregisterPublisher :: URI -> String -> TopicName -> String ->
                        IO (Int, String, Int)
 unregisterPublisher = flip remote "unregisterPublisher"
 
-
-
-
 -- | ROS API: lookupService(caller_id, service)
 -- Lookup provider of a particular service.
 -- Parameters
@@ -58,11 +56,15 @@ unregisterPublisher = flip remote "unregisterPublisher"
 --  (code, statusMessage, serviceUrl)
 -- service URL provides address and port of the service. Fails if there is no provider.
 lookupService :: URI -> String -> ServiceName -> ErrorT ServiceResponseError IO (Int, String, String)
-lookupService u s1 s2 = ErrorT $ do
-  err <- runErrorT $ call u "lookupService" (fmap toValue [s1, s2]) >>= fromValue
+lookupService u s1 s2 = ErrorT . handle handler $ do
+  let res = call u "lookupService" (fmap toValue [s1, s2]) >>= fromValue
+  err <- runErrorT res
   case err of
     Left x -> return . Left $ MasterError x
     Right y -> return $ Right y
+  where
+    handler :: IOException -> IO (Either ServiceResponseError (Int, String, String))
+    handler x =  return . Left . MasterError $ "Could not look up service with master. Is the ROS master (roscore) running? Got exception: " ++ show x
 
 -- | ROS API: registerService(caller_id, service, service_api, caller_api)
 -- Register the caller as a provider of the specified service.

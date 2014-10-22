@@ -182,7 +182,7 @@ test-suite testexe
 
 test-suite servicetest
   type: exitcode-stdio-1.0
-  hs-source-dirs: Tests, src/executable, src/Ros, Tests/ServiceClientTests
+  hs-source-dirs: Tests/ServiceClientTests
   main-is: ServiceClientTest.hs
   ghc-options: -Wall -O0
   default-language: Haskell2010
