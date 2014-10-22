@@ -12,9 +12,9 @@ import qualified Data.ByteString.Lazy as BL
 import System.IO (Handle)
 import Ros.Topic
 import Ros.Internal.RosBinary (RosBinary(get))
-import Control.Monad.Error
 import Ros.Service.ServiceTypes(ServiceResponseError(..))
 import Data.ByteString.Lazy.Char8 (unpack)
+import Control.Monad.Except (ExceptT(..), throwError)
 
 -- Get the specified number of bytes from a 'Handle'. Returns a
 -- wrapped-up 'Nothing' if the client shutdown (indicated by receiving
@@ -44,21 +44,21 @@ getInt = fromIntegral <$> getWord32le
 
 -- | Get the result back from a service call (called by the service client)
 -- (see http://wiki.ros.org/ROS/TCPROS)
-getServiceResult :: RosBinary a => Handle ->  ErrorT ServiceResponseError IO a
+getServiceResult :: RosBinary a => Handle ->  ExceptT ServiceResponseError IO a
 getServiceResult h = do
   okByte <- runGet getWord8 <$> hGetAllET h 1 (ResponseReadError "Could not read okByte")
   case okByte of
     0 -> do
       len <- runGet getInt <$> hGetAllET h 4 (ResponseReadError "Could not read length for notOk message")
       message <- hGetAllET h len (ResponseReadError "Could not read notOk message")
-      ErrorT . return . Left . NotOkError $ unpack message
+      throwError . NotOkError $ unpack message
     _ -> do
       len <- runGet getInt <$> hGetAllET h 4 (ResponseReadError "Could not read length")
       runGet get <$> hGetAllET h len (ResponseReadError "Could not read response message")
   
-hGetAllET ::  Handle -> Int -> ServiceResponseError -> ErrorT ServiceResponseError IO BL.ByteString
+hGetAllET ::  Handle -> Int -> ServiceResponseError -> ExceptT ServiceResponseError IO BL.ByteString
 hGetAllET h n errorMessage = do
   maybeData <- liftIO . runMaybeT $ hGetAll h n
   case maybeData of
     Nothing -> throwError errorMessage
-    Just b -> ErrorT . return $ Right b
+    Just b -> ExceptT . return $ Right b

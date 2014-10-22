@@ -4,8 +4,9 @@ import Network.XmlRpc.Client
 import Ros.Internal.RosTypes
 import Ros.Service.ServiceTypes
 import Network.XmlRpc.Internals (fromValue, toValue)
-import Control.Monad.Error (ErrorT(..))
+import Control.Monad.Except (ExceptT(..))
 import System.IO.Error (catchIOError)
+import Control.Monad.Error (runErrorT)
 
 
 -- |Subscribe the caller to the specified topic. In addition to
@@ -55,8 +56,8 @@ unregisterPublisher = flip remote "unregisterPublisher"
 -- Returns (int, str, str)
 --  (code, statusMessage, serviceUrl)
 -- service URL provides address and port of the service. Fails if there is no provider.
-lookupService :: URI -> String -> ServiceName -> ErrorT ServiceResponseError IO (Int, String, String)
-lookupService u s1 s2 = ErrorT . (flip catchIOError) handler $ do
+lookupService :: URI -> String -> ServiceName -> ExceptT ServiceResponseError IO (Int, String, String)
+lookupService u s1 s2 = ExceptT . (flip catchIOError) handler $ do
   let res = call u "lookupService" (fmap toValue [s1, s2]) >>= fromValue
   err <- runErrorT res
   return $ case err of

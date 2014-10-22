@@ -1,7 +1,5 @@
 module Ros.Service.ServiceTypes (ServiceResponseError(..)) where
 
-import Control.Monad.Error
-
 -- | This type represensts the possible error cases that can occur when a service is called by a client.
 -- A NotOkError occurs when the server replies to a service request with an error message instead of the normal
 -- service message. The NotOkError string a string sent from the server. See http://wiki.ros.org/ROS/TCPROS
@@ -9,10 +7,6 @@ import Control.Monad.Error
 -- message or NotOkError message.
 -- MasterError is for problems encountered while communicating with the master
 -- ConHeadError is for an error with the connection header
--- DefaultError is used by the Error typeclass instance
-data ServiceResponseError = NotOkError String | ResponseReadError String | MasterError String | ConHeadError String | DefaultError String
+data ServiceResponseError = NotOkError String | ResponseReadError String | MasterError String | ConHeadError String
                           deriving (Show, Eq)
 
-instance Error ServiceResponseError where
-  noMsg = DefaultError ""
-  strMsg x = DefaultError x

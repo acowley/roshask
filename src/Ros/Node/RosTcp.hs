@@ -35,7 +35,7 @@ import Ros.Graph.Slave (requestTopicClient)
 import Ros.Graph.Master (lookupService)
 import Data.Maybe (fromMaybe)
 import Ros.Service.ServiceTypes
-import Control.Monad.Error
+import Control.Monad.Except
 
 -- |Push each item from this client's buffer over the connected
 -- socket.
@@ -202,7 +202,7 @@ parsePort target = case parseURI target of
 --TODO: use the correct callerID
 callServiceWithMaster :: forall a b. (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) =>
                          URI -> ServiceName -> a -> IO (Either ServiceResponseError b)
-callServiceWithMaster rosMaster serviceName message = runErrorT $ do
+callServiceWithMaster rosMaster serviceName message = runExceptT $ do
   checkServicesMatch message (undefined::b)
   --lookup the service with the master
   (code, statusMessage, serviceUrl) <- lookupService rosMaster callerID serviceName
@@ -221,7 +221,7 @@ callServiceWithMaster rosMaster serviceName message = runErrorT $ do
     reqServiceType = srvTypeName message
     -- closeSocket makes sure that the socket gets closed even if there is a
     -- ServiceResponseError
-    closeSocket :: ServiceResponseError -> ErrorT ServiceResponseError IO ()
+    closeSocket :: ServiceResponseError -> ExceptT ServiceResponseError IO ()
     closeSocket err = do
       liftIO $ sClose sock
       throwError err
@@ -248,7 +248,7 @@ callServiceWithMaster rosMaster serviceName message = runErrorT $ do
 
 -- Precondition: The socket is already connected to the server
 -- Exchange ROSTCP connection headers with the server
-negotiateService :: Socket -> String -> String -> String -> ErrorT ServiceResponseError IO ()
+negotiateService :: Socket -> String -> String -> String -> ExceptT ServiceResponseError IO ()
 negotiateService sock serviceName serviceType md5 = do
     headerBytes <- liftIO $
       do sendAll sock $ genHeader [ ("callerid", "roshask"), ("service", serviceName)

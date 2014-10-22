@@ -107,7 +107,7 @@ Library
                        network >= 2.3,
                        Cabal >= 1.20,
                        stm >= 2.1.2,
-                       mtl >= 2.0,
+                       mtl >= 2.2.1,
                        time >= 1.1,
                        BoundedChan >= 1.0.0.2,
                        parsec >= 3.1,
@@ -116,7 +116,7 @@ Library
                        snap-core >= 0.9,
                        snap-server >= 0.9,
                        storable-tuple >= 0.0.2,
-                       transformers >= 0.2,
+                       transformers >= 0.4,
                        haxr >= 3000.10.3,
                        utf8-string >= 0.3.6,
                        uri >= 0.1.5,
@@ -177,7 +177,8 @@ test-suite testexe
   ghc-options: -Wall -O0
   default-language: Haskell2010
   build-depends: base >= 4.6 && < 5, bytestring, tasty, tasty-hunit, roshask,
-                 containers, mtl, filepath, attoparsec, transformers,
+                 containers, mtl, 
+                 filepath, attoparsec, transformers,
                  pureMD5 >= 2.1
 
 test-suite servicetest
