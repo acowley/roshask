@@ -200,7 +200,8 @@ parsePort target = case parseURI target of
   Nothing -> error $ "Couldn't parse URI "++target
 
 --TODO: use the correct callerID
-callServiceWithMaster :: forall a b. (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => URI -> ServiceName -> a -> IO (Either ServiceResponseError b)
+callServiceWithMaster :: forall a b. (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) =>
+                         URI -> ServiceName -> a -> IO (Either ServiceResponseError b)
 callServiceWithMaster rosMaster serviceName message = runErrorT $ do
   checkServicesMatch message (undefined::b)
   --lookup the service with the master
@@ -218,12 +219,17 @@ callServiceWithMaster rosMaster serviceName message = runErrorT $ do
   let
     reqMd5 = srvMD5 message
     reqServiceType = srvTypeName message
-  negotiateService sock serviceName reqServiceType reqMd5
-  let
-    bytes = runPut $ putMsg 0 message
-  handle <- liftIO $ do
-    sendBS sock bytes
-    socketToHandle sock ReadMode
+    -- closeSocket makes sure that the socket gets closed even if there is a
+    -- ServiceResponseError
+    closeSocket :: ServiceResponseError -> ErrorT ServiceResponseError IO ()
+    closeSocket err = do
+      liftIO $ sClose sock
+      throwError err
+  (flip catchError) closeSocket $ do
+    negotiateService sock serviceName reqServiceType reqMd5
+    let bytes = runPut $ putMsg 0 message
+    liftIO $ sendBS sock bytes
+  handle <- liftIO $ socketToHandle sock ReadMode
   result <- getServiceResult handle
   liftIO $ hClose handle
   return result
@@ -231,13 +237,14 @@ callServiceWithMaster rosMaster serviceName message = runErrorT $ do
       callerID = "roshask"
       checkLookupServiceCode 1 _ = return ()
       checkLookupServiceCode code statusMessage =
-        throwError $ MasterError ("lookupService failed, code: " ++ show code ++ ", statusMessage: " ++ statusMessage)
+        throwError $ MasterError
+        ("lookupService failed, code: " ++ show code ++ ", statusMessage: " ++ statusMessage)
       checkServicesMatch x y =
-        if not match then
+        unless match $
           -- throw error here since the calling code needs to be changed
-          error "Request and response type do not match" else return ()
+          error "Request and response type do not match"
         where
-          match = (srvMD5 x == srvMD5 y && srvTypeName x == srvTypeName y)
+          match = srvMD5 x == srvMD5 y && srvTypeName x == srvTypeName y
 
 -- Precondition: The socket is already connected to the server
 -- Exchange ROSTCP connection headers with the server
