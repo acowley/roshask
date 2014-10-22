@@ -9,9 +9,10 @@ import Control.Monad.Error
 -- message or NotOkError message.
 -- MasterError is for problems encountered while communicating with the master
 -- ConHeadError is for an error with the connection header
-data ServiceResponseError = NotOkError String | ResponseReadError String | MasterError String | ConHeadError String
+-- DefaultError is used by the Error typeclass instance
+data ServiceResponseError = NotOkError String | ResponseReadError String | MasterError String | ConHeadError String | DefaultError String
                           deriving (Show, Eq)
 
 instance Error ServiceResponseError where
-  noMsg = ResponseReadError ""
-  strMsg x = ResponseReadError x
+  noMsg = DefaultError ""
+  strMsg x = DefaultError x
