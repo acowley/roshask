@@ -56,15 +56,15 @@ unregisterPublisher = flip remote "unregisterPublisher"
 -- Returns (int, str, str)
 --  (code, statusMessage, serviceUrl)
 -- service URL provides address and port of the service. Fails if there is no provider.
-lookupService :: URI -> String -> ServiceName -> ExceptT ServiceResponseError IO (Int, String, String)
+lookupService :: URI -> String -> ServiceName -> ExceptT ServiceResponseExcept IO (Int, String, String)
 lookupService u s1 s2 = ExceptT . (flip catchIOError) handler $ do
   let res = call u "lookupService" (fmap toValue [s1, s2]) >>= fromValue
   err <- runErrorT res
   return $ case err of
-    Left x -> Left $ MasterError x
+    Left x -> Left $ MasterExcept x
     Right y -> Right y
   where
-    handler x =  return . Left . MasterError $
+    handler x =  return . Left . MasterExcept $
                  "Could not look up service with master. Is the ROS master (roscore) running? Got exception: " ++ show x
 
 -- | ROS API: registerService(caller_id, service, service_api, caller_api)

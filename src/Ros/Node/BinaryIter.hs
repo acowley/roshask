@@ -12,7 +12,7 @@ import qualified Data.ByteString.Lazy as BL
 import System.IO (Handle)
 import Ros.Topic
 import Ros.Internal.RosBinary (RosBinary(get))
-import Ros.Service.ServiceTypes(ServiceResponseError(..))
+import Ros.Service.ServiceTypes(ServiceResponseExcept(..))
 import Data.ByteString.Lazy.Char8 (unpack)
 import Control.Monad.Except (ExceptT(..), throwError)
 
@@ -44,21 +44,21 @@ getInt = fromIntegral <$> getWord32le
 
 -- | Get the result back from a service call (called by the service client)
 -- (see http://wiki.ros.org/ROS/TCPROS)
-getServiceResult :: RosBinary a => Handle ->  ExceptT ServiceResponseError IO a
+getServiceResult :: RosBinary a => Handle ->  ExceptT ServiceResponseExcept IO a
 getServiceResult h = do
-  okByte <- runGet getWord8 <$> hGetAllET h 1 (ResponseReadError "Could not read okByte")
+  okByte <- runGet getWord8 <$> hGetAllET h 1 (ResponseReadExcept "Could not read okByte")
   case okByte of
     0 -> do
-      len <- runGet getInt <$> hGetAllET h 4 (ResponseReadError "Could not read length for notOk message")
-      message <- hGetAllET h len (ResponseReadError "Could not read notOk message")
-      throwError . NotOkError $ unpack message
+      len <- runGet getInt <$> hGetAllET h 4 (ResponseReadExcept "Could not read length for notOk message")
+      message <- hGetAllET h len (ResponseReadExcept "Could not read notOk message")
+      throwError . NotOkExcept $ unpack message
     _ -> do
-      len <- runGet getInt <$> hGetAllET h 4 (ResponseReadError "Could not read length")
-      runGet get <$> hGetAllET h len (ResponseReadError "Could not read response message")
+      len <- runGet getInt <$> hGetAllET h 4 (ResponseReadExcept "Could not read length")
+      runGet get <$> hGetAllET h len (ResponseReadExcept "Could not read response message")
   
-hGetAllET ::  Handle -> Int -> ServiceResponseError -> ExceptT ServiceResponseError IO BL.ByteString
-hGetAllET h n errorMessage = do
+hGetAllET ::  Handle -> Int -> ServiceResponseExcept -> ExceptT ServiceResponseExcept IO BL.ByteString
+hGetAllET h n exceptMessage = do
   maybeData <- liftIO . runMaybeT $ hGetAll h n
   case maybeData of
-    Nothing -> throwError errorMessage
+    Nothing -> throwError exceptMessage
     Just b -> ExceptT . return $ Right b

@@ -19,6 +19,7 @@ import Test.HUnit.Tools
 --      python roshask/Tests/ServiceClientTests/add_two_ints_server.py
 -- 3. in a new terminal make sure $ROS_MASTER_URI is correct and run
 --      cabal test servicetest --show-details=always
+type Response a = IO (Either ServiceResponseExcept a)
 
 main :: IO ()
 main = defaultMain $ testGroup "Service Tests" [addIntsTest 4 7
@@ -29,20 +30,20 @@ main = defaultMain $ testGroup "Service Tests" [addIntsTest 4 7
 
 addIntsTest :: GHC.Int.Int64 -> GHC.Int.Int64 -> TestTree
 addIntsTest x y = testCase ("add_two_ints, add " ++ show x ++ " + " ++ show y) $
-  do res <- callService "/add_two_ints" Req.AddTwoIntsRequest{Req.a=x, Req.b=y} :: IO (Either ServiceResponseError Res.AddTwoIntsResponse)
+  do res <- callService "/add_two_ints" Req.AddTwoIntsRequest{Req.a=x, Req.b=y} :: Response  Res.AddTwoIntsResponse
      Right (Res.AddTwoIntsResponse (x + y)) @=? res
 
 -- add_two_ints_server returns None (triggering the NotOkError) if both a and b are 100
 notOkTest :: GHC.Int.Int64 -> GHC.Int.Int64 -> TestTree
 notOkTest x y = testCase ("NotOKError, add_two_ints, add " ++ show x ++ " + " ++ show y) $
-  do res <- callService "/add_two_ints" Req.AddTwoIntsRequest{Req.a=x, Req.b=y} :: IO (Either ServiceResponseError Res.AddTwoIntsResponse)
-     Left (NotOkError "service cannot process request: service handler returned None") @=? res
+  do res <- callService "/add_two_ints" Req.AddTwoIntsRequest{Req.a=x, Req.b=y} :: Response Res.AddTwoIntsResponse
+     Left (NotOkExcept "service cannot process request: service handler returned None") @=? res
 
 -- tests that an error is returned if the server is not registered with the master
 noProviderTest :: TestTree
 noProviderTest = testCase ("service not registered error") $
-  do res <- callService "/not_add_two_ints" Req.AddTwoIntsRequest{Req.a=x, Req.b=y} :: IO (Either ServiceResponseError Res.AddTwoIntsResponse)
-     Left (MasterError "lookupService failed, code: -1, statusMessage: no provider") @=? res
+  do res <- callService "/not_add_two_ints" Req.AddTwoIntsRequest{Req.a=x, Req.b=y} :: Response Res.AddTwoIntsResponse
+     Left (MasterExcept "lookupService failed, code: -1, statusMessage: no provider") @=? res
   where
     x = 10
     y = 10
@@ -55,16 +56,17 @@ requestResponseDontMatchTest =
     testMd5 = testCase ("check md5") $ do
       assertRaises "Failed to detect mismatch"
         (ErrorCall "Request and response type do not match")
-        (callService "/add_two_ints" (Req.AddTwoIntsRequest 1 1) :: IO (Either ServiceResponseError BadMD5))
+        --(callService "/add_two_ints" (Req.AddTwoIntsRequest 1 1) :: IO (Either ServiceResponseExcept BadMD5))
+        (callService "/add_two_ints" (Req.AddTwoIntsRequest 1 1) :: Response BadMD5)
     testName =  testCase ("check name") $ do
       assertRaises "Failed to detect mismatch"
         (ErrorCall "Request and response type do not match")
-        (callService "/add_two_ints" (Req.AddTwoIntsRequest 1 1) :: IO (Either ServiceResponseError BadName))
+        (callService "/add_two_ints" (Req.AddTwoIntsRequest 1 1) :: IO (Either ServiceResponseExcept BadName))
 
 connectionHeaderBadMD5Test :: TestTree
 connectionHeaderBadMD5Test = testCase "connection header wrong MD5 error" $ 
-  do res <- callService "/add_two_ints" $ BadMD5 10 :: IO (Either ServiceResponseError BadMD5)
-     Left (ConHeadError "Connection header from server has error, connection header is: [(\"error\",\"request from [roshask]: md5sums do not match: [6a2e34150c00229791cc89ff309fff22] vs. [6a2e34150c00229791cc89ff309fff21]\")]") @=? res
+  do res <- callService "/add_two_ints" $ BadMD5 10 :: Response BadMD5
+     Left (ConHeadExcept "Connection header from server has error, connection header is: [(\"error\",\"request from [roshask]: md5sums do not match: [6a2e34150c00229791cc89ff309fff22] vs. [6a2e34150c00229791cc89ff309fff21]\")]") @=? res
     
 data BadMD5 = BadMD5 {a :: Int.Int64} deriving (Show, Eq)
 

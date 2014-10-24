@@ -201,7 +201,7 @@ parsePort target = case parseURI target of
 
 --TODO: use the correct callerID
 callServiceWithMaster :: forall a b. (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) =>
-                         URI -> ServiceName -> a -> IO (Either ServiceResponseError b)
+                         URI -> ServiceName -> a -> IO (Either ServiceResponseExcept b)
 callServiceWithMaster rosMaster serviceName message = runExceptT $ do
   checkServicesMatch message (undefined::b)
   --lookup the service with the master
@@ -220,8 +220,8 @@ callServiceWithMaster rosMaster serviceName message = runExceptT $ do
     reqMd5 = srvMD5 message
     reqServiceType = srvTypeName message
     -- closeSocket makes sure that the socket gets closed even if there is a
-    -- ServiceResponseError
-    closeSocket :: ServiceResponseError -> ExceptT ServiceResponseError IO ()
+    -- ServiceResponseExcept
+    closeSocket :: ServiceResponseExcept -> ExceptT ServiceResponseExcept IO ()
     closeSocket err = do
       liftIO $ sClose sock
       throwError err
@@ -237,7 +237,7 @@ callServiceWithMaster rosMaster serviceName message = runExceptT $ do
       callerID = "roshask"
       checkLookupServiceCode 1 _ = return ()
       checkLookupServiceCode code statusMessage =
-        throwError $ MasterError
+        throwError $ MasterExcept
         ("lookupService failed, code: " ++ show code ++ ", statusMessage: " ++ statusMessage)
       checkServicesMatch x y =
         unless match $
@@ -248,7 +248,7 @@ callServiceWithMaster rosMaster serviceName message = runExceptT $ do
 
 -- Precondition: The socket is already connected to the server
 -- Exchange ROSTCP connection headers with the server
-negotiateService :: Socket -> String -> String -> String -> ExceptT ServiceResponseError IO ()
+negotiateService :: Socket -> String -> String -> String -> ExceptT ServiceResponseExcept IO ()
 negotiateService sock serviceName serviceType md5 = do
     headerBytes <- liftIO $
       do sendAll sock $ genHeader [ ("callerid", "roshask"), ("service", serviceName)
@@ -259,7 +259,7 @@ negotiateService sock serviceName serviceType md5 = do
     let connHeader = parseHeader headerBytes
     case lookup "error" connHeader of
       Nothing -> return ()
-      Just _ -> throwError . ConHeadError $
+      Just _ -> throwError . ConHeadExcept $
                 "Connection header from server has error, connection header is: " ++ show connHeader
                                     
 -- Helper to run the publisher's side of a topic negotiation with a

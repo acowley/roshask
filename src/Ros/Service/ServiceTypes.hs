@@ -1,4 +1,4 @@
-module Ros.Service.ServiceTypes (ServiceResponseError(..)) where
+module Ros.Service.ServiceTypes (ServiceResponseExcept(..)) where
 
 -- | This type represensts the possible error cases that can occur when a service is called by a client.
 -- A NotOkError occurs when the server replies to a service request with an error message instead of the normal
@@ -7,6 +7,6 @@ module Ros.Service.ServiceTypes (ServiceResponseError(..)) where
 -- message or NotOkError message.
 -- MasterError is for problems encountered while communicating with the master
 -- ConHeadError is for an error with the connection header
-data ServiceResponseError = NotOkError String | ResponseReadError String | MasterError String | ConHeadError String
+data ServiceResponseExcept = NotOkExcept String | ResponseReadExcept String | MasterExcept String | ConHeadExcept String
                           deriving (Show, Eq)
 
