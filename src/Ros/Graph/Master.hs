@@ -55,7 +55,7 @@ lookupService u s1 s2 = ExceptT . (flip catchIOError) handler $ do
   let res = call u "lookupService" (fmap toValue [s1, s2]) >>= fromValue
   err <- runErrorT res
   return $ case err of
-    Left x -> Left $ MasterExcept x
+    Left x -> Left $ MasterExcept $ "Could not look up service with master. Got message: " ++ x
     Right y -> Right y
   where
     handler x =  return . Left . MasterExcept $

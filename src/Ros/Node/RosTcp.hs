@@ -36,6 +36,7 @@ import Ros.Graph.Master (lookupService)
 import Data.Maybe (fromMaybe)
 import Ros.Service.ServiceTypes
 import Control.Monad.Except
+import System.IO.Error (tryIOError)
 
 -- |Push each item from this client's buffer over the connected
 -- socket.
@@ -192,12 +193,17 @@ parseHost target = case parseURI target of
             (uriRegName u)
   Nothing -> error $ "Couldn't parse URI "++target
 
-parsePort :: URI -> PortNumber
-parsePort target = case parseURI target of
-  Just u -> fromIntegral $ fromMaybe
-            (error $ "Couldn't parse port "++ "from "++ target)
-            (uriPort u)
-  Nothing -> error $ "Couldn't parse URI "++target
+parseHostAndPort :: URI -> Either ServiceResponseExcept (String, PortNumber)
+parseHostAndPort target = do
+  uri <- maybeToEither (ConnectExcept $ "Could not parse URI "++target) $ parseURI target
+  host <- maybeToEither (ConnectExcept $ "Could not parse hostname from "++target) $ uriRegName uri
+  port <- maybeToEither (ConnectExcept $ "Could not parse port from "++target) $ uriPort uri
+  return (host, fromIntegral port)
+
+maybeToEither :: a -> Maybe b -> Either a b
+maybeToEither left m = case m of
+  Just x -> Right x
+  Nothing -> Left left
 
 --TODO: use the correct callerID
 callServiceWithMaster :: forall a b. (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) =>
@@ -207,29 +213,23 @@ callServiceWithMaster rosMaster serviceName message = runExceptT $ do
   --lookup the service with the master
   (code, statusMessage, serviceUrl) <- lookupService rosMaster callerID serviceName
   checkLookupServiceCode code statusMessage
+  (host, port) <- ExceptT . return $ parseHostAndPort serviceUrl
   -- make a socket
-  sock <- liftIO $ do
-    sock <- socket AF_INET Sock.Stream defaultProtocol
-    -- connect to the socket
-    let host = parseHost serviceUrl
-    ip <- hostAddress <$> getHostByName host
-    let port = fromIntegral $ parsePort serviceUrl
-    connect sock $ SockAddrInet port ip
-    return sock
-  let
-    reqMd5 = srvMD5 message
-    reqServiceType = srvTypeName message
-    -- closeSocket makes sure that the socket gets closed even if there is a
-    -- ServiceResponseExcept
-    closeSocket :: ServiceResponseExcept -> ExceptT ServiceResponseExcept IO ()
-    closeSocket err = do
-      liftIO $ sClose sock
-      throwError err
-  (flip catchError) closeSocket $ do
-    negotiateService sock serviceName reqServiceType reqMd5
-    let bytes = runPut $ putMsg 0 message
-    liftIO $ sendBS sock bytes
-  handle <- liftIO $ socketToHandle sock ReadMode
+  let makeSocket = socket AF_INET Sock.Stream defaultProtocol
+      closeSocket sock = liftIO $ sClose sock
+      withSocket sock = do
+        ioErrorToExceptT ConnectExcept "Problem connecting to server. Got exception : " $ do
+          --Connect to the socket
+          ip <- hostAddress <$> getHostByName host
+          connect sock $ SockAddrInet port ip
+        let reqMd5 = srvMD5 message
+            reqServiceType = srvTypeName message
+        negotiateService sock serviceName reqServiceType reqMd5
+        let bytes = runPut $ putMsg 0 message
+        ioErrorToExceptT SendRequestExcept "Problem sending request. Got exception: " $
+          sendBS sock bytes
+        liftIO $ socketToHandle sock ReadMode
+  handle <- bracketOnErrorME (liftIO makeSocket) closeSocket withSocket
   result <- getServiceResult handle
   liftIO $ hClose handle
   return result
@@ -245,6 +245,27 @@ callServiceWithMaster rosMaster serviceName message = runExceptT $ do
           error "Request and response type do not match"
         where
           match = srvMD5 x == srvMD5 y && srvTypeName x == srvTypeName y
+
+-- | bracketOnError equivalent for MonadError
+bracketOnErrorME :: MonadError e m => m a -> (a -> m b) -> (a -> m c) -> m c
+bracketOnErrorME before after thing = do
+  a <- before
+  let handler e = after a >> throwError e
+  catchError (thing a) handler
+
+-- | Catch any IOErrors and convert them to a different type
+catchConvertIO :: (String -> a) -> IO b -> IO (Either a b)
+catchConvertIO excep action = do
+  err <- tryIOError action
+  return $ case err of
+    Left e -> Left . excep $ show e
+    Right r -> Right r
+
+-- | Catch all IOErrors that might occur and convert them to a custom error type
+-- with the IOError message postpended to the given string
+ioErrorToExceptT :: (String -> e) -> String -> IO a -> ExceptT e IO a
+ioErrorToExceptT except msg acc =
+  ExceptT . catchConvertIO (\m -> except $ msg ++ m) $ acc
 
 -- Precondition: The socket is already connected to the server
 -- Exchange ROSTCP connection headers with the server
