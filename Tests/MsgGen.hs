@@ -46,10 +46,10 @@ prepMsgGen = do cachePkg "Tests/std_msgs"
 --TEST GENERATORS
 
 -- | Test that the generated Haskell code matches a golden Haskell file
--- | The first argument is a path to the test directory
--- | The second argument is a list of paths to the message file
--- | The third argument is a list of paths to the golden Haskell file
--- | Precondition: cachePkg has been called
+-- The first argument is a path to the test directory
+-- The second argument is a list of paths to the message file
+-- The third argument is a list of paths to the golden Haskell file
+-- Precondition: cachePkg has been called
 testGeneratedHaskell :: B.ByteString -> [FilePath] -> [FilePath] -> [B.ByteString] -> MsgInfo TestTree
 testGeneratedHaskell packagePath msgPaths haskellPaths pkgMsgs =
   do msgs <- liftIO $ mapM (fmap (either error id) . parseMsg) msgPaths
@@ -59,7 +59,7 @@ testGeneratedHaskell packagePath msgPaths haskellPaths pkgMsgs =
      return $ testGroup "Generated Haskell" $ zipWith3
        (\name gold gen -> testCase name $ gold @=? gen) msgPaths golds gens
 
--- | moduleNames is a list of the other messages in the package
+-- | @testGeneratedService packagePath srvPath requestGolden responseGolden pkgMsgs@ tests a service defined at @srvPath@
 testGeneratedService :: B.ByteString -> FilePath -> FilePath -> FilePath -> [B.ByteString] -> MsgInfo TestTree
 testGeneratedService packagePath srvPath requestGolden responseGolden pkgMsgs =
   do srv <- liftIO $

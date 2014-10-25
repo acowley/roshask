@@ -192,9 +192,9 @@ parseHost target = case parseURI target of
             (uriRegName u)
   Nothing -> error $ "Couldn't parse URI "++target
 
-parsePort :: URI -> Integer
+parsePort :: URI -> PortNumber
 parsePort target = case parseURI target of
-  Just u -> fromMaybe
+  Just u -> fromIntegral $ fromMaybe
             (error $ "Couldn't parse port "++ "from "++ target)
             (uriPort u)
   Nothing -> error $ "Couldn't parse URI "++target

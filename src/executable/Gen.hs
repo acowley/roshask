@@ -12,6 +12,10 @@ import Instances.Binary
 import Instances.Storable
 import MD5
 
+data GenArgs = GenArgs {genExtraImport :: ByteString
+                       , genPkgPath :: ByteString
+                       , genPkgMsgs :: [ByteString]}
+
 -- | pkgMsgs is a list of all the Mesages defined in the package (can be refered to
 -- | with unqualified names)
 generateSrvTypes :: ByteString -> [ByteString] -> Srv -> MsgInfo (ByteString, ByteString)
@@ -19,15 +23,21 @@ generateSrvTypes pkgPath pkgMsgs srv = do
   let msgs = [srvRequest srv, srvResponse srv]
   srvInfo <- mapM (genSrvInfo srv) msgs
   requestResponseMsgs <-
-    mapM (generateMsgTypeExtraImport "import Ros.Internal.Msg.SrvInfo\n" pkgPath pkgMsgs) msgs
+    mapM (generateMsgTypeExtraImport GenArgs{genExtraImport = "import Ros.Internal.Msg.SrvInfo\n"
+                                               , genPkgPath=pkgPath
+                                               , genPkgMsgs=pkgMsgs})
+    msgs
   let [requestType, responseType] = zipWith B.append requestResponseMsgs srvInfo
   return (requestType, responseType)
 
 generateMsgType :: ByteString -> [ByteString] -> Msg -> MsgInfo ByteString
-generateMsgType = generateMsgTypeExtraImport ""
+generateMsgType pkgPath pkgMsgs =
+  generateMsgTypeExtraImport GenArgs {genExtraImport=""
+                                     , genPkgPath=pkgPath
+                                     , genPkgMsgs=pkgMsgs}
 
-generateMsgTypeExtraImport :: ByteString -> ByteString -> [ByteString] -> Msg -> MsgInfo ByteString
-generateMsgTypeExtraImport extraImport pkgPath pkgMsgs msg =
+generateMsgTypeExtraImport :: GenArgs -> Msg -> MsgInfo ByteString
+generateMsgTypeExtraImport (GenArgs {genExtraImport=extraImport, genPkgPath=pkgPath, genPkgMsgs=pkgMsgs}) msg =
   do (fDecls, binInst, st, cons) <- withMsg msg $
                                     (,,,) <$> mapM generateField (fields msg)
                                           <*> genBinaryInstance msg
