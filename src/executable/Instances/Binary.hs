@@ -22,7 +22,7 @@ genBinaryInstance m
                       B.concat [ "instance RosBinary ", name'
                                , " where\n"
                                , "  put _  = putUnit\n"
-                               , "  get = getUnit *> pure ", name']
+                               , "  get = pure ", name']
   | otherwise = 
     do puts <- mapM (\f -> serialize (fieldType f) >>= 
                            return . buildPut (fieldName f)) 
