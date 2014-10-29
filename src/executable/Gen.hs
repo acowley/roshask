@@ -57,7 +57,7 @@ generateMsgType pkgPath pkgMsgs msg =
                               --nfImport]
           dataLine = B.concat ["\ndata ", tName, " = ", tName, " { "]
           dataSingleton = B.concat ["\ndata ", tName, " = ", tName, 
-                                    " deriving (P.Show, P.Eq, P.Ord, G.Generic)\n\n"]
+                                    " deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)\n\n"]
           fieldIndent = B.replicate (B.length dataLine - 3) ' '
           lineSep = B.concat ["\n", fieldIndent, ", "]
 
