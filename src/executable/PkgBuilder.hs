@@ -9,7 +9,7 @@ import Control.Concurrent (putMVar)
 import Control.Concurrent (takeMVar)
 import Control.DeepSeq (rnf)
 import qualified Control.Exception as C
-import Control.Monad (when)
+import Control.Monad (when, zipWithM_)
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Char (isSpace)
@@ -17,20 +17,19 @@ import Data.Either (rights)
 import qualified Data.Foldable as F
 import Data.List (findIndex, intercalate, isSuffixOf, isPrefixOf, nub)
 import Data.Version (versionBranch)
-import Gen (generateMsgType)
-import Parse (parseMsg)
+import Gen (generateMsgType, generateSrvTypes)
+import Parse (parseMsg, parseSrv)
+import Types (Srv, requestResponseNames)
 import Paths_roshask (version, getBinDir)
 
-import Ros.Internal.DepFinder (findMessages, findDepsWithMessages, hasMsgs)
+import Ros.Internal.DepFinder (findMessages, findDepsWithMessages, hasMsgsOrSrvs, findServices)
 import Ros.Internal.PathUtil (codeGenDir, cap)
 import System.Directory (createDirectoryIfMissing, getDirectoryContents,
                          doesDirectoryExist, removeFile)
 import System.Exit (ExitCode(..))
 import System.FilePath
-import System.IO (hClose)
-import System.IO (hGetContents)
-import System.Process (StdStream(CreatePipe))
-import System.Process (createProcess, proc, CreateProcess(..), waitForProcess)
+import System.IO (hGetContents, hClose)
+import System.Process (createProcess, proc, CreateProcess(..), waitForProcess, StdStream(CreatePipe))
 
 -- | Determine if we are working in a sandbox by checking of roshask
 -- was installed in one. If so, return the immediate parent of the
@@ -105,10 +104,10 @@ packageRegistered tools pkg =
                    "-" ++ B.unpack roshaskVersion
         getList = myReadProcess $ ghcPkg tools ["list", cabalPkg]
 
--- | Build all messages defined by a package unless that package is
--- already registered with ghc-pkg.
+-- | Build all messages defined by a ROS package unless the corresponding
+-- Haskell package is already registered with ghc-pkg.
 buildPkgMsgs :: FilePath -> MsgInfo ()
-buildPkgMsgs fname = do tools <- liftIO $ toolPaths
+buildPkgMsgs fname = do tools <- liftIO toolPaths
                         r <- liftIO $ packageRegistered tools fname
                         if r
                           then liftIO . putStrLn $ 
@@ -123,6 +122,7 @@ buildNewPkgMsgs tools fname =
      destDir <- liftIO $ codeGenDir fname
      liftIO $ createDirectoryIfMissing True destDir
      pkgMsgs <- liftIO $ findMessages fname
+     pkgSrvs <- liftIO $ findServices fname
      let pkgMsgs' = map (B.pack . cap . dropExtension . takeFileName) pkgMsgs
          checkErrors xs = case findIndex isLeft xs of
                             Nothing -> rights xs
@@ -133,9 +133,20 @@ buildNewPkgMsgs tools fname =
                       . takeFileName)
                      pkgMsgs
          gen = generateMsgType pkgHier pkgMsgs'
-     parsed <- liftIO $ checkErrors <$> mapM parseMsg pkgMsgs
-     mapM_ (\(n, m) -> gen m >>= liftIO . B.writeFile n) (zip names parsed)
-     liftIO $ do f <- hasMsgs fname
+     parsedMsgs <- liftIO $ checkErrors <$> mapM parseMsg pkgMsgs
+     parsedSrvs <- liftIO $ mapM parseSrv pkgSrvs
+     let parsedSrvs' = either
+                       (\s -> error $ "In package: " ++ fname ++ "Could not parse service: " ++ s)
+                       id <$> parsedSrvs
+         genAndWriteService :: Srv -> MsgInfo ()
+         genAndWriteService srv = do
+           (request, response) <- generateSrvTypes pkgHier pkgMsgs' srv
+           let fnames = map ((destDir </>)
+                              . (++ ".hs")) $ requestResponseNames srv
+           liftIO $ zipWithM_ B.writeFile fnames [request, response]
+     mapM_ (\(n, m) -> gen m >>= liftIO . B.writeFile n) (zip names parsedMsgs)
+     mapM_ genAndWriteService parsedSrvs'
+     liftIO $ do f <- hasMsgsOrSrvs fname
                  when f (removeOldCabal fname >> compileMsgs)
     where err pkg = error $ "Couldn't parse message " ++ pkg
           pkgName = pathToRosPkg fname
@@ -173,8 +184,8 @@ path2MsgModule :: FilePath -> String
 path2MsgModule = intercalate "." . map cap . reverse . take 3 .
                  reverse . splitDirectories . dropExtension
 
-getHaskellMsgFiles :: FilePath -> String -> IO [FilePath]
-getHaskellMsgFiles pkgPath _pkgName = do
+getHaskellFiles :: FilePath -> String -> IO [FilePath]
+getHaskellFiles pkgPath _pkgName = do
   d <- codeGenDir pkgPath
   map (d </>) . filter ((== ".hs") . takeExtension) <$> getDirectoryContents d
 
@@ -189,7 +200,7 @@ genMsgCabal pkgPath pkgName =
      let deps
            | pkgName == "std_msgs" = deps'
            | otherwise = nub ("ROS-std-msgs":deps')
-     msgFiles <- getHaskellMsgFiles pkgPath pkgName
+     msgFiles <- getHaskellFiles pkgPath pkgName
      let msgModules = map (B.pack . path2MsgModule) msgFiles
          target = B.intercalate "\n" $
                   [ "Library"

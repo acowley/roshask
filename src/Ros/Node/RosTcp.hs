@@ -1,5 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
-module Ros.Node.RosTcp (subStream, runServer, runServers) where
+module Ros.Node.RosTcp (subStream, runServer, runServers, callServiceWithMaster) where
 import Control.Applicative ((<$>))
 import Control.Arrow (first)
 import Control.Concurrent (forkIO, killThread, newEmptyMVar, takeMVar, putMVar)
@@ -12,15 +12,19 @@ import Data.Binary.Get (runGet, getWord32le)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
+
 import Network.BSD (getHostByName, hostAddress)
-import Network.Socket hiding (send, sendTo, recv, recvFrom, Stream)
+import Network.Socket hiding (send, sendTo, recv, recvFrom, Stream, ServiceName)
 import qualified Network.Socket as Sock
 import Network.Socket.ByteString
-import System.IO (IOMode(ReadMode))
-import Text.URI (parseURI, uriRegName)
+import Prelude hiding (getContents)
 
-import Ros.Node.BinaryIter (streamIn)
+import System.IO (IOMode(ReadMode), hClose)
+import Text.URI (parseURI, uriRegName, uriPort)
+
+import Ros.Node.BinaryIter (streamIn, getServiceResult)
 import Ros.Internal.Msg.MsgInfo
+import Ros.Internal.Msg.SrvInfo
 import Ros.Internal.RosBinary
 import Ros.Internal.RosTypes
 import Ros.Internal.Util.RingChan
@@ -28,15 +32,25 @@ import Ros.Internal.Util.AppConfig (Config, debug, forkConfig)
 import Ros.Topic (Topic(..))
 import Ros.Node.ConnectionHeader
 import Ros.Graph.Slave (requestTopicClient)
+import Ros.Graph.Master (lookupService)
+import Data.Maybe (fromMaybe)
+import Ros.Service.ServiceTypes
+import Control.Monad.Except
+import System.IO.Error (tryIOError)
 
 -- |Push each item from this client's buffer over the connected
 -- socket.
 serviceClient :: RingChan ByteString -> Socket -> IO ()
 serviceClient c s = forever $ do bs <- readChan c
-                                 let len = runPut $ 
-                                           putWord32le . fromIntegral $ 
-                                           BL.length bs
-                                 sendAll s (BL.toStrict $ BL.append len bs)
+                                 sendBS s bs
+
+sendBS :: Socket -> ByteString -> IO ()
+sendBS sock bs =
+  let len = runPut $ 
+            putWord32le . fromIntegral $ 
+            BL.length bs
+  in
+   sendAll sock (BL.toStrict $ BL.append len bs)
 
 recvAll :: Socket -> Int -> IO B.ByteString
 recvAll s = flip go []
@@ -124,6 +138,7 @@ pubStreamIO = do m <- newEmptyMVar
                  return (feed, putMVar m)
 
 -- Negotiate a TCPROS subscriber connection.
+-- Precondition: The socket is connected
 negotiateSub :: Socket -> String -> String -> String -> IO ()
 negotiateSub sock tname ttype md5 = 
     do sendAll sock $ genHeader [ ("callerid", "roshask"), ("topic", tname)
@@ -169,13 +184,105 @@ subStream target tname _updateStats =
        --hSetBuffering h NoBuffering
        debug $ "Streaming "++tname++" from "++target
        return $ streamIn h
-    where host = case parseURI target of
-                   Just u -> case uriRegName u of
-                               Just host' -> host'
-                               Nothing -> error $ "Couldn't parse hostname "++ 
-                                                  "from "++target
-                   Nothing -> error $ "Couldn't parse URI "++target
+    where host = parseHost target
 
+parseHost :: URI -> String
+parseHost target = case parseURI target of
+  Just u -> fromMaybe
+            (error $ "Couldn't parse hostname "++ "from "++target)
+            (uriRegName u)
+  Nothing -> error $ "Couldn't parse URI "++target
+
+parseHostAndPort :: URI -> Either ServiceResponseExcept (String, PortNumber)
+parseHostAndPort target = do
+  uri <- maybeToEither (ConnectExcept $ "Could not parse URI "++target) $ parseURI target
+  host <- maybeToEither (ConnectExcept $ "Could not parse hostname from "++target) $ uriRegName uri
+  port <- maybeToEither (ConnectExcept $ "Could not parse port from "++target) $ uriPort uri
+  return (host, fromIntegral port)
+
+maybeToEither :: a -> Maybe b -> Either a b
+maybeToEither left m = case m of
+  Just x -> Right x
+  Nothing -> Left left
+
+--TODO: use the correct callerID
+callServiceWithMaster :: forall a b. (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) =>
+                         URI -> ServiceName -> a -> IO (Either ServiceResponseExcept b)
+callServiceWithMaster rosMaster serviceName message = runExceptT $ do
+  checkServicesMatch message (undefined::b)
+  --lookup the service with the master
+  (code, statusMessage, serviceUrl) <- lookupService rosMaster callerID serviceName
+  checkLookupServiceCode code statusMessage
+  (host, port) <- ExceptT . return $ parseHostAndPort serviceUrl
+  -- make a socket
+  let makeSocket = socket AF_INET Sock.Stream defaultProtocol
+      closeSocket sock = liftIO $ sClose sock
+      withSocket sock = do
+        ioErrorToExceptT ConnectExcept "Problem connecting to server. Got exception : " $ do
+          --Connect to the socket
+          ip <- hostAddress <$> getHostByName host
+          connect sock $ SockAddrInet port ip
+        let reqMd5 = srvMD5 message
+            reqServiceType = srvTypeName message
+        negotiateService sock serviceName reqServiceType reqMd5
+        let bytes = runPut $ putMsg 0 message
+        ioErrorToExceptT SendRequestExcept "Problem sending request. Got exception: " $
+          sendBS sock bytes
+        liftIO $ socketToHandle sock ReadMode
+  handle <- bracketOnErrorME (liftIO makeSocket) closeSocket withSocket
+  result <- getServiceResult handle
+  liftIO $ hClose handle
+  return result
+    where
+      callerID = "roshask"
+      checkLookupServiceCode 1 _ = return ()
+      checkLookupServiceCode code statusMessage =
+        throwError $ MasterExcept
+        ("lookupService failed, code: " ++ show code ++ ", statusMessage: " ++ statusMessage)
+      checkServicesMatch x y =
+        unless match $
+          -- throw error here since the calling code needs to be changed
+          error "Request and response type do not match"
+        where
+          match = srvMD5 x == srvMD5 y && srvTypeName x == srvTypeName y
+
+-- | bracketOnError equivalent for MonadError
+bracketOnErrorME :: MonadError e m => m a -> (a -> m b) -> (a -> m c) -> m c
+bracketOnErrorME before after thing = do
+  a <- before
+  let handler e = after a >> throwError e
+  catchError (thing a) handler
+
+-- | Catch any IOErrors and convert them to a different type
+catchConvertIO :: (String -> a) -> IO b -> IO (Either a b)
+catchConvertIO excep action = do
+  err <- tryIOError action
+  return $ case err of
+    Left e -> Left . excep $ show e
+    Right r -> Right r
+
+-- | Catch all IOErrors that might occur and convert them to a custom error type
+-- with the IOError message postpended to the given string
+ioErrorToExceptT :: (String -> e) -> String -> IO a -> ExceptT e IO a
+ioErrorToExceptT except msg acc =
+  ExceptT . catchConvertIO (\m -> except $ msg ++ m) $ acc
+
+-- Precondition: The socket is already connected to the server
+-- Exchange ROSTCP connection headers with the server
+negotiateService :: Socket -> String -> String -> String -> ExceptT ServiceResponseExcept IO ()
+negotiateService sock serviceName serviceType md5 = do
+    headerBytes <- liftIO $
+      do sendAll sock $ genHeader [ ("callerid", "roshask"), ("service", serviceName)
+                                , ("md5sum", md5), ("type", serviceType) ]
+         responseLength <- runGet (fromIntegral <$> getWord32le) <$>
+                           BL.fromChunks . (:[]) <$> recvAll sock 4
+         recvAll sock responseLength
+    let connHeader = parseHeader headerBytes
+    case lookup "error" connHeader of
+      Nothing -> return ()
+      Just _ -> throwError . ConHeadExcept $
+                "Connection header from server has error, connection header is: " ++ show connHeader
+                                    
 -- Helper to run the publisher's side of a topic negotiation with a
 -- new client.
 mkPubNegotiator :: MsgInfo a => a -> Socket -> IO ()
