@@ -13,13 +13,12 @@ import Control.Monad (when, zipWithM_)
 import Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as B
 import Data.Char (isSpace)
-import Data.Either (rights)
 import qualified Data.Foldable as F
-import Data.List (findIndex, intercalate, isSuffixOf, isPrefixOf, nub)
+import Data.List (intercalate, isSuffixOf, isPrefixOf, nub)
 import Data.Version (versionBranch)
 import Gen (generateMsgType, generateSrvTypes)
 import Parse (parseMsg, parseSrv)
-import Types (Srv, requestResponseNames)
+import Types (requestResponseNames, shortName)
 import Paths_roshask (version, getBinDir)
 
 import Ros.Internal.DepFinder (findMessages, findDepsWithMessages, hasMsgsOrSrvs, findServices)
@@ -114,6 +113,40 @@ buildPkgMsgs fname = do tools <- liftIO toolPaths
                                "Using existing " ++ pathToRosPkg fname
                           else buildNewPkgMsgs tools fname
 
+parseErrorMsg :: Show a => a -> String -> Either String c -> c
+parseErrorMsg = parseErrorHelper "message"
+
+parseErrorSrv :: Show a => a -> String -> Either String c -> c
+parseErrorSrv = parseErrorHelper "service"
+
+parseErrorHelper :: Show a => String -> a -> String -> Either String c -> c
+parseErrorHelper srvOrMsg pkgHier fileName =
+  either
+  (\s -> error $ "In package: " ++ show pkgHier ++ "Could not parse " ++ srvOrMsg ++ " in file " ++ fileName ++" . Got error :" ++ s)
+  id
+
+dirAndNameToFile :: FilePath -> String -> FilePath
+dirAndNameToFile destDir = (destDir </>) . (++ ".hs")
+
+-- | Given a FilePath to a service file, will parse the service, generate the Haskell
+-- request and response types, and write these types to a directory. This requires
+-- knowing the Haskell names for the other messages in the current package
+parseGenWriteService :: ByteString -> String -> [ByteString] -> FilePath -> MsgInfo ()
+parseGenWriteService pkgHier destDir haskellPkgMsgNames srvFile = do
+  parsedSrv <- liftIO $ parseErrorSrv pkgHier srvFile <$> parseSrv srvFile
+  (request, response) <- generateSrvTypes pkgHier haskellPkgMsgNames parsedSrv
+  let fname = map (dirAndNameToFile destDir) $ requestResponseNames parsedSrv
+  liftIO $ zipWithM_ B.writeFile fname [request, response]
+
+-- | Given a FilePath to a message file, will parse the message and generate and write
+-- the Haskell type to a directory.
+parseGenWriteMsg :: ByteString -> String -> [ByteString] -> FilePath -> MsgInfo ()
+parseGenWriteMsg pkgHier destDir haskellPkgMsgNames msgFile = do
+  parsedMsg <- liftIO $ parseErrorMsg pkgHier msgFile <$> parseMsg msgFile
+  generatedMsg <- generateMsgType pkgHier haskellPkgMsgNames parsedMsg
+  let fname = dirAndNameToFile destDir $ shortName parsedMsg
+  liftIO $ B.writeFile fname generatedMsg
+
 -- | Generate Haskell implementations of all message definitions in
 -- the given package.
 buildNewPkgMsgs :: ToolPaths -> FilePath -> MsgInfo ()
@@ -123,36 +156,13 @@ buildNewPkgMsgs tools fname =
      liftIO $ createDirectoryIfMissing True destDir
      pkgMsgs <- liftIO $ findMessages fname
      pkgSrvs <- liftIO $ findServices fname
-     let pkgMsgs' = map (B.pack . cap . dropExtension . takeFileName) pkgMsgs
-         checkErrors xs = case findIndex isLeft xs of
-                            Nothing -> rights xs
-                            Just i -> err (pkgMsgs !! i)
-         names = map ((destDir </>)
-                      . flip replaceExtension ".hs"
-                      . cap
-                      . takeFileName)
-                     pkgMsgs
-         gen = generateMsgType pkgHier pkgMsgs'
-     parsedMsgs <- liftIO $ checkErrors <$> mapM parseMsg pkgMsgs
-     parsedSrvs <- liftIO $ mapM parseSrv pkgSrvs
-     let parsedSrvs' = either
-                       (\s -> error $ "In package: " ++ fname ++ "Could not parse service: " ++ s)
-                       id <$> parsedSrvs
-         genAndWriteService :: Srv -> MsgInfo ()
-         genAndWriteService srv = do
-           (request, response) <- generateSrvTypes pkgHier pkgMsgs' srv
-           let fnames = map ((destDir </>)
-                              . (++ ".hs")) $ requestResponseNames srv
-           liftIO $ zipWithM_ B.writeFile fnames [request, response]
-     mapM_ (\(n, m) -> gen m >>= liftIO . B.writeFile n) (zip names parsedMsgs)
-     mapM_ genAndWriteService parsedSrvs'
+     let haskellMsgNames = map (B.pack . cap . dropExtension . takeFileName) pkgMsgs
+     mapM_ (parseGenWriteMsg pkgHier destDir haskellMsgNames) pkgMsgs
+     mapM_ (parseGenWriteService pkgHier destDir haskellMsgNames) pkgSrvs
      liftIO $ do f <- hasMsgsOrSrvs fname
                  when f (removeOldCabal fname >> compileMsgs)
-    where err pkg = error $ "Couldn't parse message " ++ pkg
-          pkgName = pathToRosPkg fname
+    where pkgName = pathToRosPkg fname
           pkgHier = B.pack $ "Ros." ++ cap pkgName ++ "."
-          isLeft (Left _) = True
-          isLeft _ = False
           compileMsgs = do cpath <- genMsgCabal fname pkgName
                            (_,_,_,procH) <- createProcess $
                              cabalInstall tools ["install", cpath]
@@ -205,12 +215,12 @@ genMsgCabal pkgPath pkgName =
          target = B.intercalate "\n" $
                   [ "Library"
                   , B.append "  Exposed-Modules: " 
-                             (if (not (null msgModules))
-                              then B.concat [ head msgModules
-                                            , "\n" 
-                                            , B.intercalate "\n" 
-                                                (map indent (tail msgModules)) ]
-                              else "")
+                    (if not (null msgModules)
+                    then B.concat [ head msgModules
+                                  , "\n" 
+                                  , B.intercalate "\n" 
+                                    (map indent (tail msgModules)) ]
+                    else "")
                   , ""
                   , "  Build-Depends:   base >= 4.2 && < 6,"
                   , "                   vector > 0.7,"
