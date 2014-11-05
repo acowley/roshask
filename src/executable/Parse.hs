@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings, TupleSections #-}
 -- | Parser components for the ROS message description language (@msg@
 -- files). See http://wiki.ros.org/msg for reference.
-module Parse (parseMsg, simpleFieldAssoc) where
+module Parse (parseMsg, parseSrv, simpleFieldAssoc) where
 import Prelude hiding (takeWhile)
 import Control.Applicative
 import Control.Arrow ((&&&))
@@ -32,7 +32,7 @@ parseName = skipSpace *> identifier <* eatLine <* try comment
 
 identifier :: Parser ByteString
 identifier = B.cons <$> letter_ascii <*> takeWhile validChar
-    where validChar c = or (map ($ c) [isDigit, isAlpha_ascii, (== '_'), (== '/')])
+    where validChar c = any ($ c) [isDigit, isAlpha_ascii, (== '_'), (== '/')]
 
 parseInt :: Parser Int
 parseInt = foldl' (\s x -> s*10 + digitToInt x) 0 <$> many1 digit
@@ -97,7 +97,7 @@ fieldParsers :: [Parser (Either (ByteString, MsgType)
 fieldParsers = map (comment *>) $
                map (Right . sanitizeConstants <$>) constParsers ++ 
                map (Left <$>) (builtIns ++ [userTypeParser])
-    where builtIns = concatMap (flip map simpleFieldAssoc)
+    where builtIns = concatMap (`map` simpleFieldAssoc)
                                [simpleParser, fixedArrayParser, varArrayParser]
 
 mkParser :: MsgName -> String -> ByteString -> Parser Msg
@@ -137,12 +137,43 @@ pkgName f = let parts = splitDirectories f
 parseMsg :: FilePath -> IO (Either String Msg)
 parseMsg fname = do msgFile <- B.readFile fname
                     let tName = msgName . dropExtension . takeFileName $ fname
-                        longName = pkgName fname
-                        parser = comment *> mkParser tName longName msgFile
-                    case feed (parse parser msgFile) "" of
-                      Done leftOver msg
-                          | B.null leftOver -> return $ Right msg
-                          | otherwise -> return $ Left $ "Couldn't parse " ++ 
-                                                         unpack leftOver
-                      Fail _ _ctxt err -> return $ Left err
-                      Partial _ -> return $ Left "Incomplete msg definition"
+                        packageName = pkgName fname
+                    return $ parseMsgWithName tName packageName msgFile
+
+parseMsgWithName :: MsgName -> String -> ByteString -> Either String Msg
+parseMsgWithName name packageName msgFile =
+  case feed (parse parser msgFile) "" of
+    Done leftOver msg
+      | B.null leftOver -> Right msg
+      | otherwise -> Left $ "Couldn't parse " ++ 
+                     unpack leftOver
+    Fail _ _ctxt err -> Left err
+    Partial _ -> Left "Incomplete msg definition"
+  where
+    parser = comment *> mkParser name packageName msgFile
+
+-- | Parse a service file by splitting the file into a request and a response
+-- | and parsing each part separately.
+parseSrv :: FilePath -> IO (Either String Srv)
+parseSrv fname = do
+  srvFile <- B.readFile fname
+  let (request, response) = splitService srvFile
+      packageName = pkgName fname
+      rawServiceName = dropExtension . takeFileName $ fname
+  return $ do
+    rqst <- parseMsgWithName (requestMsgName rawServiceName) packageName request
+    resp <- parseMsgWithName (responseMsgName rawServiceName) packageName response
+    return Srv{srvRequest = rqst
+              , srvResponse = resp
+              , srvName = msgName rawServiceName
+              , srvPackage = packageName
+              , srvSource = srvFile}
+
+splitService :: ByteString -> (ByteString, ByteString)
+splitService service = (request, response) where
+  -- divider does not include newlines to allow it match even
+  -- if there is no request or response message
+  divider = "---"
+  (request, dividerAndResponse) = B.breakSubstring divider service
+  --Add 1 to the length of the divider to remove newline
+  response = B.drop (1 + B.length divider) dividerAndResponse

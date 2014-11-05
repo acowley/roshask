@@ -3,7 +3,8 @@
 module Ros.Internal.DepFinder (findPackageDeps, findPackageDepNames, 
                                findPackageDepsTrans,
                                findMessages, findMessage, findMessagesInPkg,
-                               findDepsWithMessages, hasMsgs
+                               findDepsWithMessages, hasMsgsOrSrvs,
+                               findServices
                               ) where
 import Control.Applicative ((<$>))
 import Control.Monad (when, filterM)
@@ -24,7 +25,7 @@ findPackagePath :: [FilePath] -> Package -> Maybe FilePath
 findPackagePath search pkg = find ((== pkg) . last . splitPath) search
 
 -- Get the packages listed as dependencies in an XML manifest.  NOTE:
--- In version 1.3.7, the xml package gained the ability to work with
+-- In version 1.3.7, the "xml" package gained the ability to work with
 -- ByteStrings via the XmlSource typeclass. Consider that upgrade if
 -- performance is causing trouble.
 getPackages :: String -> Maybe [Package]
@@ -65,10 +66,10 @@ getRosPaths =
 -- dependencies.
 ignoredPackages :: [String]
 ignoredPackages = ["genmsg_cpp", "rospack", "rosconsole", "rosbagmigration", 
-                   "roscpp", "rospy", "roslisp", "std_srvs", "roslib", "boost"]
+                   "roscpp", "rospy", "roslisp", "roslib", "boost"]
 
 -- |Find the names of the ROS packages this package depends on as
--- indicated by the manifest.xml file in this package's root
+-- indicated by the manifest.xml or package.xml file in this package's root
 -- directory.
 findPackageDepNames :: FilePath -> IO [String]
 findPackageDepNames pkgRoot = 
@@ -86,9 +87,9 @@ findPackageDepNames pkgRoot =
           Just ps -> return . nub $ filter (not . (`elem` ignoredPackages)) ps
 
 -- |Returns 'True' if the ROS package at the given 'FilePath' defines
--- any messages.
-hasMsgs :: FilePath -> IO Bool
-hasMsgs = fmap (not . null) . F.find (depth <? 2) (extension ==? ".msg")
+-- any messages or services
+hasMsgsOrSrvs :: FilePath -> IO Bool
+hasMsgsOrSrvs = fmap (not . null) . F.find (depth <? 2) (extension ==? ".msg" ||? extension ==? ".srv")
 
 {-
 -- |Returns 'True' if the ROS package at the given 'FilePath' is a
@@ -101,12 +102,12 @@ isRoshask pkgPath = not . null . filter ((== ".cabal") . takeExtension) <$>
 
 -- |Find the names of the ROS packages the package at the given
 -- 'FilePath' depends on as indicated by its @manifest.xml@ file. Only
--- those packages that define messages are returned.
+-- those packages that define messages or services are returned.
 findDepsWithMessages :: FilePath -> IO [String]
 findDepsWithMessages pkgRoot = 
   do names <- findPackageDepNames pkgRoot
      searchPaths <- getRosPaths
-     filterM (maybe (return False) hasMsgs . findPackagePath searchPaths) names
+     filterM (maybe (return False) hasMsgsOrSrvs . findPackagePath searchPaths) names
 
 -- |Find the paths to the packages this package depends on as
 -- indicated by the manifest.xml file in this package's root
@@ -128,6 +129,8 @@ findPackageDeps pkgRoot =
 -- root directories of the dependencies, and so on.
 findPackageDepsTrans :: FilePath -> IO [FilePath]
 findPackageDepsTrans pkgRoot =
+  -- searchPaths is a list of all directories on the ROS package path that have
+  -- either a manifest.xml(rosbuild), or a package.xml(new replacement for manifest.xml)
   do searchPaths <- getRosPaths
      let getDeps pkg = 
            do pkgDeps <- findPackageDepNames pkg
@@ -149,6 +152,13 @@ findMessages pkgRoot =
   do e <- doesDirectoryExist dir
      if e then F.find (depth <? 1) (extension ==? ".msg") dir else return []
   where dir = pkgRoot </> "msg"
+        
+--TODO: refactor with findMessages
+findServices :: FilePath -> IO [FilePath]
+findServices pkgRoot =
+  do e <- doesDirectoryExist dir
+     if e then F.find (depth <? 1) (extension ==? ".srv") dir else return []
+  where dir = pkgRoot </> "srv"
 
 -- |Find all message definition files in a ROS package. Returns the
 -- 'FilePath' to the package, and the 'FilePath' to each message
