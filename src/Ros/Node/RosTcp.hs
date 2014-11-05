@@ -70,7 +70,8 @@ negotiatePub ttype md5 sock =
        case lookup "tcp_nodelay" connHeader of
          Just "1" -> setSocketOption sock NoDelay 0
          _ -> return ()
-       sendAll sock $ genHeader [("md5sum",md5),("type",ttype)]
+       sendAll sock . genHeader $
+         [("md5sum",md5), ("type",ttype), ("callerid","roshask")]
 
 -- |Accept new client connections. A new send buffer is allocated for
 -- each new client and added to the client list along with an action
