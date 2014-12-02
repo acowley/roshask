@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Main where
 import qualified Ros.Test_srvs.AddTwoIntsRequest as Req
 import qualified Ros.Test_srvs.AddTwoIntsResponse as Res
@@ -98,6 +99,8 @@ instance RosBinary BadName where
   put (BadName x) = put x
   get = BadName <$> get
 
+#if MIN_VERSION_base(4,7,0)
+#else
 instance Eq ErrorCall where
     x == y = (show x) == (show y)
-
+#endif
