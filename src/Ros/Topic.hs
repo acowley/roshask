@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 -- |The ROS Topic type and basic operations on Topics.
 --
 -- /Note/: Many of these operations have the same names as similar
@@ -6,7 +6,9 @@
 -- using either qualification (e.g. @import qualified Ros.TopicUtil as
 -- T@), an explicit import list, or a @hiding@ clause.
 module Ros.Topic where
+#if __GLASGOW_HASKELL__ >= 710
 import Prelude hiding (join)
+#endif
 import Control.Applicative
 import Control.Arrow ((***), second)
 import Control.Monad ((<=<), (>=>))

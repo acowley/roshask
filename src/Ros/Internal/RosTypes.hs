@@ -1,7 +1,7 @@
 -- |Utility types for working with ROS.
 module Ros.Internal.RosTypes (ROSTime, ROSDuration, URI, CallerID, TopicName, 
                               NodeName, ParamName, TopicType, 
-                              ConnectionID) where
+                              ConnectionID, ServiceName) where
 import Data.Word (Word32)
 import Foreign.Storable.Tuple ()
 
@@ -12,6 +12,7 @@ type NodeName     = String
 type ParamName    = String
 type TopicType    = String
 type ConnectionID = Int
+type ServiceName  = String
 
 -- |ROSTime is a tuple of (seconds, nanoseconds)
 type ROSTime = (Word32, Word32)
