@@ -10,7 +10,8 @@ Copyright:           (c) 2010 Anthony Cowley
 Category:            Robotics
 Build-type:          Simple
 Bug-reports:         http://github.com/acowley/roshask/issues
-Tested-with:         GHC==6.12.3
+Homepage:            http://github.com/acowley/roshask
+Tested-with:         GHC >= 7.6
 Description:         Tools for working with ROS in Haskell.
                      .
                      ROS (<http://www.ros.org>) is a software
