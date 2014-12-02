@@ -51,12 +51,6 @@ Extra-source-files:  Examples/PubSub/CMakeLists.txt
                      Examples/Turtle/mainpage.dox
                      Examples/Turtle/manifest.xml
                      Examples/Turtle/src/*.hs
-                     Examples/NodePlugins/Makefile
-                     Examples/NodePlugins/NodePlugins.cabal
-                     Examples/NodePlugins/Setup.hs
-                     Examples/NodePlugins/mainpage.dox
-                     Examples/NodePlugins/manifest.xml
-                     Examples/NodePlugins/src/*.hs
 
 Source-repository head
   type:     git
