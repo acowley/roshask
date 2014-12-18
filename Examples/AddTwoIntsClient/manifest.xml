@@ -1,0 +1,15 @@
+<package>
+  <description brief="AddTwoIntsClient">
+
+     AddTwoIntsClient
+
+  </description>
+  <author>robbie</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/AddTwoIntsClient</url>
+  <depend package="rospy_tutorials"/>
+
+</package>
+
+

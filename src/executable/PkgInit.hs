@@ -56,7 +56,7 @@ prepCabal pkgName rosDeps = B.writeFile (pkgName</>(pkgName++".cabal")) $
                    , "                   vector > 0.7,"
                    , "                   time >= 1.1,"
                    , "                   ROS-rosgraph-msgs,"
-                   , B.append "                   roshask == 0.1.*" moreDeps
+                   , B.append "                   roshask == 0.2.*" moreDeps
                    , rosDeps
                    , "  GHC-Options:     -O2"
                    , "  Hs-Source-Dirs:  src"
@@ -67,7 +67,7 @@ prepCabal pkgName rosDeps = B.writeFile (pkgName</>(pkgName++".cabal")) $
                 , "  Build-Depends:   base >= 4.2 && < 6,"
                 , "                   vector > 0.7,"
                 , "                   time >= 1.1,"
-                , B.append "                   roshask == 0.1.*" moreDeps
+                , B.append "                   roshask == 0.2.*" moreDeps
                 , rosDeps
                 , "  GHC-Options:     -O2"
                 , B.concat ["  Exposed-Modules: ", pkgName']
@@ -109,4 +109,3 @@ prepLib pkgName = writeFile (pkgName</>"src"</>pkgName'++".hs") . concat $
                   , nodeName++" = return ()\n"]
   where pkgName' = toUpper (head pkgName) : tail pkgName
         nodeName = toLower (head pkgName) : tail pkgName
-                       
