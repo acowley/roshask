@@ -1,0 +1,15 @@
+Name:              ROS-AddTwoIntsClient
+Version:           0.0
+Synopsis:          I am code
+Cabal-version:     >=1.6
+Category:          Robotics
+Build-type:        Custom
+
+Executable AddTwoIntsClient
+  Build-Depends:   base >= 4.2 && < 6,
+                   roshask == 0.2.*,
+                   ROS-rospy-tutorials-msgs
+
+  GHC-Options:     -O2
+  Hs-Source-Dirs:  src
+  Main-Is:         Main.hs
