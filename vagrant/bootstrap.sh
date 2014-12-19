@@ -36,6 +36,7 @@ wget https://raw.githubusercontent.com/haskell/cabal/master/cabal-install/bash-c
 su vagrant <<'EOF'
 echo 'PATH=/home/vagrant/.cabal/bin:/opt/ghc/7.8.3/bin:/opt/cabal/1.20/bin:$PATH' >> ~/.bashrc
 echo 'PATH=/opt/ros/indigo/bin:$PATH' >> ~/.bashrc
+echo 'alias roshask=/home/vagrant/roshask/dist/build/roshask/roshask' >> ~/.bashrc
 /opt/cabal/1.20/bin/cabal update
 /opt/cabal/1.20/bin/cabal install cabal-install
 echo "Host github.com" > ~/.ssh/config
