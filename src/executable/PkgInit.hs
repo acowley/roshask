@@ -5,10 +5,12 @@ import Data.ByteString.Char8 (ByteString, pack)
 import qualified Data.ByteString.Char8 as B
 import Data.Char (toLower, toUpper)
 import Data.List (intercalate)
+import Data.Version (versionBranch)
 import System.Directory (createDirectory)
 import System.FilePath ((</>))
 import System.Process (system)
 
+import Paths_roshask (version)
 import PkgBuilder (rosPkg2CabalPkg)
 
 -- |Initialize a package with the given name in the eponymous
@@ -39,6 +41,15 @@ prepCMakeLists :: String -> IO ()
 prepCMakeLists pkgName = B.appendFile (pkgName</>"CMakeLists.txt") cmd
     where cmd = "\nadd_custom_target(roshask ALL roshask dep ${PROJECT_SOURCE_DIR} COMMAND cd ${PROJECT_SOURCE_DIR} && cabal install)\n"
 
+-- | New packages are constrained to the same major version of roshask
+-- that was used to create them.
+roshaskVersionBound :: ByteString
+roshaskVersionBound = B.pack . ("roshask == "++)
+                      . intercalate "."
+                      . (++["*"])
+                      . map show
+                      $ take 2 (versionBranch version  ++ [0..])
+
 -- Generate a .cabal file and a Setup.hs that will perform the
 -- necessary dependency tracking and code generation.
 prepCabal :: String -> ByteString -> IO ()
@@ -67,7 +78,8 @@ prepCabal pkgName rosDeps = B.writeFile (pkgName</>(pkgName++".cabal")) $
                 , "  Build-Depends:   base >= 4.2 && < 6,"
                 , "                   vector > 0.7,"
                 , "                   time >= 1.1,"
-                , B.append "                   roshask == 0.2.*" moreDeps
+                , B.concat [
+                  "                   ", roshaskVersionBound, moreDeps ]
                 , rosDeps
                 , "  GHC-Options:     -O2"
                 , B.concat ["  Exposed-Modules: ", pkgName']
