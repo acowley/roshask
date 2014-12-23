@@ -160,7 +160,7 @@ Executable roshask
   GHC-Options:    -O2 -Wall
   Main-Is:        Main.hs
   Other-modules:  Analysis Gen MD5 Parse PkgInit ResolutionTypes
-                  FieldImports Unregister
+                  FieldImports Unregister PkgBuilder Types 
                   Instances.Binary Instances.Storable Instances.NFData
                   Paths_roshask
   Hs-Source-Dirs: src/executable
