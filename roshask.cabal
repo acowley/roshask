@@ -126,7 +126,7 @@ Library
     Build-depends: unix
 
 
-  GHC-Options:         -O2 -Wall
+  GHC-Options:         -Wall
   Hs-Source-Dirs:      src
   default-language: Haskell2010
   -- Modules not exported by this package.
