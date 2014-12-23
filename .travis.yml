@@ -27,7 +27,7 @@ script:
   - cabal configure --enable-tests
   - cabal build
   - cabal test testexe
-  - cabal check
+  - cabal check || true
   - cabal sdist
 
 # The following scriptlet checks that the resulting source distribution can be built & installed
