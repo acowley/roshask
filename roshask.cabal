@@ -1,5 +1,5 @@
 Name:                roshask
-Version:             0.2
+Version:             0.2.1
 Synopsis:            Haskell support for the ROS robotics framework.
 License:             BSD3
 License-file:        LICENSE
