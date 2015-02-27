@@ -5,9 +5,8 @@ import Network.XmlRpc.Client
 import Ros.Internal.RosTypes
 import Ros.Service.ServiceTypes
 import Network.XmlRpc.Internals (fromValue, toValue)
-import Control.Monad.Except (ExceptT(..))
+import Control.Monad.Except (ExceptT(..), runExceptT)
 import System.IO.Error (catchIOError)
-import Control.Monad.Error (runErrorT)
 
 -- |Subscribe the caller to the specified topic. In addition to
 -- receiving a list of current publishers, the subscriber will also
@@ -53,7 +52,7 @@ unregisterPublisher = flip remote "unregisterPublisher"
 lookupService :: URI -> String -> ServiceName -> ExceptT ServiceResponseExcept IO (Int, String, String)
 lookupService u s1 s2 = ExceptT . (flip catchIOError) handler $ do
   let res = call u "lookupService" (fmap toValue [s1, s2]) >>= fromValue
-  err <- runErrorT res
+  err <- runExceptT res
   return $ case err of
     Left x -> Left $ MasterExcept $ "Could not look up service with master. Got message: " ++ x
     Right y -> Right y
