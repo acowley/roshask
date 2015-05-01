@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
+{-# LANGUAGE BangPatterns, FlexibleContexts, ScopedTypeVariables #-}
 module Ros.Node.RosTcp (subStream, runServer, runServers, callServiceWithMaster) where
 import Control.Applicative ((<$>))
 import Control.Arrow (first)
