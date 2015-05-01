@@ -195,6 +195,20 @@ bothNew t1 t2 = Topic $ warmup =<< runTopic (t1 <+> t2)
         go (Right _) (r@(Right _), t) = go r =<< runTopic t
         go (Right y) (Left x, t) = return ((x,y), Topic $ warmup =<< runTopic t)
 
+-- |Returns a 'Topic' that produces a new pair every time a value of
+-- first topic produces a new value, followed by a new value from the
+-- second topic. This can be used for sampling the first topic with
+-- the second topic.
+firstThenSecond :: Topic IO a -> Topic IO b -> Topic IO (a,b)
+firstThenSecond t1 t2 = leftThenRight (t1 <+> t2)
+
+-- |Produces a value when a Left value is followed by a Right value.
+leftThenRight :: (Monad m) => Topic m (Either a b) -> Topic m (a,b)
+leftThenRight t1 = Topic $ warmup =<< runTopic t1
+    where warmup (v,t) = go v =<< runTopic t
+          go (Left x) (Right y, t) = return ((x,y), Topic $ warmup =<< runTopic t)
+          go _ (x, t) = go x =<< runTopic t
+
 -- |Merge two 'Topic's into one. The items from each component
 -- 'Topic' will be added to the combined 'Topic' as they become
 -- available.
