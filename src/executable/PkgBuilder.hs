@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
 -- |Build all messages defined in a ROS package.
 module PkgBuilder where
 import Analysis
