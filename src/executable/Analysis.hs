@@ -201,8 +201,7 @@ mkFlatType RFloat32      = "P.Float"
 mkFlatType RFloat64      = "P.Double"
 mkFlatType RTime         = "ROSTime"
 mkFlatType RDuration     = "ROSDuration"
-mkFlatType (RUserType t) = qualify . pack . takeFileName . unpack $ t
-    where qualify b = B.concat [b, ".", b]
+mkFlatType (RUserType t) = pack . takeFileName . unpack $ t
 mkFlatType t             = error $ show t ++ " is not a flat type"
 
 -- Given a home package name and a ROS 'MsgType', generate a Haskell

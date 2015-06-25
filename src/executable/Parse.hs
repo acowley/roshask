@@ -9,7 +9,7 @@ import Data.Attoparsec.ByteString.Char8
 import Data.ByteString (ByteString)
 import Data.ByteString.Char8 (pack, unpack)
 import qualified Data.ByteString.Char8 as B
-import Data.Char (toLower, digitToInt)
+import Data.Char (toLower, toUpper, digitToInt)
 import Data.Either (partitionEithers)
 import Data.List (foldl')
 import System.FilePath (dropExtension, takeFileName, splitDirectories)
@@ -103,14 +103,20 @@ fieldParsers = map (comment *>) $
 mkParser :: MsgName -> String -> ByteString -> Parser Msg
 mkParser sname lname txt = aux . partitionEithers <$> many (choice fieldParsers)
   where aux (fs, cs) = Msg sname lname txt
-                           (map buildField fs)
-                           (map buildConst cs)
+                           (map (buildField sname) fs)
+                           (map (buildConst sname) cs)
 
-buildField :: (ByteString, MsgType) -> MsgField
-buildField (name,typ) = MsgField (sanitize name) typ name
+fullName :: MsgName -> ByteString -> ByteString
+fullName (MsgName sname _) fname =
+    B.concat [pack sname, pack [toUpper (B.head fname)], B.tail fname]
 
-buildConst :: (ByteString, MsgType, ByteString) -> MsgConst
-buildConst (name,typ,val) = MsgConst (sanitize name) typ val name
+buildField :: MsgName -> (ByteString, MsgType) -> MsgField
+buildField m (name,typ) = MsgField fullname typ name
+  where fullname = B.append "_" $ sanitize $ fullName m name
+
+buildConst :: MsgName -> (ByteString, MsgType, ByteString) -> MsgConst
+buildConst m (name,typ,val) = MsgConst fullname typ val name
+  where fullname = sanitize $ fullName m name
 
 {-
 testMsg :: ByteString
@@ -123,10 +129,12 @@ test = feed (parse (comment *> (mkParser "" "" testMsg)) testMsg) ""
 -- Ensure that field and constant names are valid Haskell identifiers
 -- and do not coincide with Haskell reserved words.
 sanitize :: ByteString -> ByteString
+{-
 sanitize "data" = "_data"
 sanitize "type" = "_type"
 sanitize "class" = "_class"
 sanitize "module" = "_module"
+-}
 sanitize x = B.cons (toLower (B.head x)) (B.tail x)
 
 pkgName :: FilePath -> String
