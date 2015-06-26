@@ -1,5 +1,5 @@
 Name:                roshask
-Version:             0.2.1
+Version:             0.3
 Synopsis:            Haskell support for the ROS robotics framework.
 License:             BSD3
 License-file:        LICENSE
@@ -159,7 +159,8 @@ Executable roshask
   Main-Is:        Main.hs
   Other-modules:  Analysis Gen MD5 Parse PkgInit ResolutionTypes
                   FieldImports Unregister PkgBuilder Types 
-                  Instances.Binary Instances.Storable Instances.NFData
+                  Instances.Binary Instances.Storable
+                  Instances.Lens Instances.NFData
                   Paths_roshask
   Hs-Source-Dirs: src/executable
 
