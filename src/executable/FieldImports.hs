@@ -46,12 +46,11 @@ typeDependency p m (RFixedArray _ t)    = S.union vectorDeps $
 typeDependency p m (RVarArray t)        = S.union vectorDeps $
                                        typeDependency p m t
 typeDependency _ _ (RUserType "Header") = 
-    S.fromList ["qualified Ros.Std_msgs.Header as Header", 
+    S.fromList ["Ros.Std_msgs.Header",
                 "Ros.Internal.Msg.HeaderSupport"]
 typeDependency p m (RUserType ut)       = if elem ut m
                                           then singleton $ 
-                                               B.concat ["qualified ", p, ut, 
-                                                         " as ", ut]
+                                               B.append p ut
                                           else path2Module ut
 typeDependency _ _ _                    = S.empty
 
@@ -62,10 +61,9 @@ typeDependency _ _ _                    = S.empty
 path2Module :: ByteString -> Set ByteString
 path2Module p 
     | B.elem '/' p = singleton $
-                     B.concat ["qualified Ros.",
-                               B.intercalate "." . map cap $ parts,
-                               " as ", last parts]
+                     B.append "Ros." $
+                              B.intercalate "." . map cap $ parts
     | otherwise    = singleton $
-                     B.concat ["qualified Ros.Std_msgs.", p, " as ", p]
+                     B.append"Ros.Std_msgs." p
     where cap s = B.cons (toUpper (B.head s)) (B.tail s)
           parts = B.split '/' p

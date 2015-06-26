@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 -- |ROS message types.
 module Types (MsgType(..), MsgField(..), MsgConst(..),
-              MsgName, msgName, requestMsgName, responseMsgName,
+              MsgName(..), msgName, requestMsgName, responseMsgName,
               shortName, rawName, fullRosMsgName,
               fullRosSrvName,
               Msg(..), hasHeader, Srv(..),
