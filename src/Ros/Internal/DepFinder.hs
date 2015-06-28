@@ -8,7 +8,7 @@ module Ros.Internal.DepFinder (findPackageDeps, findPackageDepNames,
                               ) where
 import Control.Applicative ((<$>))
 import Control.Monad (when, filterM)
-import Data.Maybe (mapMaybe, isNothing, fromJust)
+import Data.Maybe (mapMaybe, isJust, catMaybes)
 import Data.List (find, findIndex, nub)
 import System.Directory (doesFileExist, doesDirectoryExist)
 import System.Environment (getEnvironment)
@@ -118,11 +118,19 @@ findPackageDeps pkgRoot =
     do pkgs <- findPackageDepNames pkgRoot
        searchPaths <- getRosPaths
        let pkgPaths = map (findPackagePath searchPaths) pkgs
-       case findIndex isNothing pkgPaths of
-         Just i -> putStrLn ("Looking for "++show pkgs++
-                             ", dependencies of"++pkgRoot) >>
-                   error ("Couldn't find path to package (1) " ++ (pkgs !! i))
-         Nothing -> return $ map fromJust pkgPaths
+       putStrLn $ "Looking for " ++ show pkgs ++ ", dependencies of" ++ pkgRoot
+       noticeNotFound (zip pkgPaths pkgs)
+       return $ catMaybes pkgPaths
+
+-- |Notificate end-user when packages or deps are not found.
+noticeNotFound :: [(Maybe FilePath, String)] -> IO ()
+noticeNotFound pkgs =
+    case dropWhile (isJust . fst) pkgs of
+        [] -> return ()
+        (x : xs) -> do
+            notice (snd x)
+            noticeNotFound xs
+  where notice = putStrLn . ("Couldn't find path to package " ++)
 
 -- |Transitive closure of 'findPackageDeps'. Find the paths to the
 -- packages this package depends on as indicated by the manifest.xml
@@ -136,12 +144,9 @@ findPackageDepsTrans pkgRoot =
      let getDeps pkg = 
            do pkgDeps <- findPackageDepNames pkg
               let pkgPaths = map (findPackagePath searchPaths) pkgDeps
-              case findIndex isNothing pkgPaths of
-                Just i -> putStrLn ("Looking for "++show pkgDeps++
-                                    ", dependencies of "++pkgRoot) >>
-                          error ("Couldn't find path to package (2) " ++ 
-                                 (pkgDeps !! i))
-                Nothing -> return $ map fromJust pkgPaths
+              putStrLn $ "Looking for " ++ show pkg ++ ", dependencies of" ++ pkgRoot
+              noticeNotFound (zip pkgPaths pkgDeps)
+              return $ catMaybes pkgPaths
          recurse p = do deps <- getDeps p
                         nub . (++[p]) . concat <$> mapM recurse deps
      init <$> recurse pkgRoot
