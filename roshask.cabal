@@ -110,7 +110,7 @@ Library
                        snap-server >= 0.9,
                        storable-tuple >= 0.0.2,
                        transformers >= 0.4,
-                       haxr >= 3000.10.4,
+                       haxr == 3000.10.*,
                        utf8-string >= 0.3.6,
                        uri >= 0.1.5,
                        vector-space,
