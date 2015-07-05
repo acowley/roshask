@@ -11,12 +11,13 @@ import Ros.Internal.RosBinary
 import Ros.Internal.Msg.MsgInfo
 import qualified GHC.Generics as G
 import qualified Data.Default.Generics as D
-import Control.Lens (makeLenses, view, set)
+import Lens.Family.TH (makeLenses)
+import Lens.Family (view, set)
 
 data StringConst = StringConst { _link_name :: P.String
                                } deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)
 
-makeLenses ''StringConst
+$(makeLenses ''StringConst)
 
 instance RosBinary StringConst where
   put obj' = put (_link_name obj')

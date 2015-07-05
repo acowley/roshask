@@ -15,12 +15,13 @@ import Ros.Internal.Msg.SrvInfo
 import qualified Data.Int as Int
 import Foreign.Storable (Storable(..))
 import qualified Ros.Internal.Util.StorableMonad as SM
-import Control.Lens (makeLenses, view, set)
+import Lens.Family.TH (makeLenses)
+import Lens.Family (view, set)
 
 data AddTwoIntsResponse = AddTwoIntsResponse { _sum :: Int.Int64
                                              } deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)
 
-makeLenses ''AddTwoIntsResponse
+$(makeLenses ''AddTwoIntsResponse)
 
 instance RosBinary AddTwoIntsResponse where
   put obj' = put (_sum obj')

@@ -11,8 +11,8 @@ import Ros.Logging
 import System.IO (hFlush, stdout)
 import Data.Default.Generics (def)
 import Control.Applicative ((<$>))
-import Control.Lens ((.~), (^.), (&))
 import Control.Arrow ((&&&))
+import Lens.Family ((.~), (^.), (&))
 import Data.Complex
 
 -- A type synonym for a 2D point.

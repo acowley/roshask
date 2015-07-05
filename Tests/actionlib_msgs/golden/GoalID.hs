@@ -12,13 +12,14 @@ import Ros.Internal.Msg.MsgInfo
 import qualified GHC.Generics as G
 import qualified Data.Default.Generics as D
 import Ros.Internal.RosTypes
-import Control.Lens (makeLenses, view, set)
+import Lens.Family.TH (makeLenses)
+import Lens.Family (view, set)
 
 data GoalID = GoalID { _stamp :: ROSTime
                      , _id :: P.String
                      } deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)
 
-makeLenses ''GoalID
+$(makeLenses ''GoalID)
 
 instance RosBinary GoalID where
   put obj' = put (_stamp obj') *> put (_id obj')

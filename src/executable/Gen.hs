@@ -58,8 +58,10 @@ generateMsgTypeExtraImport (GenArgs {genExtraImport=extraImport, genPkgPath=pkgP
                                        , fieldSpecs
                                        , "\n"
                                        , fieldIndent
-                                       , "} deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)\n\n"]
-                       , lensInstance name, "\n\n"
+                                       , "} deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)"
+                                       , "\n\n"
+                                       , lensInstance name
+                                       , "\n\n"]
                        , binInst, "\n\n"
                        , storableInstance
                        --, genNFDataInstance msg

@@ -15,7 +15,7 @@ import Ros.Turtlesim.Pose
 import Ros.Geometry_msgs.Twist
 import qualified Ros.Geometry_msgs.Vector3 as V
 import Data.Default.Generics (def)
-import Control.Lens ((.~), (^.), (&))
+import Lens.Family ((.~), (^.), (&))
 
 -- A type synonym for a 2D point.
 type Point = Complex Float

@@ -15,13 +15,14 @@ import Ros.Internal.Msg.HeaderSupport
 import qualified Data.Vector.Storable as V
 import qualified Ros.Actionlib_msgs.GoalStatus as GoalStatus
 import qualified Ros.Std_msgs.Header as Header
-import Control.Lens (makeLenses, view, set)
+import Lens.Family.TH (makeLenses)
+import Lens.Family (view, set)
 
 data GoalStatusArray = GoalStatusArray { _header :: Header.Header
                                        , _status_list :: [GoalStatus.GoalStatus]
                                        } deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)
 
-makeLenses ''GoalStatusArray
+$(makeLenses ''GoalStatusArray)
 
 instance RosBinary GoalStatusArray where
   put obj' = put (_header obj') *> putList (_status_list obj')

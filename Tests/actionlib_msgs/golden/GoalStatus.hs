@@ -13,14 +13,15 @@ import qualified GHC.Generics as G
 import qualified Data.Default.Generics as D
 import qualified Data.Word as Word
 import qualified Ros.Actionlib_msgs.GoalID as GoalID
-import Control.Lens (makeLenses, view, set)
+import Lens.Family.TH (makeLenses)
+import Lens.Family (view, set)
 
 data GoalStatus = GoalStatus { _goal_id :: GoalID.GoalID
                              , _status :: Word.Word8
                              , _text :: P.String
                              } deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)
 
-makeLenses ''GoalStatus
+$(makeLenses ''GoalStatus)
 
 instance RosBinary GoalStatus where
   put obj' = put (_goal_id obj') *> put (_status obj') *> put (_text obj')

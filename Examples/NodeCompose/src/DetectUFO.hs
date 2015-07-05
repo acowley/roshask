@@ -3,7 +3,7 @@
 -- in a video feed from a sensor.
 module DetectUFO (detectUFO, main) where
 import Ros.Node
-import Control.Lens
+import Lens.Family
 import qualified Data.Vector.Storable as V
 import Data.Word (Word8)
 import Ros.Sensor_msgs.Image

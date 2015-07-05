@@ -226,7 +226,8 @@ genMsgCabal pkgPath pkgName =
                   , "                   vector > 0.7,"
                   , "                   time >= 1.1,"
                   , "                   data-default-generics >= 0.3,"
-                  , "                   lens >= 4.11,"
+                  , "                   lens-family-core >= 1.2,"
+                  , "                   lens-family-th >= 0.4.1,"
                   , B.concat [ "                   roshask == "
                              , roshaskMajorMinor
                              , if null deps then ""  else "," ]

@@ -13,11 +13,10 @@ import qualified GHC.Generics as G
 import qualified Data.Default.Generics as D
 import Ros.Internal.Msg.SrvInfo
 import Foreign.Storable (Storable(..))
-import Control.Lens (makeLenses, view, set)
+import Lens.Family.TH (makeLenses)
+import Lens.Family (view, set)
 
 data EmptyRequest = EmptyRequest deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)
-
-makeLenses ''EmptyRequest
 
 instance RosBinary EmptyRequest where
   put _  = pure ()

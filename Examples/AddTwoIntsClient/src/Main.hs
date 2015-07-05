@@ -4,7 +4,6 @@ import Ros.Service.ServiceTypes
 import Ros.Service (callService)
 import qualified Ros.Rospy_tutorials.AddTwoIntsRequest as Req
 import Ros.Rospy_tutorials.AddTwoIntsResponse as Res
-import Ros.Internal.RosBinary
 
 type Response a = IO (Either ServiceResponseExcept a)
 

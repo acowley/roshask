@@ -1,6 +1,6 @@
 module Listener (main) where
 import Ros.Node
-import Control.Lens
+import Lens.Family (view)
 import qualified Ros.Std_msgs.String as S
 
 showMsg :: S.String -> IO ()

@@ -66,7 +66,8 @@ prepCabal pkgName rosDeps = B.writeFile (pkgName</>(pkgName++".cabal")) $
                    , "  Build-Depends:   base >= 4.2 && < 6,"
                    , "                   vector > 0.7,"
                    , "                   time >= 1.1,"
-                   , "                   lens >= 4.11,"
+                   , "                   lens-family-core >= 1.2,"
+                   , "                   lens-family-th >= 0.4.1,"
                    , "                   ROS-rosgraph-msgs,"
                    , B.concat [ "                   roshask == "
                               , roshaskMajorMinor
