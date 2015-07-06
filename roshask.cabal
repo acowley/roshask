@@ -67,6 +67,7 @@ Library
                        Ros.Topic.PID
                        Ros.Topic.Transformers
                        Ros.Topic.Stamped
+                       Ros.Topic.Arrow
                        Ros.Rate
                        Ros.Internal.DepFinder
                        Ros.Internal.Msg.MsgInfo

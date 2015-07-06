@@ -1,11 +1,12 @@
-{-# LANGUAGE ScopedTypeVariables, ExistentialQuantification #-}
+{-# LANGUAGE FlexibleInstances, ScopedTypeVariables, ExistentialQuantification #-}
 -- |The primary entrypoint to the ROS client library portion of
 -- roshask. This module defines the actions used to configure a ROS
 -- Node.
-module Ros.Node (Node, runNode, advertise, advertiseBuffered, 
-                 subscribe, getShutdownAction, runHandler, getParam, 
-                 getParamOpt, getName, getNamespace, 
-                 module Ros.Internal.RosTypes, Topic(..), topicRate, 
+module Ros.Node (Node, runNode, Subscribe, Advertise,
+                 getShutdownAction, runHandler, getParam,
+                 getParamOpt, getName, getNamespace,
+                 subscribe, advertise, advertiseBuffered,
+                 module Ros.Internal.RosTypes, Topic(..),
                  module Ros.Internal.RosTime, liftIO) where
 import Control.Applicative ((<$>))
 import Control.Concurrent (newEmptyMVar, readMVar, putMVar)
@@ -33,7 +34,31 @@ import Ros.Node.RosTcp (subStream, runServer)
 import qualified Ros.Node.RunNode as RN
 import Ros.Topic
 import Ros.Topic.Stats (recvMessageStat, sendMessageStat)
-import Ros.Topic.Util (topicRate, share)
+import Ros.Topic.Util (share)
+
+-- |ROS topic subscriber
+class Subscribe s where
+    -- |Subscrive to given topic name
+    subscribe :: (RosBinary a, MsgInfo a, Typeable a)
+              => TopicName -> Node (s a)
+
+-- |ROS topic publisher
+class Advertise a where
+    -- |Advertise topic messages with a per-client
+    -- transmit buffer of the specified size.
+    advertiseBuffered :: (RosBinary b, MsgInfo b, Typeable b)
+                      => Int -> TopicName -> a b -> Node ()
+    -- |Advertise a 'Topic' publishing a stream of values produced in
+    -- the 'IO' monad. Fixed buffer size version of @advertiseBuffered@.
+    advertise :: (RosBinary b, MsgInfo b, Typeable b)
+              => TopicName -> a b -> Node ()
+    advertise = advertiseBuffered 1
+
+instance Subscribe (Topic IO) where
+    subscribe = subscribe_
+
+instance Advertise (Topic IO) where
+    advertiseBuffered = advertiseBuffered_
 
 -- |Maximum number of items to buffer for a subscriber.
 recvBufferSize :: Int
@@ -41,16 +66,16 @@ recvBufferSize = 10
 
 -- |Spark a thread that funnels a Stream from a URI into the given
 -- Chan.
-addSource :: (RosBinary a, MsgInfo a) => 
-             String -> (URI -> Int -> IO ()) -> BoundedChan a -> URI -> 
+addSource :: (RosBinary a, MsgInfo a) =>
+             String -> (URI -> Int -> IO ()) -> BoundedChan a -> URI ->
              Config ThreadId
-addSource tname updateStats c uri = 
-    forkConfig $ subStream uri tname (updateStats uri) >>= 
+addSource tname updateStats c uri =
+    forkConfig $ subStream uri tname (updateStats uri) >>=
                  liftIO . forever . join . fmap (writeChan c)
 
 -- Create a new Subscription value that will act as a named input
 -- channel with zero or more connected publishers.
-mkSub :: forall a. (RosBinary a, MsgInfo a) => 
+mkSub :: forall a. (RosBinary a, MsgInfo a) =>
          String -> Config (Topic IO a, Subscription)
 mkSub tname = do c <- liftIO $ newBoundedChan recvBufferSize
                  let stream = Topic $ do x <- readChan c
@@ -64,39 +89,39 @@ mkSub tname = do c <- liftIO $ newBoundedChan recvBufferSize
                      sub = Subscription known addSource' topicType stats
                  return (stream, sub)
 
-mkPub :: forall a. (RosBinary a, MsgInfo a, Typeable a) => 
+mkPub :: forall a. (RosBinary a, MsgInfo a, Typeable a) =>
          Topic IO a -> Int -> Config Publication
 mkPub t n = do t' <- liftIO $ share t
                mkPubAux (msgTypeName (undefined::a)) t' (runServer t') n
 
-mkPubAux :: Typeable a => 
-            String -> Topic IO a -> 
+mkPubAux :: Typeable a =>
+            String -> Topic IO a ->
             ((URI -> Int -> IO ()) -> Int -> Config (Config (), Int)) ->
             Int -> Config Publication
-mkPubAux trep t runServer' bufferSize = 
+mkPubAux trep t runServer' bufferSize =
     do stats <- liftIO $ newTVarIO M.empty
        (cleanup, port) <- runServer' (sendMessageStat stats) bufferSize
        known <- liftIO $ newTVarIO S.empty
        cleanup' <- configured cleanup
        return $ Publication known trep port cleanup' (DynTopic t) stats
 
--- |Subscribe to the given Topic. Returns a 'Ros.TopicUtil.share'd 'Topic'.
-subscribe :: (RosBinary a, MsgInfo a, Typeable a) => 
-             TopicName -> Node (Topic IO a)
-subscribe name = do n <- get
-                    name' <- canonicalizeName =<< remapName name
-                    r <- nodeAppConfig <$> ask
-                    let subs = subscriptions n
-                    when (M.member name' subs) 
-                         (error $ "Already subscribed to "++name')
-                    let pubs = publications n
-                    if M.member name' pubs
-                      then return . fromDynErr . pubTopic $ pubs M.! name'
-                      else do (stream, sub) <- liftIO $
-                                               runReaderT (mkSub name') r
-                              put n { subscriptions = M.insert name' sub subs }
-                              --return stream
-                              liftIO $ share stream
+-- |Subscribe to the given Topic. Returns a 'Ros.Topic.Util.share'd 'Topic'.
+subscribe_ :: (RosBinary a, MsgInfo a, Typeable a)
+           => TopicName -> Node (Topic IO a)
+subscribe_ name =
+    do n <- get
+       name' <- canonicalizeName =<< remapName name
+       r <- nodeAppConfig <$> ask
+       let subs = subscriptions n
+       when (M.member name' subs)
+            (error $ "Already subscribed to "++name')
+       let pubs = publications n
+       if M.member name' pubs
+         then return . fromDynErr . pubTopic $ pubs M.! name'
+         else do (stream, sub) <- liftIO $ runReaderT (mkSub name') r
+                 put n { subscriptions = M.insert name' sub subs }
+                 --return stream
+                 liftIO $ share stream
   where fromDynErr = maybe (error msg) id . fromDynTopic
         msg = "Subscription to "++name++" at a different type than "++
               "what that Topic was already advertised at by this Node."
@@ -108,7 +133,7 @@ runHandler :: (a -> IO b) -> Topic IO a -> Node ThreadId
 runHandler = ((liftIO . forkIO . forever . join) .) . fmap
 
 advertiseAux :: (Int -> Config Publication) -> Int -> TopicName -> Node ()
-advertiseAux mkPub' bufferSize name = 
+advertiseAux mkPub' bufferSize name =
     do n <- get
        name' <- remapName =<< canonicalizeName name
        r <- nodeAppConfig <$> ask
@@ -120,15 +145,9 @@ advertiseAux mkPub' bufferSize name =
 
 -- |Advertise a 'Topic' publishing a stream of 'IO' values with a
 -- per-client transmit buffer of the specified size.
-advertiseBuffered :: (RosBinary a, MsgInfo a, Typeable a) => 
+advertiseBuffered_ :: (RosBinary a, MsgInfo a, Typeable a) =>
                      Int -> TopicName -> Topic IO a -> Node ()
-advertiseBuffered bufferSize name s = advertiseAux (mkPub s) bufferSize name
-
--- |Advertise a 'Topic' publishing a stream of values produced in
--- the 'IO' monad.
-advertise :: (RosBinary a, MsgInfo a, Typeable a) => 
-             TopicName -> Topic IO a -> Node ()
-advertise = advertiseBuffered 1
+advertiseBuffered_ bufferSize name s = advertiseAux (mkPub s) bufferSize name
 
 -- -- |Existentially quantified message type that roshask can
 -- -- serialize. This type provides a way to work with collections of
@@ -161,7 +180,7 @@ getServerParam :: XmlRpcType a => String -> Node (Maybe a)
 getServerParam var = do state <- get
                         let masterUri = master state
                             myName = nodeName state
-                        -- Call hasParam first because getParam only returns 
+                        -- Call hasParam first because getParam only returns
                         -- a partial result (just the return code) in failure.
                         hasParam <- liftIO $ P.hasParam masterUri myName var
                         case hasParam of
@@ -194,7 +213,7 @@ getNamespace = namespace <$> get
 
 -- |Run a ROS Node.
 runNode :: NodeName -> Node a -> IO ()
-runNode name (Node nConf) = 
+runNode name (Node nConf) =
     do myURI <- newEmptyMVar
        sigStop <- newEmptyMVar
        env <- liftIO getEnvironment
@@ -219,7 +238,7 @@ runNode name (Node nConf) =
            params' = concatMap resolve params
        when (not $ null nameMap')
             (putStrLn $ "Remapping name(s) "++show nameMap')
-       when (not $ null params') 
+       when (not $ null params')
             (putStrLn $ "Setting parameter(s) "++show params')
        case getConfig "ROS_IP" of
          Nothing -> case getConfig "ROS_HOSTNAME" of
