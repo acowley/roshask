@@ -68,9 +68,11 @@ instance Connect (TopicArrow IO) where
   connect a b = connect' a b . linkTA
 
 linkFn :: (a -> b) -> Topic IO a -> Topic IO b
+{-# INLINE linkFn #-}
 linkFn = fmap
 
 linkTA :: TopicArrow IO a b -> TopicArrow IO () a -> TopicArrow IO () b
+{-# INLINE linkTA #-}
 linkTA = (<<<)
 
 connect' :: (Subscribe s, Advertise a,
@@ -87,18 +89,23 @@ connect' n1 n2 f =
 --break
 
 catMaybes :: Monad m => TopicArrow m (Maybe a) a
+{-# INLINE catMaybes #-}
 catMaybes = TopicArrow T.catMaybes
 
 cons :: Monad m => a -> TopicArrow m a a
+{-# INLINE cons #-}
 cons = TopicArrow . T.cons
 
 drop :: Monad m => Int -> TopicArrow m a a
+{-# INLINE drop #-}
 drop = TopicArrow . T.drop
 
 dropWhile :: Monad m => (a -> Bool) -> TopicArrow m a a
+{-# INLINE dropWhile #-}
 dropWhile = TopicArrow . T.dropWhile
 
 filter :: Monad m => (a -> Bool) -> TopicArrow m a a
+{-# INLINE filter #-}
 filter = TopicArrow . T.filter
 
 -- force
@@ -107,20 +114,24 @@ filter = TopicArrow . T.filter
 -- join
 
 mapM :: (Functor m, Monad m) => (a -> m b) -> TopicArrow m a b
+{-# INLINE mapM #-}
 mapM = TopicArrow . T.mapM
 
 -- mapM_
 
 repeatM :: Monad m => m a -> TopicArrow m () a
+{-# INLINE repeatM #-}
 repeatM = TopicArrow . const . T.repeatM
 
 scan :: Monad m => (a -> b -> a) -> a -> TopicArrow m b a
+{-# INLINE scan #-}
 scan f = TopicArrow . T.scan f
 
 -- showTopic
 -- splitAt
 
 tail :: Monad m => TopicArrow m a a
+{-# INLINE tail #-}
 tail = TopicArrow T.tail
 
 -- tails
@@ -130,6 +141,7 @@ tail = TopicArrow T.tail
 -- uncons
 
 unfold :: Functor m => (b -> m (a, b)) -> b -> TopicArrow m () a
+{-# INLINE unfold #-}
 unfold f = TopicArrow . const . T.unfold f
 
 --
@@ -137,9 +149,11 @@ unfold f = TopicArrow . const . T.unfold f
 --
 
 toList :: TopicArrow IO () a -> IO [a]
+{-# INLINE toList #-}
 toList = U.toList . flip runTopicArrow (T.repeatM (return ()))
 
 fromList :: Monad m => [a] -> TopicArrow m () a
+{-# INLINE fromList #-}
 fromList = TopicArrow . const . U.fromList
 
 -- tee
@@ -148,11 +162,13 @@ fromList = TopicArrow . const . U.fromList
 -- share
 
 topicRate :: (Functor m, MonadIO m) => Double -> TopicArrow m a a
+{-# INLINE topicRate #-}
 topicRate = TopicArrow . U.topicRate
 
 -- partition
 
 consecutive :: Monad m => TopicArrow m a (a, a)
+{-# INLINE consecutive #-}
 consecutive = TopicArrow U.consecutive
 
 -- <+>
@@ -161,32 +177,38 @@ consecutive = TopicArrow U.consecutive
 -- firstThenSecond
 
 leftThenRight :: Monad m => TopicArrow m (Either a b) (a, b)
+{-# INLINE leftThenRight #-}
 leftThenRight = TopicArrow U.leftThenRight
 
 -- merge
 
 finiteDifference :: (Functor m, Monad m) => (a -> a -> b) -> TopicArrow m a b
+{-# INLINE finiteDifference #-}
 finiteDifference = TopicArrow . U.finiteDifference
 
 
 weightedMeanNormalized :: Monad m =>
                           n -> n -> (b -> b -> c) -> (n -> a -> b) ->
                           (c -> a) -> TopicArrow m a a
+{-# INLINE weightedMeanNormalized #-}
 weightedMeanNormalized alpha invAlpha plus scale normalize =
   TopicArrow $ U.weightedMeanNormalized alpha invAlpha plus scale normalize
 
 simpsonsRule :: (Monad m, Fractional n) =>
                 (a -> a -> a) -> (n -> a -> a) -> TopicArrow m a a
+{-# INLINE simpsonsRule #-}
 simpsonsRule plus scale = TopicArrow $ U.simpsonsRule plus scale
 
 
 weightedMean :: (Monad m, Num n) =>
                 n -> (a -> a -> a) -> (n -> a -> a) -> TopicArrow m a a
+{-# INLINE weightedMean #-}
 weightedMean alpha plus scale = weightedMean2 alpha (1 - alpha) plus scale
 
 
 weightedMean2 :: Monad m =>
                  n -> n -> (a -> a -> a) -> (n -> a -> a) -> TopicArrow m a a
+{-# INLINE weightedMean2 #-}
 weightedMean2 alpha invAlpha plus scale =
   TopicArrow $ U.weightedMean2 alpha invAlpha plus scale
 
@@ -194,20 +216,25 @@ weightedMean2 alpha invAlpha plus scale =
 -- gate
 
 concats :: (Monad m, Foldable f) => TopicArrow m (f a) a
+{-# INLINE concats #-}
 concats = TopicArrow U.concats
 
 -- interruptible
 -- forkTopic
 
 slidingWindow :: (Monad m, Monoid a) => Int -> TopicArrow m a a
+{-# INLINE slidingWindow #-}
 slidingWindow = TopicArrow . U.slidingWindow
 
 slidingWindowG :: (Monad m, AdditiveGroup a) => Int -> TopicArrow m a a
+{-# INLINE slidingWindowG #-}
 slidingWindowG = TopicArrow . U.slidingWindowG
 
 topicOn :: (Applicative m, Monad m) =>
            (a -> b) -> (a -> c -> d) -> m (b -> m c) -> TopicArrow m a d
+{-# INLINE topicOn #-}
 topicOn proj inj trans = TopicArrow $ U.topicOn proj inj trans
 
 subsample :: Monad m => Int -> TopicArrow m a a
+{-# INLINE subsample #-}
 subsample = TopicArrow . U.subsample
