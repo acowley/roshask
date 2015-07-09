@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedStrings, DeriveDataTypeable, DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Ros.Actionlib_msgs.GoalStatusArray where
 import qualified Prelude as P
 import Prelude ((.), (+), (*))
@@ -12,21 +15,25 @@ import Ros.Internal.Msg.HeaderSupport
 import qualified Data.Vector.Storable as V
 import qualified Ros.Actionlib_msgs.GoalStatus as GoalStatus
 import qualified Ros.Std_msgs.Header as Header
+import Lens.Family.TH (makeLenses)
+import Lens.Family (view, set)
 
-data GoalStatusArray = GoalStatusArray { header :: Header.Header
-                                       , status_list :: [GoalStatus.GoalStatus]
+data GoalStatusArray = GoalStatusArray { _header :: Header.Header
+                                       , _status_list :: [GoalStatus.GoalStatus]
                                        } deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)
 
+$(makeLenses ''GoalStatusArray)
+
 instance RosBinary GoalStatusArray where
-  put obj' = put (header obj') *> putList (status_list obj')
+  put obj' = put (_header obj') *> putList (_status_list obj')
   get = GoalStatusArray <$> get <*> getList
   putMsg = putStampedMsg
 
 instance HasHeader GoalStatusArray where
-  getSequence = Header.seq . header
-  getFrame = Header.frame_id . header
-  getStamp = Header.stamp . header
-  setSequence seq x' = x' { header = (header x') { Header.seq = seq } }
+  getSequence = view (header . Header.seq)
+  getFrame    = view (header . Header.frame_id)
+  getStamp    = view (header . Header.stamp)
+  setSequence = set  (header . Header.seq)
 
 instance MsgInfo GoalStatusArray where
   sourceMD5 _ = "8b2b82f13216d0a8ea88bd3af735e619"

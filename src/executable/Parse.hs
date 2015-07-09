@@ -107,10 +107,12 @@ mkParser sname lname txt = aux . partitionEithers <$> many (choice fieldParsers)
                            (map buildConst cs)
 
 buildField :: (ByteString, MsgType) -> MsgField
-buildField (name,typ) = MsgField (sanitize name) typ name
+buildField (name,typ) = MsgField fname typ name
+  where fname = B.append "_" $ sanitize name
 
 buildConst :: (ByteString, MsgType, ByteString) -> MsgConst
-buildConst (name,typ,val) = MsgConst (sanitize name) typ val name
+buildConst (name,typ,val) = MsgConst fname typ val name
+  where fname = B.map toLower $ sanitize name
 
 {-
 testMsg :: ByteString

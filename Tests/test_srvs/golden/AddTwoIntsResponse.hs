@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedStrings, DeriveDataTypeable, DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Ros.Test_srvs.AddTwoIntsResponse where
 import qualified Prelude as P
 import Prelude ((.), (+), (*))
@@ -12,12 +15,16 @@ import Ros.Internal.Msg.SrvInfo
 import qualified Data.Int as Int
 import Foreign.Storable (Storable(..))
 import qualified Ros.Internal.Util.StorableMonad as SM
+import Lens.Family.TH (makeLenses)
+import Lens.Family (view, set)
 
-data AddTwoIntsResponse = AddTwoIntsResponse { sum :: Int.Int64
+data AddTwoIntsResponse = AddTwoIntsResponse { _sum :: Int.Int64
                                              } deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)
 
+$(makeLenses ''AddTwoIntsResponse)
+
 instance RosBinary AddTwoIntsResponse where
-  put obj' = put (sum obj')
+  put obj' = put (_sum obj')
   get = AddTwoIntsResponse <$> get
 
 instance Storable AddTwoIntsResponse where
@@ -25,7 +32,7 @@ instance Storable AddTwoIntsResponse where
   alignment _ = 8
   peek = SM.runStorable (AddTwoIntsResponse <$> SM.peek)
   poke ptr' obj' = SM.runStorable store' ptr'
-    where store' = SM.poke (sum obj')
+    where store' = SM.poke (_sum obj')
 
 instance MsgInfo AddTwoIntsResponse where
   sourceMD5 _ = "b88405221c77b1878a3cbbfff53428d7"

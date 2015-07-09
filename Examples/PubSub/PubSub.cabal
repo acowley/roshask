@@ -6,21 +6,22 @@ Category:            Robotics
 Build-type:          Custom
 
 Executable talker
-  Build-Depends:  base >= 4.2 && < 6,
-                  vector >= 0.7,
-                  time >= 1.1,
-                  roshask == 0.1.*,
-                  ROS-std-msgs
+  Build-Depends:  base             >= 4.2 && < 6
+                , vector           >= 0.7
+                , time             >= 1.1
+                , roshask          >= 0.3
+                , ROS-std-msgs
   GHC-Options:    -Odph -main-is Talker
   Main-Is:        Talker.hs
   Hs-Source-Dirs: src
 
 Executable listener
-  Build-Depends:  base >= 4.2 && < 6,
-                  vector >= 0.7,
-                  time >= 1.1,
-                  roshask == 0.1.*,
-                  ROS-std-msgs
+  Build-Depends:  base             >= 4.2 && < 6
+                , vector           >= 0.7
+                , time             >= 1.1
+                , roshask          >= 0.3
+                , lens-family-core >= 1.2
+                , ROS-std-msgs
   GHC-Options:    -Odph -main-is Listener
   Main-Is:        Listener.hs
   Hs-Source-Dirs: src

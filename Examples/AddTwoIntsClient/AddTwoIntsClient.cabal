@@ -7,7 +7,7 @@ Build-type:        Custom
 
 Executable AddTwoIntsClient
   Build-Depends:   base >= 4.2 && < 6,
-                   roshask == 0.2.*,
+                   roshask >= 0.2,
                    ROS-rospy-tutorials-msgs
 
   GHC-Options:     -O2

@@ -143,8 +143,8 @@ emptySrv = do
     md5 = "d41d8cd98f00b204e9800998ecf8427e"
     testDir = "Tests/test_srvs"
     srvFile = "Tests/test_srvs/srv/Empty.srv"
-    requestFile = "Tests/ServiceClientTests/Ros/Test_srvs/EmptyRequest.hs"
-    responseFile = "Tests/ServiceClientTests/Ros/Test_srvs/EmptyResponse.hs"
+    requestFile = "Tests/test_srvs/golden/EmptyRequest.hs"
+    responseFile = "Tests/test_srvs/golden/EmptyResponse.hs"
 
 -- | ROOT TEST
 

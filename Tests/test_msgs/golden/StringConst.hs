@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedStrings, DeriveDataTypeable, DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Ros.Test_msgs.StringConst where
 import qualified Prelude as P
 import Prelude ((.), (+), (*))
@@ -8,12 +11,16 @@ import Ros.Internal.RosBinary
 import Ros.Internal.Msg.MsgInfo
 import qualified GHC.Generics as G
 import qualified Data.Default.Generics as D
+import Lens.Family.TH (makeLenses)
+import Lens.Family (view, set)
 
-data StringConst = StringConst { link_name :: P.String
+data StringConst = StringConst { _link_name :: P.String
                                } deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)
 
+$(makeLenses ''StringConst)
+
 instance RosBinary StringConst where
-  put obj' = put (link_name obj')
+  put obj' = put (_link_name obj')
   get = StringConst <$> get
 
 instance MsgInfo StringConst where
@@ -22,9 +29,9 @@ instance MsgInfo StringConst where
 
 instance D.Default StringConst
 
-rEMOVE_ALL_ATTACHED_OBJECTS :: P.String
-rEMOVE_ALL_ATTACHED_OBJECTS = "\"all\""
+remove_all_attached_objects :: P.String
+remove_all_attached_objects = "\"all\""
 
-eMBEDDED_QUOTES :: P.String
-eMBEDDED_QUOTES = "here \"we\" go"
+embedded_quotes :: P.String
+embedded_quotes = "here \"we\" go"
 

@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedStrings, DeriveDataTypeable, DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Ros.Test_srvs.AddTwoIntsRequest where
 import qualified Prelude as P
 import Prelude ((.), (+), (*))
@@ -12,13 +15,17 @@ import Ros.Internal.Msg.SrvInfo
 import qualified Data.Int as Int
 import Foreign.Storable (Storable(..))
 import qualified Ros.Internal.Util.StorableMonad as SM
+import Lens.Family.TH (makeLenses)
+import Lens.Family (view, set)
 
-data AddTwoIntsRequest = AddTwoIntsRequest { a :: Int.Int64
-                                           , b :: Int.Int64
+data AddTwoIntsRequest = AddTwoIntsRequest { _a :: Int.Int64
+                                           , _b :: Int.Int64
                                            } deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)
 
+$(makeLenses ''AddTwoIntsRequest)
+
 instance RosBinary AddTwoIntsRequest where
-  put obj' = put (a obj') *> put (b obj')
+  put obj' = put (_a obj') *> put (_b obj')
   get = AddTwoIntsRequest <$> get <*> get
 
 instance Storable AddTwoIntsRequest where
@@ -27,7 +34,7 @@ instance Storable AddTwoIntsRequest where
   alignment _ = 8
   peek = SM.runStorable (AddTwoIntsRequest <$> SM.peek <*> SM.peek)
   poke ptr' obj' = SM.runStorable store' ptr'
-    where store' = SM.poke (a obj') *> SM.poke (b obj')
+    where store' = SM.poke (_a obj') *> SM.poke (_b obj')
 
 instance MsgInfo AddTwoIntsRequest where
   sourceMD5 _ = "36d09b846be0b371c5f190354dd3153e"

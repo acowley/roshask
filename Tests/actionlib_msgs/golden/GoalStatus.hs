@@ -1,4 +1,7 @@
-{-# LANGUAGE OverloadedStrings, DeriveDataTypeable, DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Ros.Actionlib_msgs.GoalStatus where
 import qualified Prelude as P
 import Prelude ((.), (+), (*))
@@ -10,14 +13,18 @@ import qualified GHC.Generics as G
 import qualified Data.Default.Generics as D
 import qualified Data.Word as Word
 import qualified Ros.Actionlib_msgs.GoalID as GoalID
+import Lens.Family.TH (makeLenses)
+import Lens.Family (view, set)
 
-data GoalStatus = GoalStatus { goal_id :: GoalID.GoalID
-                             , status :: Word.Word8
-                             , text :: P.String
+data GoalStatus = GoalStatus { _goal_id :: GoalID.GoalID
+                             , _status :: Word.Word8
+                             , _text :: P.String
                              } deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)
 
+$(makeLenses ''GoalStatus)
+
 instance RosBinary GoalStatus where
-  put obj' = put (goal_id obj') *> put (status obj') *> put (text obj')
+  put obj' = put (_goal_id obj') *> put (_status obj') *> put (_text obj')
   get = GoalStatus <$> get <*> get <*> get
 
 instance MsgInfo GoalStatus where
@@ -26,33 +33,33 @@ instance MsgInfo GoalStatus where
 
 instance D.Default GoalStatus
 
-pENDING :: Word.Word8
-pENDING = 0
+pending :: Word.Word8
+pending = 0
 
-aCTIVE :: Word.Word8
-aCTIVE = 1
+active :: Word.Word8
+active = 1
 
-pREEMPTED :: Word.Word8
-pREEMPTED = 2
+preempted :: Word.Word8
+preempted = 2
 
-sUCCEEDED :: Word.Word8
-sUCCEEDED = 3
+succeeded :: Word.Word8
+succeeded = 3
 
-aBORTED :: Word.Word8
-aBORTED = 4
+aborted :: Word.Word8
+aborted = 4
 
-rEJECTED :: Word.Word8
-rEJECTED = 5
+rejected :: Word.Word8
+rejected = 5
 
-pREEMPTING :: Word.Word8
-pREEMPTING = 6
+preempting :: Word.Word8
+preempting = 6
 
-rECALLING :: Word.Word8
-rECALLING = 7
+recalling :: Word.Word8
+recalling = 7
 
-rECALLED :: Word.Word8
-rECALLED = 8
+recalled :: Word.Word8
+recalled = 8
 
-lOST :: Word.Word8
-lOST = 9
+lost :: Word.Word8
+lost = 9
 

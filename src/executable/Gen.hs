@@ -10,6 +10,7 @@ import Types
 import FieldImports
 import Instances.Binary
 import Instances.Storable
+import Instances.Lens
 import MD5
 
 data GenArgs = GenArgs {genExtraImport :: ByteString
@@ -50,13 +51,17 @@ generateMsgTypeExtraImport (GenArgs {genExtraImport=extraImport, genPkgPath=pkgP
      return $ B.concat [ modLine, "\n"
                        , imports
                        , storableImport
+                       , lensImport
                        , if null fDecls
                          then dataSingleton
                          else B.concat [ dataLine
                                        , fieldSpecs
                                        , "\n"
                                        , fieldIndent
-                                       , "} deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)\n\n"]
+                                       , "} deriving (P.Show, P.Eq, P.Ord, T.Typeable, G.Generic)"
+                                       , "\n\n"
+                                       , lensInstance name
+                                       , "\n\n"]
                        , binInst, "\n\n"
                        , storableInstance
                        --, genNFDataInstance msg
@@ -66,8 +71,11 @@ generateMsgTypeExtraImport (GenArgs {genExtraImport=extraImport, genPkgPath=pkgP
                        , cons ]
     where name = shortName msg
           tName = pack $ toUpper (head name) : tail name
-          modLine = B.concat ["{-# LANGUAGE OverloadedStrings, DeriveDataTypeable, DeriveGeneric #-}\n",
-                              "module ", pkgPath, tName, " where"]
+          modLine = B.concat [ "{-# LANGUAGE OverloadedStrings #-}\n"
+                             , "{-# LANGUAGE DeriveDataTypeable #-}\n"
+                             , "{-# LANGUAGE DeriveGeneric #-}\n"
+                             , "{-# LANGUAGE TemplateHaskell #-}\n"
+                             , "module ", pkgPath, tName, " where"]
           imports = B.concat ["import qualified Prelude as P\n",
                               "import Prelude ((.), (+), (*))\n",
                               "import qualified Data.Typeable as T\n",
@@ -89,13 +97,12 @@ generateMsgTypeExtraImport (GenArgs {genExtraImport=extraImport, genPkgPath=pkgP
 genHasHeader :: Msg -> ByteString
 genHasHeader m = 
     if hasHeader m
-    then let hn = fieldName (head (fields m)) -- The header field name
+    then let hn = B.tail $ fieldName (head (fields m)) -- The header field name
          in B.concat ["instance HasHeader ", pack (shortName m), " where\n",
-                      "  getSequence = Header.seq . ", hn, "\n",
-                      "  getFrame = Header.frame_id . ", hn, "\n",
-                      "  getStamp = Header.stamp . " , hn, "\n",
-                      "  setSequence seq x' = x' { ", hn, 
-                      " = (", hn, " x') { Header.seq = seq } }\n\n"]
+                      "  getSequence = view (", hn, " . Header.seq)\n",
+                      "  getFrame    = view (", hn, " . Header.frame_id)\n",
+                      "  getStamp    = view (", hn, " . Header.stamp)\n",
+                      "  setSequence = set  (", hn, " . Header.seq)\n\n"]
     else ""
 
 genDefault :: Msg -> ByteString

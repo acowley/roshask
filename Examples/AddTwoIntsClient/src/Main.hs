@@ -1,12 +1,15 @@
 module Main (main) where
-import qualified Ros.Rospy_tutorials.AddTwoIntsRequest as Req
-import qualified Ros.Rospy_tutorials.AddTwoIntsResponse as Res
-import Ros.Service (callService)
+
 import Ros.Service.ServiceTypes
+import Ros.Service (callService)
+import qualified Ros.Rospy_tutorials.AddTwoIntsRequest as Req
+import Ros.Rospy_tutorials.AddTwoIntsResponse as Res
 
 type Response a = IO (Either ServiceResponseExcept a)
 
 main :: IO ()
 main = do
-  response <- callService "/add_two_ints" Req.AddTwoIntsRequest{Req.a=10, Req.b=5} :: Response  Res.AddTwoIntsResponse
-  print response
+  response <- callService "/add_two_ints" Req.AddTwoIntsRequest { Req._a=10, Req._b=5 }
+  case response of
+    Right result -> print (result :: Res.AddTwoIntsResponse)
+    Left  e      -> error (show e)

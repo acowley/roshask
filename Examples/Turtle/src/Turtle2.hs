@@ -7,11 +7,16 @@ import Data.Complex
 import AngleNum
 import Ros.Node
 import Ros.Topic (repeatM, force, dropWhile, metamorphM, yieldM)
-import Ros.TopicUtil (everyNew, interruptible)
+import Ros.Topic.Util (everyNew, interruptible)
 import Ros.Turtlesim.Pose
-import Ros.Turtlesim.Velocity
+import Ros.Geometry_msgs.Twist
+import qualified Ros.Geometry_msgs.Vector3 as V
 import Ros.Logging
+
 import System.IO (hFlush, stdout)
+import Data.Default.Generics (def)
+import Lens.Family ((.~), (^.), (&))
+import Control.Arrow ((&&&))
 
 -- A type synonym for a 2D point.
 type Point = Complex Float
@@ -21,6 +26,11 @@ getTraj :: Topic IO [Point]
 getTraj = repeatM (do putStr "Enter waypoints: " >> hFlush stdout
                       $(logInfo "Waiting for new traj")
                       map (uncurry (:+)) . read <$> getLine)
+
+-- Create Twist message with linear and angular velocity in arguments.
+mkTwist :: Real a => a -> a -> Twist
+mkTwist l a = def & linear  . V.x .~ realToFrac l
+                  & angular . V.z .~ realToFrac a
 
 -- Produce a new goal 'Point' every time a goal is reached.
 destinations :: (Functor m, Monad m) => 
@@ -34,20 +44,20 @@ destinations goals poses = metamorphM (start (p2v <$> poses)) goals
 -- Compute linear distance to goal and bearing to goal
 toGoal :: (Pose,Point) -> (Float, Angle Float)
 toGoal (pos,goal) = (magnitude v, angle $ phase v)
-  where v = goal - (x pos :+ y pos)
+  where v = goal - (pos^.x :+ pos^.y)
 
 -- Steer based on a current pose estimate and distance from goal
-steering :: Pose -> (Float, Angle Float) -> Velocity
-steering pos (dpos, thetaDesired) = Velocity (min 2 dpos) angVel
-  where thetaErr = toDegrees $ thetaDesired - angle (theta pos)
+steering :: Pose -> (Float, Angle Float) -> Twist
+steering pos (dpos, thetaDesired) = mkTwist (min 2 dpos) angVel
+  where thetaErr = toDegrees $ thetaDesired - angle (pos^.theta)
         angVel = signum thetaErr * min 2 (abs thetaErr)
 
-navigate :: (Pose, Point) -> Velocity
+navigate :: (Pose, Point) -> Twist
 navigate = uncurry ($) . (steering . fst &&& toGoal)
 
 main = runNode "HaskellBTurtle" $
        do enableLogging (Just Warn)
           poses <- subscribe "/turtle1/pose"
           let goals = destinations (interruptible getTraj) poses
-          advertise "/turtle1/command_velocity" 
+          advertise "/turtle1/cmd_vel" 
                     (navigate <$> everyNew poses goals)

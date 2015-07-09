@@ -2,31 +2,36 @@
 module Main (main) where
 import Control.Applicative
 import qualified Data.ByteString.Char8 as B
-import System.Directory (createDirectoryIfMissing, getCurrentDirectory)
+import System.Directory (getCurrentDirectory)
 import System.Environment (getArgs)
 import System.Exit (exitWith, ExitCode(..))
-import System.FilePath (replaceExtension, isRelative, (</>), dropFileName, 
-                        takeFileName)
+import System.FilePath (isRelative, (</>), dropFileName,
+                        takeFileName, takeExtension, dropExtension)
 import Ros.Internal.DepFinder (findMessages, findPackageDeps, 
                                findPackageDepsTrans)
-import Ros.Internal.PathUtil (codeGenDir, pathToPkgName)
+import Ros.Internal.PathUtil (cap, codeGenDir, pathToPkgName)
 
 import Analysis (runAnalysis)
 import Parse
 import Gen
 import MD5
-import PkgBuilder (buildPkgMsgs)
+import PkgBuilder (buildPkgMsgs, pathToRosPkg,
+                   parseGenWriteMsg, parseGenWriteService)
 import Unregister
 import PkgInit (initPkg)
 
+-- Generate and save Haskell code for a message or service file.
 generateAndSave :: FilePath -> IO ()
-generateAndSave fname = do msgType <- fst <$> generate fname
-                           fname' <- hsName
-                           B.writeFile fname' msgType
-  where hsName = do d' <- codeGenDir fname
-                    createDirectoryIfMissing True d'
-                    return $ d' </> f
-        f =  replaceExtension (takeFileName fname) ".hs"
+generateAndSave fname = do
+    destDir <- codeGenDir fname
+    let hsNames = [(B.pack . cap . dropExtension . takeFileName) fname]
+    runAnalysis $ case takeExtension fname of
+        ".msg" -> parseGenWriteMsg     pkgHier destDir hsNames fname
+        ".srv" -> parseGenWriteService pkgHier destDir hsNames fname
+        _ -> error $ "Unknown file type: " ++ fname
+  where
+    pkgName = pathToRosPkg fname
+    pkgHier = B.pack $ "Ros." ++ cap pkgName ++ "."
 
 -- Generate Haskell code for a message type.
 generate :: FilePath -> IO (B.ByteString, String)

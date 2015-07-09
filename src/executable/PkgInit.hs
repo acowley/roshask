@@ -11,7 +11,7 @@ import System.FilePath ((</>))
 import System.Process (system)
 
 import Paths_roshask (version)
-import PkgBuilder (rosPkg2CabalPkg)
+import PkgBuilder (rosPkg2CabalPkg, roshaskMajorMinor)
 
 -- |Initialize a package with the given name in the eponymous
 -- directory with the given ROS package dependencies.
@@ -66,8 +66,12 @@ prepCabal pkgName rosDeps = B.writeFile (pkgName</>(pkgName++".cabal")) $
                    , "  Build-Depends:   base >= 4.2 && < 6,"
                    , "                   vector > 0.7,"
                    , "                   time >= 1.1,"
+                   , "                   lens-family-core >= 1.2,"
+                   , "                   lens-family-th >= 0.4.1,"
                    , "                   ROS-rosgraph-msgs,"
-                   , B.append "                   roshask == 0.2.*" moreDeps
+                   , B.concat [ "                   roshask == "
+                              , roshaskMajorMinor
+                              , moreDeps ]
                    , rosDeps
                    , "  GHC-Options:     -O2"
                    , "  Hs-Source-Dirs:  src"

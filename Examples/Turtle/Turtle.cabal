@@ -6,36 +6,39 @@ Category:            Robotics
 Build-type:          Custom
 
 Executable Turtle
-  Build-Depends:  base >= 4.2 && < 6,
-                  vector > 0.7,
-                  time >= 1.1,
-                  roshask == 0.1.*,
-                  ROS-std-msgs,
-                  ROS-turtlesim-msgs
+  Build-Depends:  base              >= 4.2 && < 6
+                , vector            >  0.7
+                , time              >= 1.1
+                , roshask           >= 0.3
+                , lens-family-core  >= 1.2
+                , data-default-generics
+                , ROS-std-msgs
+                , ROS-geometry-msgs
+                , ROS-turtlesim-msgs
   GHC-Options:    -O2 -main-is Turtle
   Main-Is:        Turtle.hs
   Hs-Source-Dirs: src
 
 Executable Turtle2
-  Build-Depends:  base >= 4.2 && < 6,
-                  vector > 0.7,
-                  time >= 1.1,
-                  roshask == 0.1.*,
-                  vector-space,
-                  ROS-std-msgs,
-                  ROS-turtlesim-msgs
+  Build-Depends:  base              >= 4.2 && < 6
+                , vector            >  0.7
+                , time              >= 1.1
+                , roshask           >= 0.3
+                , vector-space
+                , ROS-std-msgs
+                , ROS-turtlesim-msgs
   GHC-Options:    -O2 -main-is Turtle2
   Main-Is:        Turtle2.hs
   Other-Modules:  AngleNum
   Hs-Source-Dirs: src
 
 Executable Turtle3
-  Build-Depends:  base >= 4.2 && < 6,
-                  vector > 0.7,
-                  time >= 1.1,
-                  roshask == 0.1.*,
-                  ROS-std-msgs,
-                  ROS-turtlesim-msgs
+  Build-Depends:  base              >= 4.2 && < 6
+                , vector            >  0.7
+                , time              >= 1.1
+                , roshask           >= 0.3
+                , ROS-std-msgs
+                , ROS-turtlesim-msgs
   GHC-Options:    -O2 -main-is Turtle3
   Main-Is:        Turtle3.hs
   Other-Modules:  AngleNum
