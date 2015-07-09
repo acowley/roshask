@@ -29,7 +29,7 @@ Executable scope
                  , vector           >  0.7
                  , time             >= 1.1
                  , roshask          >= 0.3
-                 , lens             >= 4.11
+                 , lens-family-core >= 1.2
                  , mtl
                  , ROS-std-msgs
                  , ROS-sensor-msgs
@@ -43,7 +43,7 @@ Executable detect
                  , vector           >  0.7
                  , time             >= 1.1
                  , roshask          >= 0.3
-                 , lens             >= 4.11
+                 , lens-family-core >= 1.2
                  , mtl
                  , ROS-std-msgs
                  , ROS-sensor-msgs
