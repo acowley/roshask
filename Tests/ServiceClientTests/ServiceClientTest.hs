@@ -14,7 +14,6 @@ import Ros.Internal.Msg.SrvInfo
 import Ros.Internal.RosBinary
 import Control.Applicative ((<$>))
 import Control.Exception
-import Test.HUnit.Tools
 
 -- To run:
 -- 1. start ros: run "roscore"
@@ -52,6 +51,24 @@ noProviderTest = testCase ("service not registered error") $
   where
     x = 10
     y = 10
+
+-- From the deprecated @testpack@ package by John Goerzen
+assertRaises :: (Show a, Control.Exception.Exception e, Show e, Eq e)
+             => String -> e -> IO a -> IO ()
+assertRaises msg selector action =
+    let thetest e = if e == selector then return ()
+                    else assertFailure $
+                         msg ++ "\nReceived unexpected exception: "
+                             ++ show e
+                             ++ "\ninstead of exception: " ++ show selector
+        in do
+           r <- Control.Exception.try action
+           case r of
+                  Left e -> thetest e
+                  Right _ -> assertFailure $
+                             msg ++ "\nReceived no exception, "
+                                 ++ "but was expecting exception: "
+                                 ++ show selector
 
 
 requestResponseDontMatchTest :: TestTree

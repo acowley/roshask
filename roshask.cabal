@@ -184,5 +184,4 @@ test-suite servicetest
   build-depends: base >= 4.6 && < 5, bytestring, tasty, tasty-hunit, roshask,
                  containers, mtl, filepath, attoparsec, transformers,
                  pureMD5 >= 2.1,
-                 data-default-generics,
-                 testpack
+                 data-default-generics
