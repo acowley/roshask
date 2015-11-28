@@ -24,21 +24,22 @@ apt-get install -y python-rosinstall python-software-properties software-propert
 # Get GHC and cabal-install from Herbert's PPA
 # add-apt-repository ppa:hvr/ghc
 # sed 's/ raring / precise /' /etc/apt/sources.list.d/hvr-ghc-raring.list > /etc/apt/sources.list.d/hvr-ghc-precise.list
-apt-add-repository "deb http://ppa.launchpad.net/hvr/ghc/ubuntu precise main"
+#apt-add-repository "deb http://ppa.launchpad.net/hvr/ghc/ubuntu precise main"
+add-apt-repository ppa:hvr/ghc
 apt-get update
-apt-get install -y --force-yes ghc-7.8.3
-apt-get install -y --force-yes cabal-install-1.20
+apt-get install -y --force-yes ghc-7.10.2
+apt-get install -y --force-yes cabal-install-1.22
 
 # cabal-install bash completion
 wget https://raw.githubusercontent.com/haskell/cabal/master/cabal-install/bash-completion/cabal -O /etc/bash_completion.d/cabal
 
 # Setup PATH, run cabal update, and configure SSH
 su vagrant <<'EOF'
-echo 'PATH=/home/vagrant/.cabal/bin:/opt/ghc/7.8.3/bin:/opt/cabal/1.20/bin:$PATH' >> ~/.bashrc
+echo 'PATH=/home/vagrant/.cabal/bin:/opt/ghc/7.10.2/bin:/opt/cabal/1.22/bin:$PATH' >> ~/.bashrc
 echo 'PATH=/opt/ros/indigo/bin:$PATH' >> ~/.bashrc
 echo 'alias roshask=/home/vagrant/roshask/dist/build/roshask/roshask' >> ~/.bashrc
-/opt/cabal/1.20/bin/cabal update
-/opt/cabal/1.20/bin/cabal install cabal-install
+/opt/cabal/1.22/bin/cabal update
+# /opt/cabal/1.22/bin/cabal install cabal-install
 echo "Host github.com" > ~/.ssh/config
 echo "User git" >> ~/.ssh/config
 # echo "IdentityFile ~/.ssh/github" >> ~/.ssh/config
