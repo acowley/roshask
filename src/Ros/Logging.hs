@@ -83,4 +83,4 @@ enableLogging ll = do xs <- liftIO $ getChanContents rosOutChan
                                      (writeIORef showLevel . printLog)
                                      ll
                       liftIO . writeIORef nodeName =<< getName
-                      advertise "/rosout" (fromList xs)
+                      advertise "/rosout" (fromList xs :: Topic IO Log)
