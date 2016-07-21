@@ -1,8 +1,13 @@
+#+CATEGORY: roshask
 * TODO Change from =snap= to =warp=
   :PROPERTIES:
   :ID:       34EBDA27-4791-4ED4-8D87-C832D6833C16
   :END:
   It looks like building directly on =warp= might be a simpler choice for all HTTP needs. We do most of our work through =haxr= as it stands, and do not want or need a heavier server.
+* TODO Update to newer Stackage release
+Resolve this [[https://github.com/acowley/roshask/issues/44][issue]]
+* TODO Bump version bounds to match current Stackage LTS
+
 
 * Code Organization
 ** Ros
@@ -59,7 +64,7 @@
     cases. This directory on the host (your computer) is mapped to
     =/vagrant= on the guest (the VM).
 
-*** GitHub 
+*** GitHub
     A convention used here is to configure SSH on the guest to work
     with [[http://www.github.com] [GitHub]] by using a key file the
     guest finds at =/vagrant/vagrant/ssh/github=, which maps to the
@@ -81,7 +86,7 @@
    directories and files from =/vagrant= to =/home/vagrant/roshask=. I
    then initialize a sandbox in =/home/vagrant/roshask=, so that
    =.cabal-sandbox= is on the guest machine.
-   
+
    It can be convenient to share sandboxes between the example
    programs and roshask itself if you are working on roshask. In an
    example program directory, run =cabal sandbox init
