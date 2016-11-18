@@ -4,11 +4,6 @@
   :ID:       34EBDA27-4791-4ED4-8D87-C832D6833C16
   :END:
   It looks like building directly on =warp= might be a simpler choice for all HTTP needs. We do most of our work through =haxr= as it stands, and do not want or need a heavier server.
-* TODO Update to newer Stackage release
-Resolve this [[https://github.com/acowley/roshask/issues/44][issue]]
-* TODO Bump version bounds to match current Stackage LTS
-
-
 * Code Organization
 ** Ros
 *** Graph
@@ -39,6 +34,90 @@ Resolve this [[https://github.com/acowley/roshask/issues/44][issue]]
    initialize new packages and generation Haskell packages
    corresponding to message definitions found in ROS package
    dependencies.
+* Docker
+
+There are [[https://hub.docker.com/_/ros/][docs]] associated with the official ROS docker images and a [[http://wiki.ros.org/docker/Tutorials/Docker][tutorial]].
+
+** ROS
+One can use an official ROS docker image,
+
+#+BEGIN_SRC bash
+docker pull ros:kinetic-perception
+#+END_SRC
+
+** roshask
+
+We have a derived image that is suitable for ~roshask~ development and usage.
+
+*** Building the Image
+
+#+BEGIN_SRC bash
+docker build -t roshask .
+#+END_SRC
+
+*** Building ~roshask~
+#+BEGIN_SRC bash
+cd /roshask && stack setup && stack build
+#+END_SRC
+
+*** Running an interactive shell
+
+Assuming you have a local checkout of ~roshask~ at the path =~Documents/Projects/roshask=,
+
+#+BEGIN_SRC bash
+docker run -v ~/Documents/Projects/roshask:/roshask --name ros -it roshask
+#+END_SRC
+
+If you exit the container and it stops running, you can start and attach to it again,
+
+#+BEGIN_SRC bash
+docker start -ai ros
+#+END_SRC
+
+*** Running ROS nodes
+
+**** Master
+
+#+BEGIN_SRC bash
+docker run -it --rm --name master roshask roscore
+#+END_SRC
+
+**** Desktop
+
+If you need a desktop to connect to for GUI tools, you can use [[http://wiki.x2go.org/doku.php][x2go]] via ssh,
+
+#+BEGIN_SRC bash
+docker run -p 2222:22 -v /Users/acowley/Documents/Projects/roshask:/roshask --link master:master --name ros -it roshask
+#+END_SRC
+
+In a shell in the container,
+
+#+BEGIN_SRC bash
+/etc/init.d/ssh restart
+adduser roshask
+#+END_SRC
+
+Now you can connect to ~localhost:2222~ to connect to the container with x2go using the user info you just added.
+
+On the container's desktop, open up a terminal and,
+
+- Run ~export ROS_MASTER_URI=http://master:11311~
+- Define ~ROS_HOSTNAME~ to the container's IP address
+  You can find the IP (and much more) on the host machine with ~docker network inspect bridge~ or use ~/sbin/ifconfig~ in the container.
+- Run ~source /opt/ros/kinetic/setup.bash~
+- Start whatever nodes you wish! e.g. ~rosrun turtlesim turtlesim_node~
+
+**** CLI node
+
+#+BEGIN_SRC bash
+docker run -it --rm --name turtle_teleop --link master:master --env ROS_HOSTNAME=172.17.0.4 --env ROS_MASTER_URI=http://master:11311 roshask rosrun turtlesim turtle_teleop_key
+#+END_SRC
+
+Note that the ~HOSTNAME~ part there depends on how many containers you have.
+
+**** TODO Set ROS_HOSTNAME in docker invocation
+
+
 * Vagrant
   [[http://www.vagrantup.com] [Vagrant]] is used to provide a common development environment that can be re-created on various platforms. On Windows and Mac, VirtualBox can be used to provide a virtual machine (VM) to host a ROS-friendly Ubuntu environment. When the current working directory contains the =Vagrantfile= defining a VM, a few simple commands to remember are:
 

@@ -64,3 +64,20 @@ Archived entries from file /Users/acowley/Documents/Projects/roshask/roshask-not
   :ARCHIVE_TODO: DONE
   :END:
   This should go in the Graph section.
+
+* DONE Update to newer Stackage release
+  :PROPERTIES:
+  :ARCHIVE_TIME: 2016-11-07 Mon 10:39
+  :ARCHIVE_FILE: ~/Documents/Projects/roshask/roshask-notes.org
+  :ARCHIVE_CATEGORY: roshask
+  :ARCHIVE_TODO: DONE
+  :END:
+Resolve this [[https://github.com/acowley/roshask/issues/44][issue]]
+
+* DONE Bump version bounds to match current Stackage LTS
+  :PROPERTIES:
+  :ARCHIVE_TIME: 2016-11-07 Mon 10:40
+  :ARCHIVE_FILE: ~/Documents/Projects/roshask/roshask-notes.org
+  :ARCHIVE_CATEGORY: roshask
+  :ARCHIVE_TODO: DONE
+  :END:
