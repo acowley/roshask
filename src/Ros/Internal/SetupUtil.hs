@@ -1,7 +1,9 @@
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE CPP, TupleSections #-}
 -- |Integration with the Cabal build system.
 module Ros.Internal.SetupUtil (rosBuild, rosConf) where
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Data.List (intercalate)
 import Distribution.Simple
 import Distribution.Simple.InstallDirs

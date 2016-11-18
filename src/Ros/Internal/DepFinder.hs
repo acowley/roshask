@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -- Use a package's manifest.xml file to find paths to the packages on
 -- which this package is dependent.
 module Ros.Internal.DepFinder (findPackageDeps, findPackageDepNames,
@@ -6,7 +7,9 @@ module Ros.Internal.DepFinder (findPackageDeps, findPackageDepNames,
                                findDepsWithMessages, hasMsgsOrSrvs,
                                findServices
                               ) where
+#if __GLASGOW_HASKELL__ < 710                              
 import Control.Applicative ((<$>))
+#endif
 import Control.Monad (when, filterM)
 import Data.Maybe (mapMaybe, isJust, catMaybes)
 import Data.List (find, nub)

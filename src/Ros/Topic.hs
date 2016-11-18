@@ -6,10 +6,9 @@
 -- using either qualification (e.g. @import qualified Ros.TopicUtil as
 -- T@), an explicit import list, or a @hiding@ clause.
 module Ros.Topic where
-#if __GLASGOW_HASKELL__ >= 710
-import Prelude hiding (join)
-#endif
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative
+#endif
 import Control.Arrow ((***), second)
 import Control.Monad ((<=<), (>=>))
 import Control.Monad.IO.Class

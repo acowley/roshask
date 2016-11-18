@@ -1,9 +1,12 @@
+{-# LANGUAGE CPP #-}
 -- |The ROS connection header contains important metadata about a
 -- connection being established, including typing information and
 -- routing information. How it is exchanged depends on the ROS
 -- transport being used.
 module Ros.Node.ConnectionHeader (genHeader, ConnHeader(..), parseHeader) where
+#if __GLASGOW_HASKELL__ < 710
 import Control.Applicative ((<$>))
+#endif
 import Control.Arrow (second, (***))
 import Data.Binary.Get (getWord32le, Get, getByteString, runGetIncremental)
 import qualified Data.Binary.Get as G
