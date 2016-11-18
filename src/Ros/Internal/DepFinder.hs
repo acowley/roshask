@@ -1,6 +1,6 @@
 -- Use a package's manifest.xml file to find paths to the packages on
 -- which this package is dependent.
-module Ros.Internal.DepFinder (findPackageDeps, findPackageDepNames, 
+module Ros.Internal.DepFinder (findPackageDeps, findPackageDepNames,
                                findPackageDepsTrans,
                                findMessages, findMessage, findMessagesInPkg,
                                findDepsWithMessages, hasMsgsOrSrvs,
@@ -9,10 +9,10 @@ module Ros.Internal.DepFinder (findPackageDeps, findPackageDepNames,
 import Control.Applicative ((<$>))
 import Control.Monad (when, filterM)
 import Data.Maybe (mapMaybe, isJust, catMaybes)
-import Data.List (find, findIndex, nub)
+import Data.List (find, nub)
 import System.Directory (doesFileExist, doesDirectoryExist)
 import System.Environment (getEnvironment)
-import System.FilePath ((</>), splitSearchPath, dropExtension, 
+import System.FilePath ((</>), splitSearchPath, dropExtension,
                         takeFileName, splitPath)
 import System.FilePath.Find hiding (find)
 import qualified System.FilePath.Find as F
@@ -29,9 +29,9 @@ findPackagePath search pkg = find ((== pkg) . last . splitPath) search
 -- ByteStrings via the XmlSource typeclass. Consider that upgrade if
 -- performance is causing trouble.
 getPackages :: String -> Maybe [Package]
-getPackages = (map attrVal . 
-               mapMaybe (find ((==pkg).attrKey) . elAttribs) . 
-               findChildren dep <$>) . 
+getPackages = (map attrVal .
+               mapMaybe (find ((==pkg).attrKey) . elAttribs) .
+               findChildren dep <$>) .
               parseXMLDoc
     where pkg = QName "package" Nothing Nothing
           dep = QName "depend" Nothing Nothing
@@ -51,7 +51,7 @@ packagePaths = F.find always $
 
 -- Get every package directory on the ROS search path.
 getRosPaths :: IO [FilePath]
-getRosPaths = 
+getRosPaths =
     do env <- getEnvironment
        let pPaths = case lookup "ROS_PACKAGE_PATH" env of
                       Just s -> s
@@ -73,7 +73,7 @@ ignoredPackages = [ "genmsg_cpp", "rospack", "rosconsole", "rosbagmigration"
 -- indicated by the manifest.xml or package.xml file in this package's root
 -- directory.
 findPackageDepNames :: FilePath -> IO [String]
-findPackageDepNames pkgRoot = 
+findPackageDepNames pkgRoot =
   let manifest = pkgRoot </> "manifest.xml"
       pkg = pkgRoot </> "package.xml"
   in do exists <- doesFileExist manifest
@@ -97,7 +97,7 @@ hasMsgsOrSrvs = fmap (not . null) . F.find (depth <? 2) (extension ==? ".msg" ||
 -- roshask package (determined by the presence of a @.cabal@ file in
 -- the package's root directory).
 isRoshask :: FilePath -> IO Bool
-isRoshask pkgPath = not . null . filter ((== ".cabal") . takeExtension) <$> 
+isRoshask pkgPath = not . null . filter ((== ".cabal") . takeExtension) <$>
                     getDirectoryContents pkgPath
 -}
 
@@ -105,7 +105,7 @@ isRoshask pkgPath = not . null . filter ((== ".cabal") . takeExtension) <$>
 -- 'FilePath' depends on as indicated by its @manifest.xml@ file. Only
 -- those packages that define messages or services are returned.
 findDepsWithMessages :: FilePath -> IO [String]
-findDepsWithMessages pkgRoot = 
+findDepsWithMessages pkgRoot =
   do names <- findPackageDepNames pkgRoot
      searchPaths <- getRosPaths
      filterM (maybe (return False) hasMsgsOrSrvs . findPackagePath searchPaths) names
@@ -114,7 +114,7 @@ findDepsWithMessages pkgRoot =
 -- indicated by the manifest.xml file in this package's root
 -- directory.
 findPackageDeps :: FilePath -> IO [FilePath]
-findPackageDeps pkgRoot = 
+findPackageDeps pkgRoot =
     do pkgs <- findPackageDepNames pkgRoot
        searchPaths <- getRosPaths
        let pkgPaths = map (findPackagePath searchPaths) pkgs
@@ -122,7 +122,7 @@ findPackageDeps pkgRoot =
        noticeNotFound (zip pkgPaths pkgs)
        return $ catMaybes pkgPaths
 
--- |Notificate end-user when packages or deps are not found.
+-- |Notify end-user when packages or deps are not found.
 noticeNotFound :: [(Maybe FilePath, String)] -> IO ()
 noticeNotFound pkgs =
     case dropWhile (isJust . fst) pkgs of
@@ -141,7 +141,7 @@ findPackageDepsTrans pkgRoot =
   -- searchPaths is a list of all directories on the ROS package path that have
   -- either a manifest.xml(rosbuild), or a package.xml(new replacement for manifest.xml)
   do searchPaths <- getRosPaths
-     let getDeps pkg = 
+     let getDeps pkg =
            do pkgDeps <- findPackageDepNames pkg
               let pkgPaths = map (findPackagePath searchPaths) pkgDeps
               putStrLn $ "Looking for " ++ show pkg ++ ", dependencies of" ++ pkgRoot
@@ -150,15 +150,15 @@ findPackageDepsTrans pkgRoot =
          recurse p = do deps <- getDeps p
                         nub . (++[p]) . concat <$> mapM recurse deps
      init <$> recurse pkgRoot
-     
+
 -- |Return the full path to every .msg file in the given package
 -- directory.
 findMessages :: FilePath -> IO [FilePath]
-findMessages pkgRoot = 
+findMessages pkgRoot =
   do e <- doesDirectoryExist dir
      if e then F.find (depth <? 1) (extension ==? ".msg") dir else return []
   where dir = pkgRoot </> "msg"
-        
+
 --TODO: refactor with findMessages
 findServices :: FilePath -> IO [FilePath]
 findServices pkgRoot =
@@ -171,7 +171,7 @@ findServices pkgRoot =
 -- definition in the package.
 findMessagesInPkg :: String -> IO (FilePath, [FilePath])
 findMessagesInPkg pkgName = do searchPaths <- getRosPaths
-                               let pkgPath = maybe err id $ 
+                               let pkgPath = maybe err id $
                                              findPackagePath searchPaths pkgName
                                msgs <- findMessages pkgPath
                                return (pkgPath, msgs)
@@ -185,7 +185,7 @@ findMessagesInPkg pkgName = do searchPaths <- getRosPaths
 -- search paths indicated in the current environment (ROS_PACKAGE_PATH
 -- and ROS_ROOT).
 findMessage :: String -> String -> IO (Maybe FilePath)
-findMessage pkg msgType = 
+findMessage pkg msgType =
     do searchPaths <- getRosPaths
        let pkgPath = findPackagePath searchPaths pkg
        case pkgPath of
