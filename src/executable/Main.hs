@@ -1,13 +1,16 @@
+{-# LANGUAGE CPP #-}
 -- |The main entry point for the roshask executable.
 module Main (main) where
+#if __GLASGOW_HASKELL__ < 800
 import Control.Applicative
+#endif
 import qualified Data.ByteString.Char8 as B
 import System.Directory (getCurrentDirectory)
 import System.Environment (getArgs)
 import System.Exit (exitWith, ExitCode(..))
 import System.FilePath (isRelative, (</>), dropFileName,
                         takeFileName, takeExtension, dropExtension)
-import Ros.Internal.DepFinder (findMessages, findPackageDeps, 
+import Ros.Internal.DepFinder (findMessages, findPackageDeps,
                                findPackageDepsTrans)
 import Ros.Internal.PathUtil (cap, codeGenDir, pathToPkgName)
 
@@ -15,7 +18,7 @@ import Analysis (runAnalysis)
 import Parse
 import Gen
 import MD5
-import PkgBuilder (buildPkgMsgs, pathToRosPkg,
+import PkgBuilder (buildPkgMsgs, pathToRosPkg, DestDir(..),
                    parseGenWriteMsg, parseGenWriteService)
 import Unregister
 import PkgInit (initPkg)
@@ -35,13 +38,13 @@ generateAndSave fname = do
 
 -- Generate Haskell code for a message type.
 generate :: FilePath -> IO (B.ByteString, String)
-generate fname = 
+generate fname =
     do r <- parseMsg fname
        pkgMsgs <- map B.pack <$> findMessages dir
        case r of
          Left err -> do putStrLn $ "ERROR: " ++ err
                         exitWith (ExitFailure (-2))
-         Right msg -> runAnalysis $ 
+         Right msg -> runAnalysis $
                       do hMsg <- generateMsgType pkgHier pkgMsgs msg
                          md5 <- msgMD5 msg
                          return (hMsg, md5)
@@ -52,7 +55,7 @@ generate fname =
 -- |Run "roshask gen" on all the .msg files in each of the given
 -- package directories.
 buildDepMsgs :: [FilePath] -> IO ()
-buildDepMsgs = runAnalysis . mapM_ buildPkgMsgs
+buildDepMsgs = runAnalysis . mapM_ (buildPkgMsgs DestHere)
 
 -- When given a relative path, prepend it with the current working
 -- directory.
@@ -73,7 +76,7 @@ help = [ "Usage: roshask command [[arguments]]"
        , "                                      depends on"
        , ""
        , "  dep directory                    -- Build all messages the specified "
-       , "                                      package depends on" 
+       , "                                      package depends on"
        , ""
        , "  md5 file.msg                     -- Generate an MD5 sum for a ROS "
        , "                                      message type"
@@ -89,11 +92,11 @@ main :: IO ()
 main = do args <- getArgs
           case args of
             ["gen",name] -> canonicalizeName name >>= generateAndSave
-            ["md5",name] -> canonicalizeName name >>= 
+            ["md5",name] -> canonicalizeName name >>=
                             generate >>= putStrLn . snd
             ("create":pkgName:deps) -> initPkg pkgName deps
             ["unregister"] -> unregisterInteractive
-            ["dep"] -> do d <- getCurrentDirectory 
+            ["dep"] -> do d <- getCurrentDirectory
                           deps <- findPackageDepsTrans d
                           buildDepMsgs (deps++[d])
             ["dep",name] -> findPackageDeps name >>= (buildDepMsgs . (++[name]))

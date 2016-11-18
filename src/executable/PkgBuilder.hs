@@ -1,8 +1,10 @@
-{-# LANGUAGE FlexibleContexts, OverloadedStrings #-}
+{-# LANGUAGE CPP, FlexibleContexts, OverloadedStrings #-}
 -- |Build all messages defined in a ROS package.
 module PkgBuilder where
 import Analysis
+#if __GLASGOW_HASKELL__ < 800
 import Control.Applicative
+#endif
 import Control.Concurrent (forkIO)
 import Control.Concurrent (newEmptyMVar)
 import Control.Concurrent (putMVar)
@@ -22,7 +24,7 @@ import Types (requestResponseNames, shortName)
 import Paths_roshask (version, getBinDir)
 
 import Ros.Internal.DepFinder (findMessages, findDepsWithMessages, hasMsgsOrSrvs, findServices)
-import Ros.Internal.PathUtil (codeGenDir, cap)
+import Ros.Internal.PathUtil (codeGenDir, cap, pathToPkgName)
 import System.Directory (createDirectoryIfMissing, getDirectoryContents,
                          doesDirectoryExist, removeFile)
 import System.Exit (ExitCode(..))
@@ -36,7 +38,7 @@ import System.Process (createProcess, proc, CreateProcess(..), waitForProcess, S
 sandboxDir :: IO (Maybe FilePath)
 sandboxDir = do d <- splitDirectories <$> getBinDir
                 return $ case reverse d of
-                           ("bin" : ".cabal-sandbox" : ds) -> 
+                           ("bin" : ".cabal-sandbox" : ds) ->
                              Just . joinPath $ reverse ds
                            _ -> Nothing
 
@@ -99,19 +101,29 @@ myReadProcess cp =
 packageRegistered :: ToolPaths -> FilePath -> IO Bool
 packageRegistered tools pkg =
   any (isPrefixOf cabalPkg . dropWhile isSpace) . lines <$> getList
-  where cabalPkg = (rosPkg2CabalPkg $ pathToRosPkg pkg) ++ 
+  where cabalPkg = (rosPkg2CabalPkg $ pathToRosPkg pkg) ++
                    "-" ++ B.unpack roshaskVersion
         getList = myReadProcess $ ghcPkg tools ["list", cabalPkg]
 
+-- | A generated package of message definitions can be written in the
+-- current directory or in @~/.cabal/share/roshask@ (only appropriate
+-- if installing into a user's package database.
+data DestDir = DestHere | DestCabal
+
 -- | Build all messages defined by a ROS package unless the corresponding
 -- Haskell package is already registered with ghc-pkg.
-buildPkgMsgs :: FilePath -> MsgInfo ()
-buildPkgMsgs fname = do tools <- liftIO toolPaths
-                        r <- liftIO $ packageRegistered tools fname
-                        if r
-                          then liftIO . putStrLn $ 
-                               "Using existing " ++ pathToRosPkg fname
-                          else buildNewPkgMsgs tools fname
+buildPkgMsgs :: DestDir -> FilePath -> MsgInfo ()
+buildPkgMsgs DestHere fname =
+  buildNewPkgMsgs Nothing (pkg</>"Ros"</>pkg) fname
+  where pkg = pathToPkgName fname
+buildPkgMsgs DestCabal fname =
+  do tools <- liftIO toolPaths
+     r <- liftIO $ packageRegistered tools fname
+     if r
+       then liftIO . putStrLn $
+            "Using existing " ++ pathToRosPkg fname
+       else do destDir <- liftIO $ codeGenDir fname
+               buildNewPkgMsgs (Just tools) destDir fname
 
 parseErrorMsg :: Show a => a -> String -> Either String c -> c
 parseErrorMsg = parseErrorHelper "message"
@@ -149,10 +161,9 @@ parseGenWriteMsg pkgHier destDir haskellPkgMsgNames msgFile = do
 
 -- | Generate Haskell implementations of all message definitions in
 -- the given package.
-buildNewPkgMsgs :: ToolPaths -> FilePath -> MsgInfo ()
-buildNewPkgMsgs tools fname =
+buildNewPkgMsgs :: Maybe ToolPaths -> FilePath -> FilePath -> MsgInfo ()
+buildNewPkgMsgs tools' destDir fname =
   do liftIO . putStrLn $ "Generating package " ++ fname
-     destDir <- liftIO $ codeGenDir fname
      liftIO $ createDirectoryIfMissing True destDir
      pkgMsgs <- liftIO $ findMessages fname
      pkgSrvs <- liftIO $ findServices fname
@@ -160,16 +171,19 @@ buildNewPkgMsgs tools fname =
      mapM_ (parseGenWriteMsg pkgHier destDir haskellMsgNames) pkgMsgs
      mapM_ (parseGenWriteService pkgHier destDir haskellMsgNames) pkgSrvs
      liftIO $ do f <- hasMsgsOrSrvs fname
-                 when f (removeOldCabal fname >> compileMsgs)
+                 when f (removeOldCabal destDir >> compileMsgs)
     where pkgName = pathToRosPkg fname
           pkgHier = B.pack $ "Ros." ++ cap pkgName ++ "."
-          compileMsgs = do cpath <- genMsgCabal fname pkgName
-                           (_,_,_,procH) <- createProcess $
-                             cabalInstall tools ["install", cpath]
-                           code <- waitForProcess procH
-                           when (code /= ExitSuccess)
-                                (error $ "Building messages for "++
-                                         pkgName++" failed")
+          compileMsgs =
+            do cpath <- genMsgCabal destDir fname pkgName
+               case tools' of
+                 Just tools -> do (_,_,_,procH) <- createProcess $
+                                    cabalInstall tools ["install", cpath]
+                                  code <- waitForProcess procH
+                                  when (code /= ExitSuccess)
+                                       (error $ "Building messages for "++
+                                                pkgName++" failed")
+                 Nothing -> return ()
 
 -- |Convert a ROS package name to the corresponding Cabal package name
 -- defining the ROS package's msg types.
@@ -182,11 +196,10 @@ rosPkg2CabalPkg = ("ROS-"++) . addSuffix . map sanitize
           | otherwise = n ++ "-msgs"
 
 removeOldCabal :: FilePath -> IO ()
-removeOldCabal pkgPath = 
-  do msgPath <- codeGenDir pkgPath
-     f <- doesDirectoryExist msgPath
+removeOldCabal msgPath =
+  do f <- doesDirectoryExist msgPath
      when f (getDirectoryContents msgPath >>=
-             mapM_ (removeFile . (msgPath </>)) . 
+             mapM_ (removeFile . (msgPath </>)) .
                    filter ((== ".cabal") . takeExtension))
 
 -- Extract a Msg module name from a Path
@@ -194,31 +207,31 @@ path2MsgModule :: FilePath -> String
 path2MsgModule = intercalate "." . map cap . reverse . take 3 .
                  reverse . splitDirectories . dropExtension
 
-getHaskellFiles :: FilePath -> String -> IO [FilePath]
-getHaskellFiles pkgPath _pkgName = do
-  d <- codeGenDir pkgPath
-  map (d </>) . filter ((== ".hs") . takeExtension) <$> getDirectoryContents d
+getHaskellFiles :: FilePath -> IO [FilePath]
+getHaskellFiles destDir =
+  map (destDir </>) . filter ((== ".hs") . takeExtension) <$>
+  getDirectoryContents destDir
 
 -- Generate a .cabal file to build this ROS package's messages.
-genMsgCabal :: FilePath -> String -> IO FilePath
-genMsgCabal pkgPath pkgName = 
-  do deps' <- map (B.pack . rosPkg2CabalPkg) <$> 
+genMsgCabal :: FilePath -> FilePath -> String -> IO FilePath
+genMsgCabal destDir pkgPath pkgName =
+  do deps' <- map (B.pack . rosPkg2CabalPkg) <$>
               findDepsWithMessages pkgPath
-     cabalFilePath <- (</>cabalPkg++".cabal") . 
-                      joinPath . init . init . splitPath <$> 
-                      codeGenDir pkgPath
-     let deps
+     let cabalFilePath = (</>cabalPkg++".cabal") .
+                         joinPath . init . init . splitPath $
+                         destDir
+         deps
            | pkgName == "std_msgs" = deps'
            | otherwise = nub ("ROS-std-msgs":deps')
-     msgFiles <- getHaskellFiles pkgPath pkgName
+     msgFiles <- getHaskellFiles destDir
      let msgModules = map (B.pack . path2MsgModule) msgFiles
          target = B.intercalate "\n" $
                   [ "Library"
-                  , B.append "  Exposed-Modules: " 
+                  , B.append "  Exposed-Modules: "
                     (if not (null msgModules)
                     then B.concat [ head msgModules
-                                  , "\n" 
-                                  , B.intercalate "\n" 
+                                  , "\n"
+                                  , B.intercalate "\n"
                                     (map indent (tail msgModules)) ]
                     else "")
                   , ""
@@ -241,7 +254,7 @@ genMsgCabal pkgPath pkgName =
   where cabalPkg = rosPkg2CabalPkg pkgName
         preamble = format [ ("Name", B.pack cabalPkg)
                           , ("Version", roshaskVersion)
-                          , ("Synopsis", B.append "ROS Messages from " 
+                          , ("Synopsis", B.append "ROS Messages from "
                                                   (B.pack pkgName))
                           , ("Cabal-version", ">=1.6")
                           , ("Category", "Robotics")
@@ -250,6 +263,6 @@ genMsgCabal pkgPath pkgName =
 
 format :: [(ByteString, ByteString)] -> ByteString
 format fields = B.concat $ map indent fields
-  where indent (k,v) = let spaces = flip B.replicate ' ' $ 
+  where indent (k,v) = let spaces = flip B.replicate ' ' $
                                     21 - B.length k - 1
                        in B.concat [k,":",spaces,v,"\n"]
