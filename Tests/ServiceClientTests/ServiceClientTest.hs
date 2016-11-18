@@ -1,19 +1,20 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, ScopedTypeVariables #-}
 module Main where
+import Control.Applicative ((<$>))
+import Control.Exception
+import Data.List (isPrefixOf)
+import qualified Data.Int as Int
+import GHC.Int
+import Ros.Internal.Msg.SrvInfo
+import Ros.Internal.RosBinary
+import Ros.Service (callService)
+import Ros.Service.ServiceTypes
 import qualified Ros.Test_srvs.AddTwoIntsRequest as Req
 import qualified Ros.Test_srvs.AddTwoIntsResponse as Res
 import Ros.Test_srvs.EmptyRequest
 import Ros.Test_srvs.EmptyResponse
-import Ros.Service (callService)
-import Ros.Service.ServiceTypes
 import Test.Tasty
 import Test.Tasty.HUnit
-import GHC.Int
-import qualified Data.Int as Int
-import Ros.Internal.Msg.SrvInfo
-import Ros.Internal.RosBinary
-import Control.Applicative ((<$>))
-import Control.Exception
 
 -- To run:
 -- 1. start ros: run "roscore"
@@ -53,10 +54,11 @@ noProviderTest = testCase ("service not registered error") $
     y = 10
 
 -- From the deprecated @testpack@ package by John Goerzen
-assertRaises :: (Show a, Control.Exception.Exception e, Show e, Eq e)
+assertRaises :: forall a e. (Show a, Control.Exception.Exception e, Show e, Eq e)
              => String -> e -> IO a -> IO ()
 assertRaises msg selector action =
-    let thetest e = if e == selector then return ()
+    let thetest :: e -> IO ()
+        thetest e = if isPrefixOf (show selector) (show e) then return ()
                     else assertFailure $
                          msg ++ "\nReceived unexpected exception: "
                              ++ show e
