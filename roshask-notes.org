@@ -34,6 +34,18 @@
    initialize new packages and generation Haskell packages
    corresponding to message definitions found in ROS package
    dependencies.
+* Generating msg and srv Packages
+
+We generate Haskell Cabal packages for message and service definitions from an environment with a functioning ROS installation.
+
+Using the Turtlesim tutorial as an example,
+
+#+BEGIN_SRC bash
+nix-shell ros.nix
+cd msgs
+stack exec roshask -- dep $(rospack find turtlesim)/share/turtlesim
+#+END_SRC
+
 * Docker
 
 There are [[https://hub.docker.com/_/ros/][docs]] associated with the official ROS docker images and a [[http://wiki.ros.org/docker/Tutorials/Docker][tutorial]].
@@ -116,7 +128,6 @@ docker run -it --rm --name turtle_teleop --link master:master --env ROS_HOSTNAME
 Note that the ~HOSTNAME~ part there depends on how many containers you have.
 
 **** TODO Set ROS_HOSTNAME in docker invocation
-
 
 * Vagrant
   [[http://www.vagrantup.com] [Vagrant]] is used to provide a common development environment that can be re-created on various platforms. On Windows and Mac, VirtualBox can be used to provide a virtual machine (VM) to host a ROS-friendly Ubuntu environment. When the current working directory contains the =Vagrantfile= defining a VM, a few simple commands to remember are:
