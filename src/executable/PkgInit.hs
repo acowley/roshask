@@ -60,7 +60,7 @@ prepCabal pkgName rosDeps = B.writeFile (pkgName</>(pkgName++".cabal")) $
                             , ("Synopsis","I am code")
                             , ("Cabal-version",">=1.6")
                             , ("Category","Robotics")
-                            , ("Build-type","Custom") ]
+                            , ("Build-type","Simple") ]
           target = B.intercalate "\n" $
                    [ B.concat ["Executable ", pack pkgName]
                    , "  Build-Depends:   base >= 4.2 && < 6,"
@@ -102,10 +102,7 @@ format fields = B.concat $ map indent fields
 prepSetup :: String -> IO ()
 prepSetup pkgName = B.writeFile (pkgName</>"Setup.hs") $
                     B.concat [ "import Distribution.Simple\n"
-                             , "import Ros.Internal.SetupUtil\n\n"
-                             , "main = defaultMainWithHooks $\n"
-                             , "       simpleUserHooks { confHook = "
-                             , "rosConf }\n" ]
+                             , "main = defaultMain\n" ]
 
 prepMain :: String -> IO ()
 prepMain pkgName = writeFile (pkgName</>"src"</>"Main.hs") $
