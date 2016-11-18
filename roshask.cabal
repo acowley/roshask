@@ -6,7 +6,7 @@ License-file:        LICENSE
 Cabal-version:       >=1.10
 Author:              Anthony Cowley
 Maintainer:          Anthony Cowley <acowley@seas.upenn.edu>
-Copyright:           (c) 2010 Anthony Cowley
+Copyright:           (c) 2010-2016 Anthony Cowley
 Category:            Robotics
 Build-type:          Simple
 Bug-reports:         http://github.com/acowley/roshask/issues
