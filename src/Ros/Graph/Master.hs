@@ -45,11 +45,17 @@ unregisterPublisher :: URI -> String -> TopicName -> String ->
                        IO (Int, String, Int)
 unregisterPublisher = flip remote "unregisterPublisher"
 
--- |@lookupService u s1 s2@ where @u@ is the URI of the ROS master, @s1@ is the ROS caller ID, and @s2@ is the ROS fully-qualified name of the service
+-- |@lookupService u s1 s2@ where @u@ is the URI of the ROS master,
+-- @s1@ is the ROS caller ID, and @s2@ is the ROS fully-qualified name
+-- of the service
 --
--- In the result tuple @(code, statusMessage, serviceUrl)@, @code@ should be 1 upon a sucessful call. If @code@ is not 1 then @statusMessage@ may contain an error message. The host name and port of the service can be extracted from the @serviceUrl@
+-- In the result tuple @(code, statusMessage, serviceUrl)@, @code@
+-- should be 1 upon a sucessful call. If @code@ is not 1 then
+-- @statusMessage@ may contain an error message. The host name and
+-- port of the service can be extracted from the @serviceUrl@
 --
-lookupService :: URI -> String -> ServiceName -> ExceptT ServiceResponseExcept IO (Int, String, String)
+lookupService :: URI -> String -> ServiceName 
+              -> ExceptT ServiceResponseExcept IO (Int, String, String)
 lookupService u s1 s2 = ExceptT . (flip catchIOError) handler $ do
   let res = call u "lookupService" (fmap toValue [s1, s2]) >>= fromValue
   err <- runExceptT res

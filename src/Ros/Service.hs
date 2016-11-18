@@ -10,7 +10,8 @@ import Ros.Service.ServiceTypes
 
 --type NotOkError = String
 
-callService :: (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) => ServiceName -> a -> IO (Either ServiceResponseExcept b)
+callService :: (RosBinary a, SrvInfo a, RosBinary b, SrvInfo b) 
+            => ServiceName -> a -> IO (Either ServiceResponseExcept b)
 callService name req =
   do
     env <- getEnvironment
