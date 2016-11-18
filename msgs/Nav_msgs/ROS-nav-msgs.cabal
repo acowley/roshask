@@ -1,5 +1,5 @@
 Name:                ROS-nav-msgs
-Version:             0.3
+Version:             0.4
 Synopsis:            ROS Messages from nav_msgs
 Cabal-version:       >=1.6
 Category:            Robotics
@@ -31,7 +31,7 @@ Library
                    data-default-generics >= 0.3,
                    lens-family-core >= 1.2,
                    lens-family-th >= 0.4.1,
-                   roshask == 0.3.*,
+                   roshask == 0.4.*,
                    ROS-std-msgs,
                    ROS-geometry-msgs,
                    ROS-actionlib-msgs
