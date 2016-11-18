@@ -217,7 +217,7 @@ callServiceWithMaster rosMaster serviceName message = runExceptT $ do
   (host, port) <- ExceptT . return $ parseHostAndPort serviceUrl
   -- make a socket
   let makeSocket = socket AF_INET Sock.Stream defaultProtocol
-      closeSocket sock = liftIO $ sClose sock
+      closeSocket sock = liftIO $ close sock
       withSocket sock = do
         ioErrorToExceptT ConnectExcept "Problem connecting to server. Got exception : " $ do
           --Connect to the socket
