@@ -1,0 +1,32 @@
+Name:                ROS-turtlesim-msgs
+Version:             0.3
+Synopsis:            ROS Messages from turtlesim
+Cabal-version:       >=1.6
+Category:            Robotics
+Build-type:          Simple
+
+Library
+  Exposed-Modules: Ros.Turtlesim.Color
+                   Ros.Turtlesim.KillRequest
+                   Ros.Turtlesim.KillResponse
+                   Ros.Turtlesim.Pose
+                   Ros.Turtlesim.SetPenRequest
+                   Ros.Turtlesim.SetPenResponse
+                   Ros.Turtlesim.SpawnRequest
+                   Ros.Turtlesim.SpawnResponse
+                   Ros.Turtlesim.TeleportAbsoluteRequest
+                   Ros.Turtlesim.TeleportAbsoluteResponse
+                   Ros.Turtlesim.TeleportRelativeRequest
+                   Ros.Turtlesim.TeleportRelativeResponse
+
+  Build-Depends:   base >= 4.2 && < 6,
+                   vector > 0.7,
+                   time >= 1.1,
+                   data-default-generics >= 0.3,
+                   lens-family-core >= 1.2,
+                   lens-family-th >= 0.4.1,
+                   roshask == 0.3.*,
+                   ROS-std-msgs,
+                   ROS-geometry-msgs,
+                   ROS-std-srvs-msgs
+  GHC-Options:     -O2

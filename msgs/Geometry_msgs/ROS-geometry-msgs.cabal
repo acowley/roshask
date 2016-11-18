@@ -1,0 +1,47 @@
+Name:                ROS-geometry-msgs
+Version:             0.3
+Synopsis:            ROS Messages from geometry_msgs
+Cabal-version:       >=1.6
+Category:            Robotics
+Build-type:          Simple
+
+Library
+  Exposed-Modules: Ros.Geometry_msgs.Accel
+                   Ros.Geometry_msgs.AccelStamped
+                   Ros.Geometry_msgs.AccelWithCovariance
+                   Ros.Geometry_msgs.AccelWithCovarianceStamped
+                   Ros.Geometry_msgs.Inertia
+                   Ros.Geometry_msgs.InertiaStamped
+                   Ros.Geometry_msgs.Point
+                   Ros.Geometry_msgs.Point32
+                   Ros.Geometry_msgs.PointStamped
+                   Ros.Geometry_msgs.Polygon
+                   Ros.Geometry_msgs.PolygonStamped
+                   Ros.Geometry_msgs.Pose
+                   Ros.Geometry_msgs.Pose2D
+                   Ros.Geometry_msgs.PoseArray
+                   Ros.Geometry_msgs.PoseStamped
+                   Ros.Geometry_msgs.PoseWithCovariance
+                   Ros.Geometry_msgs.PoseWithCovarianceStamped
+                   Ros.Geometry_msgs.Quaternion
+                   Ros.Geometry_msgs.QuaternionStamped
+                   Ros.Geometry_msgs.Transform
+                   Ros.Geometry_msgs.TransformStamped
+                   Ros.Geometry_msgs.Twist
+                   Ros.Geometry_msgs.TwistStamped
+                   Ros.Geometry_msgs.TwistWithCovariance
+                   Ros.Geometry_msgs.TwistWithCovarianceStamped
+                   Ros.Geometry_msgs.Vector3
+                   Ros.Geometry_msgs.Vector3Stamped
+                   Ros.Geometry_msgs.Wrench
+                   Ros.Geometry_msgs.WrenchStamped
+
+  Build-Depends:   base >= 4.2 && < 6,
+                   vector > 0.7,
+                   time >= 1.1,
+                   data-default-generics >= 0.3,
+                   lens-family-core >= 1.2,
+                   lens-family-th >= 0.4.1,
+                   roshask == 0.3.*,
+                   ROS-std-msgs
+  GHC-Options:     -O2

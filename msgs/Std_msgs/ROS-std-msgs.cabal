@@ -1,0 +1,50 @@
+Name:                ROS-std-msgs
+Version:             0.3
+Synopsis:            ROS Messages from std_msgs
+Cabal-version:       >=1.6
+Category:            Robotics
+Build-type:          Simple
+
+Library
+  Exposed-Modules: Ros.Std_msgs.Bool
+                   Ros.Std_msgs.Byte
+                   Ros.Std_msgs.ByteMultiArray
+                   Ros.Std_msgs.Char
+                   Ros.Std_msgs.ColorRGBA
+                   Ros.Std_msgs.Duration
+                   Ros.Std_msgs.Empty
+                   Ros.Std_msgs.Float32
+                   Ros.Std_msgs.Float32MultiArray
+                   Ros.Std_msgs.Float64
+                   Ros.Std_msgs.Float64MultiArray
+                   Ros.Std_msgs.Header
+                   Ros.Std_msgs.Int16
+                   Ros.Std_msgs.Int16MultiArray
+                   Ros.Std_msgs.Int32
+                   Ros.Std_msgs.Int32MultiArray
+                   Ros.Std_msgs.Int64
+                   Ros.Std_msgs.Int64MultiArray
+                   Ros.Std_msgs.Int8
+                   Ros.Std_msgs.Int8MultiArray
+                   Ros.Std_msgs.MultiArrayDimension
+                   Ros.Std_msgs.MultiArrayLayout
+                   Ros.Std_msgs.String
+                   Ros.Std_msgs.Time
+                   Ros.Std_msgs.UInt16
+                   Ros.Std_msgs.UInt16MultiArray
+                   Ros.Std_msgs.UInt32
+                   Ros.Std_msgs.UInt32MultiArray
+                   Ros.Std_msgs.UInt64
+                   Ros.Std_msgs.UInt64MultiArray
+                   Ros.Std_msgs.UInt8
+                   Ros.Std_msgs.UInt8MultiArray
+
+  Build-Depends:   base >= 4.2 && < 6,
+                   vector > 0.7,
+                   time >= 1.1,
+                   data-default-generics >= 0.3,
+                   lens-family-core >= 1.2,
+                   lens-family-th >= 0.4.1,
+                   roshask == 0.3.*
+
+  GHC-Options:     -O2

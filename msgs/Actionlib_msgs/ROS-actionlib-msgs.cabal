@@ -1,0 +1,21 @@
+Name:                ROS-actionlib-msgs
+Version:             0.3
+Synopsis:            ROS Messages from actionlib_msgs
+Cabal-version:       >=1.6
+Category:            Robotics
+Build-type:          Simple
+
+Library
+  Exposed-Modules: Ros.Actionlib_msgs.GoalID
+                   Ros.Actionlib_msgs.GoalStatus
+                   Ros.Actionlib_msgs.GoalStatusArray
+
+  Build-Depends:   base >= 4.2 && < 6,
+                   vector > 0.7,
+                   time >= 1.1,
+                   data-default-generics >= 0.3,
+                   lens-family-core >= 1.2,
+                   lens-family-th >= 0.4.1,
+                   roshask == 0.3.*,
+                   ROS-std-msgs
+  GHC-Options:     -O2

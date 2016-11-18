@@ -1,0 +1,48 @@
+Name:                ROS-sensor-msgs
+Version:             0.3
+Synopsis:            ROS Messages from sensor_msgs
+Cabal-version:       >=1.6
+Category:            Robotics
+Build-type:          Simple
+
+Library
+  Exposed-Modules: Ros.Sensor_msgs.BatteryState
+                   Ros.Sensor_msgs.CameraInfo
+                   Ros.Sensor_msgs.ChannelFloat32
+                   Ros.Sensor_msgs.CompressedImage
+                   Ros.Sensor_msgs.FluidPressure
+                   Ros.Sensor_msgs.Illuminance
+                   Ros.Sensor_msgs.Image
+                   Ros.Sensor_msgs.Imu
+                   Ros.Sensor_msgs.JointState
+                   Ros.Sensor_msgs.Joy
+                   Ros.Sensor_msgs.JoyFeedback
+                   Ros.Sensor_msgs.JoyFeedbackArray
+                   Ros.Sensor_msgs.LaserEcho
+                   Ros.Sensor_msgs.LaserScan
+                   Ros.Sensor_msgs.MagneticField
+                   Ros.Sensor_msgs.MultiDOFJointState
+                   Ros.Sensor_msgs.MultiEchoLaserScan
+                   Ros.Sensor_msgs.NavSatFix
+                   Ros.Sensor_msgs.NavSatStatus
+                   Ros.Sensor_msgs.PointCloud
+                   Ros.Sensor_msgs.PointCloud2
+                   Ros.Sensor_msgs.PointField
+                   Ros.Sensor_msgs.Range
+                   Ros.Sensor_msgs.RegionOfInterest
+                   Ros.Sensor_msgs.RelativeHumidity
+                   Ros.Sensor_msgs.SetCameraInfoRequest
+                   Ros.Sensor_msgs.SetCameraInfoResponse
+                   Ros.Sensor_msgs.Temperature
+                   Ros.Sensor_msgs.TimeReference
+
+  Build-Depends:   base >= 4.2 && < 6,
+                   vector > 0.7,
+                   time >= 1.1,
+                   data-default-generics >= 0.3,
+                   lens-family-core >= 1.2,
+                   lens-family-th >= 0.4.1,
+                   roshask == 0.3.*,
+                   ROS-std-msgs,
+                   ROS-geometry-msgs
+  GHC-Options:     -O2

@@ -1,0 +1,38 @@
+Name:                ROS-nav-msgs
+Version:             0.3
+Synopsis:            ROS Messages from nav_msgs
+Cabal-version:       >=1.6
+Category:            Robotics
+Build-type:          Simple
+
+Library
+  Exposed-Modules: Ros.Nav_msgs.GetMapAction
+                   Ros.Nav_msgs.GetMapActionFeedback
+                   Ros.Nav_msgs.GetMapActionGoal
+                   Ros.Nav_msgs.GetMapActionResult
+                   Ros.Nav_msgs.GetMapFeedback
+                   Ros.Nav_msgs.GetMapGoal
+                   Ros.Nav_msgs.GetMapRequest
+                   Ros.Nav_msgs.GetMapResponse
+                   Ros.Nav_msgs.GetMapResult
+                   Ros.Nav_msgs.GetPlanRequest
+                   Ros.Nav_msgs.GetPlanResponse
+                   Ros.Nav_msgs.GridCells
+                   Ros.Nav_msgs.MapMetaData
+                   Ros.Nav_msgs.OccupancyGrid
+                   Ros.Nav_msgs.Odometry
+                   Ros.Nav_msgs.Path
+                   Ros.Nav_msgs.SetMapRequest
+                   Ros.Nav_msgs.SetMapResponse
+
+  Build-Depends:   base >= 4.2 && < 6,
+                   vector > 0.7,
+                   time >= 1.1,
+                   data-default-generics >= 0.3,
+                   lens-family-core >= 1.2,
+                   lens-family-th >= 0.4.1,
+                   roshask == 0.3.*,
+                   ROS-std-msgs,
+                   ROS-geometry-msgs,
+                   ROS-actionlib-msgs
+  GHC-Options:     -O2
