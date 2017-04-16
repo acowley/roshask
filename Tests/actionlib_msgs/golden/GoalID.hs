@@ -23,3 +23,4 @@ instance MsgInfo GoalID where
   msgTypeName _ = "actionlib_msgs/GoalID"
 
 instance D.Default GoalID
+

@@ -33,3 +33,4 @@ instance MsgInfo GoalStatusArray where
   msgTypeName _ = "actionlib_msgs/GoalStatusArray"
 
 instance D.Default GoalStatusArray
+

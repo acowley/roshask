@@ -27,3 +27,4 @@ rEMOVE_ALL_ATTACHED_OBJECTS = "\"all\""
 
 eMBEDDED_QUOTES :: P.String
 eMBEDDED_QUOTES = "here \"we\" go"
+
